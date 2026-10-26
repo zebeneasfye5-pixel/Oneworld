@@ -1,0 +1,6 @@
+{
+  "name": "ዓለም አንድ (AlemAnd) - Global Unity & Knowledge Agora",
+  "description": "የአለማችን ህዝቦች የጋራ መሰብሰቢያ፣ የቀጥታ ቪዲዮና ድምፅ ውይይት፣ ራስ-ሰር የቋንቋ ተርጓሚ፣ ዲጂታል እቁብ፣ የበጎ አድራጎት፣ የኤአይ ትምህርት እና የገቢ ማስገኛ መድረክ",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
