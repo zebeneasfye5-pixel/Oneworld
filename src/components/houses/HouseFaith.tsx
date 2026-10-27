@@ -18,8 +18,8 @@ export const HouseFaith: React.FC = () => {
   const [faithGroups] = useState<FaithGroup[]>([
     {
       id: 'fg-1',
-      nameAm: 'የኢትዮጵያ ኦርቶዶክስ ተዋህዶ ትምህርት ቤት',
-      nameEn: 'Ethiopian Orthodox Tewahedo Sacred Fellowship',
+      nameAm: 'የኦርቶዶክስ እምነት ትምህርት ቤት',
+      nameEn: 'Orthodox Sacred Fellowship & Studies',
       symbol: '☦️',
       membersCount: 4820,
       currentLesson: 'ስለ ፍቅር፣ ስለ ትህትና እና ስለ መልካም ስነምግባር በቅዱሳት መጻሕፍት',

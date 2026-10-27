@@ -36,8 +36,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [address, setAddress] = useState(currentUser?.address || 'አዲስ አበባ፣ ኢትዮጵያ');
   const [idNumber, setIdNumber] = useState(currentUser?.idNumber || 'ETH-ID-2026-9814');
   const [roleTitle, setRoleTitle] = useState(currentUser?.roleTitle || 'የሰላምና የዕውቀት አምባሳደር');
+  const [avatarUrl, setAvatarUrl] = useState(currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80');
 
   if (!isOpen) return null;
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setAvatarUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +66,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       address: address.trim(),
       idNumber: idNumber.trim(),
       roleTitle: roleTitle.trim(),
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
+      avatarUrl: avatarUrl,
       verifiedAt: '2026-10-26'
     };
 
@@ -85,6 +99,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Profile Photo Upload */}
+          <div className="flex items-center gap-4 p-3 bg-slate-900/60 border border-slate-800 rounded-2xl">
+            <div className="relative">
+              <img
+                src={avatarUrl}
+                alt="Profile Preview"
+                className="w-16 h-16 rounded-full object-cover border-2 border-indigo-500 shadow-md shadow-indigo-500/20"
+              />
+              <div className="absolute -bottom-1 -right-1 bg-indigo-600 rounded-full p-1 text-white border border-slate-900 shadow">
+                <Camera className="w-3 h-3" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs font-bold text-slate-200 mb-1">
+                የፕሮፋይል ፎቶ (Profile Photo) *
+              </label>
+              <p className="text-[11px] text-slate-400 mb-2">
+                እባክዎ ትክክለኛ የራስዎን ፎቶ ከስልክዎ ወይም ከኮምፒተርዎ ይጫኑ
+              </p>
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/80 hover:bg-indigo-600 text-white rounded-lg text-xs font-semibold cursor-pointer transition shadow">
+                <Camera className="w-3.5 h-3.5" />
+                <span>ፎቶ ይምረጡ / ፎቶ አንሳ</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+          </div>
+
           {/* Phone & Password */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

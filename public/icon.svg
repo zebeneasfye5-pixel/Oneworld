@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0c0f17"/>
+    </radialGradient>
+    <linearGradient id="orbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="100" fill="url(#bgGlow)"/>
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#ringGrad)" stroke-width="8" stroke-dasharray="16 12"/>
+  <circle cx="256" cy="256" r="170" fill="#0f172a" stroke="url(#orbGrad)" stroke-width="12"/>
+  <ellipse cx="256" cy="256" rx="170" ry="70" fill="none" stroke="#10b981" stroke-width="6" opacity="0.6"/>
+  <ellipse cx="256" cy="256" rx="70" ry="170" fill="none" stroke="#fbbf24" stroke-width="6" opacity="0.6"/>
+  <line x1="86" y1="256" x2="426" y2="256" stroke="#38bdf8" stroke-width="6" opacity="0.7"/>
+  <line x1="256" y1="86" x2="256" y2="426" stroke="#6366f1" stroke-width="6" opacity="0.7"/>
+  <path d="M200 170 C220 140 292 140 312 170 C332 200 322 250 292 280 C272 300 232 300 212 280 C182 250 180 200 200 170 Z" fill="url(#orbGrad)" opacity="0.85"/>
+  <circle cx="256" cy="240" r="24" fill="#fef08a"/>
+  <polygon points="256,110 270,146 308,158 280,182 290,220 256,198 222,220 232,182 204,158 242,146" fill="#fbbf24"/>
+</svg>

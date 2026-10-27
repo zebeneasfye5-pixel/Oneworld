@@ -43,7 +43,8 @@ export const AIAcademy: React.FC<AIAcademyProps> = ({ userLang, onEarnRoyalty })
 
   const sampleTopics = [
     'የሰው ሰራሽ አስተውሎት (Artificial Intelligence)',
-    'የኢትዮጵያ ጥንታዊ ስልጣኔና ቅርሶች',
+    'የጥንታዊ አለም ስልጣኔዎችና ቅርሶች',
+    'የሰው ልጅ ጤናና ረጅም እድሜ ሳይንስ (Longevity & Health)',
     'አለም አቀፍ ህግና ጂኦፖለቲክስ',
     'ዘመናዊ የፀሐይ ሀይልና ግብርና',
     'የኳንተም ኮምፒውቲንግ መሰረታዊያን',

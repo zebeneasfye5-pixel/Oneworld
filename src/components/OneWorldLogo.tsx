@@ -96,14 +96,11 @@ export const OneWorldLogo: React.FC<OneWorldLogoProps> = ({
         <div className="flex flex-col text-left">
           <div className="flex items-center gap-1.5 leading-none">
             <span className={`font-black tracking-tight bg-gradient-to-r from-amber-300 via-emerald-300 to-indigo-300 bg-clip-text text-transparent ${currentSize.text}`}>
-              OneWorld
-            </span>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-950/80 text-emerald-400 border border-emerald-500/30">
-              ዓለም አንድ
+              Oneworld
             </span>
           </div>
           <span className={`text-slate-400 font-medium tracking-wide mt-0.5 ${currentSize.sub}`}>
-            የአለም ህዝቦች የጋራ 15ቱ ቤቶች ማህበራዊ ድህረገፅ
+            15ቱ ዋና ዋና ቤቶች ማህበራዊ አጎራ
           </span>
         </div>
       )}

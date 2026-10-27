@@ -53,7 +53,8 @@ export function startSpeechRecognition(
       ar: 'ar-SA',
       fr: 'fr-FR',
       es: 'es-ES',
-      zh: 'zh-CN'
+      zh: 'zh-CN',
+      de: 'de-DE'
     };
 
     recognition.lang = langMap[lang] || 'am-ET';
@@ -125,16 +126,17 @@ export function speakText(text: string, lang: LanguageCode): void {
       ar: 'ar-SA',
       fr: 'fr-FR',
       es: 'es-ES',
-      zh: 'zh-CN'
+      zh: 'zh-CN',
+      de: 'de-DE'
     };
 
     utterance.lang = langVoiceMap[lang] || 'en-US';
-    utterance.rate = 0.95;
+    utterance.rate = 1.0;
     utterance.pitch = 1.0;
 
     // Pick appropriate voice if available
     const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find(v => v.lang.startsWith(utterance.lang.substring(0, 2)));
+    const voice = voices.find(v => v.lang.toLowerCase().startsWith(utterance.lang.substring(0, 2).toLowerCase()));
     if (voice) {
       utterance.voice = voice;
     }
@@ -143,4 +145,24 @@ export function speakText(text: string, lang: LanguageCode): void {
   } catch (e) {
     console.warn('SpeechSynthesis error:', e);
   }
+}
+
+/**
+ * Synchronized Voice Announcement when user changes language
+ */
+export function announceLanguageSwitch(lang: LanguageCode | string): void {
+  const announcements: Record<string, string> = {
+    am: 'ቋንቋ ወደ አማርኛ ተቀይሯል። ወደ Oneworld እንኳን ደህና መጡ!',
+    om: 'Afaan Oromoo filatameera. Baga gara Oneworld dhuftan!',
+    ti: 'ቋንቋ ናብ ትግርኛ ተቐይሩ ኣሎ። ናብ Oneworld እንቋዕ ብደሓን መጻእኹም!',
+    en: 'Language switched to English. Welcome to Oneworld!',
+    fr: 'Langue changée en français. Bienvenue sur Oneworld !',
+    zh: '语言已切换为中文。欢迎来到 Oneworld！',
+    ar: 'تم تغيير اللغة إلى العربية. مرحباً بكم في Oneworld!',
+    es: 'Idioma cambiado a español. ¡Bienvenido a Oneworld!',
+    de: 'Sprache auf Deutsch umgestellt. Willkommen bei Oneworld!'
+  };
+
+  const text = announcements[lang] || announcements.am;
+  speakText(text, lang as LanguageCode);
 }

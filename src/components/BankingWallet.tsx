@@ -294,11 +294,11 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
           <span className="text-[10px] text-slate-500">በህግ የተረጋገጠ መጠባበቂያ</span>
         </div>
 
-        {/* 5% Builder Reserve Vault */}
+        {/* 10% Developer Sovereign Treasury */}
         <div className="p-5 bg-[#101626] border border-slate-800 rounded-2xl shadow-xl flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
-              5% የገንቢው ተቆጣቢ ፈንድ
+              10% ለገንቢው/ድርጅቱ (ዘበነ አስፍዬ)
             </span>
             <Award className="w-4 h-4 text-indigo-400" />
           </div>
@@ -307,10 +307,10 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
               {builderReserveTotal.toLocaleString()} <span className="text-sm font-semibold text-slate-400">ብር</span>
             </div>
             <p className="text-[10px] text-slate-400 mt-0.5">
-              የድህረገፁ ፈጣሪ ሉዓላዊ የልማት ሂሳብ
+              CBE 1000167413618 (በPIN 2026 የተጠበቀ)
             </p>
           </div>
-          <span className="text-[10px] text-slate-500">ለዘላቂ ስርአት ጥገናና ልማት</span>
+          <span className="text-[10px] text-indigo-400 font-semibold">60% አባል · 10% ባንክ · 10% ገንቢ · 20% ማህበረሰብ</span>
         </div>
       </div>
 

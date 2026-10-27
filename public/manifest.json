@@ -1,20 +1,18 @@
 {
-  "short_name": "OneWorld",
-  "name": "OneWorld (ዓለም አንድ) - Global Unity & 15 Houses Social Agora",
-  "description": "የአለማችን ህዝቦች የጋራ 15ቱ ዋና ዋና ቤቶች፣ የቀጥታ ቪዲዮና ድምፅ ውይይት፣ የሰርግ አዳራሽ፣ ፍርድ ቤት፣ የንግድ ማዕከልና የባንክ አገልግሎት። መስራች፡ ዘበነ አስፍዬ",
+  "short_name": "Oneworld",
+  "name": "Oneworld",
+  "id": "/",
+  "description": "Oneworld - የአለማችን ህዝቦች የጋራ 15ቱ ዋና ዋና ቤቶች፣ የቀጥታ ቪዲዮና ድምፅ ውይይት፣ የሰርግ አዳራሽ፣ ፍርድ ቤት፣ የንግድ ማዕከልና የባንክ አገልግሎት። መስራች፡ ዘበነ አስፍዬ",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "/icon-512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any"
     }
   ],
   "start_url": "/",
+  "scope": "/",
   "background_color": "#0c0f17",
   "theme_color": "#0c0f17",
   "display": "standalone",

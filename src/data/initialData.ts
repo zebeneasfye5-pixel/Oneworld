@@ -247,7 +247,8 @@ export const INITIAL_SPEECH_MESSAGES: LiveSpeechMessage[] = [
       ar: 'عندما تجتمع البشرية تحت سقف واحد لتبادل المعرفة والتكنولوجيا والمحبة، يصبح عالمنا جميلاً ومزدهراً.',
       fr: 'Quand l\'humanité se réunit sous un même toit pour échanger savoirs, technologie et fraternité, notre monde s\'épanouit.',
       es: 'Cuando la humanidad se reúne bajo un mismo techo intercambiando conocimiento, tecnología y amor, nuestro mundo prospera.',
-      zh: '当全人类汇聚一堂，交流科技、爱心与文明知识时，我们的世界将变得和平而美好。'
+      zh: '当全人类汇聚一堂，交流科技、爱心与文明知识时，我们的世界将变得和平而美好。',
+      de: 'Wenn die Menschheit unter einem Dach zusammenkommt und Wissen über Technologie, Liebe und Zivilisation austauscht, wird unsere Welt friedlich und schön.'
     },
     timestamp: '10:42 AM',
     seatNumber: 2
@@ -266,7 +267,8 @@ export const INITIAL_SPEECH_MESSAGES: LiveSpeechMessage[] = [
       ar: 'الترجمة الصوتية الفورية أزالت حواجز اللغة في لحظة. أستمع إلى حديث الدكتور زبيني بالإنجليزية دون أي تأخير!',
       fr: 'La traduction vocale instantanée fait disparaître les barrières linguistiques en un éclair!',
       es: 'La traducción de voz instantánea elimina las barreras idiomáticas al instante.',
-      zh: '即时语音翻译瞬间消除了语言障碍。我正在以英语无延迟地聆听演讲！'
+      zh: '即时语音翻译瞬间消除了语言障碍。我正在以英语无延迟地聆听演讲！',
+      de: 'Die automatische Sprachübersetzung überwindet Barrieren sofort. Ich höre Dr. Zebene ohne Verzögerung auf Deutsch!'
     },
     timestamp: '10:44 AM',
     seatNumber: 3

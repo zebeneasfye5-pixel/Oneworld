@@ -69,7 +69,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
               </span>
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              ለድህረገፁ ፈጣሪና ገንቢ ብቻ የተመደበ የ5% ቋሚ የኮሚሽን መዝገብ
+              ለድህረገፁ ፈጣሪና ገንቢ ብቻ የተመደበ የ10% ቋሚ የኮሚሽን መዝገብ
             </p>
           </div>
         </div>
@@ -78,7 +78,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
           <form onSubmit={handleUnlock} className="space-y-4">
             <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-2xl text-xs text-slate-300 space-y-1">
               <span className="font-bold text-amber-400 block mb-1">ጥብቅ የደህንነት ማስጠንቀቂያ፡</span>
-              <p>ይህ ካዝና በ2026 ኮድ የተቆለፈ ሲሆን ለገንቢው የሚገባውን ክፍያ በምስጢር ለመጠበቅ የተዘጋጀ ነው።</p>
+              <p>ይህ ካዝና በ2026 ኮድ የተቆለፈ ሲሆን ለገንቢው የሚገባውን 10% ክፍያ በምስጢር ለመጠበቅ የተዘጋጀ ነው። (60% አባል · 10% ባንክ · 10% ገንቢ · 20% ማህበረሰብ)</p>
             </div>
 
             <div>
@@ -137,7 +137,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
             {/* Total Accrued Commission */}
             <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-950/40 to-slate-900 border border-amber-500/40 text-center space-y-1">
               <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest">
-                የተጠራቀመ የገንቢው 5% ቋሚ ገቢ
+                የተጠራቀመ የገንቢው 10% ቋሚ ገቢ
               </span>
               <div className="text-3xl font-black text-white">
                 {builderReserveETB.toLocaleString()}{' '}

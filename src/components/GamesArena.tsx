@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { GebetaGame } from './GebetaGame';
-import { TriviaQuestion } from '../types';
-import { INITIAL_TRIVIA_QUESTIONS } from '../data/initialData';
+import { DamaTacticsGame } from './games/DamaTacticsGame';
+import { SpeedMathChallenge } from './games/SpeedMathChallenge';
+import { MysteryChestsGame } from './games/MysteryChestsGame';
+import { GlobalUniversalTrivia } from './GlobalUniversalTrivia';
 import confetti from 'canvas-confetti';
 import { 
   Gamepad2, 
@@ -11,22 +13,24 @@ import {
   CheckCircle2, 
   XCircle, 
   Sparkles, 
-  Coins 
+  Coins,
+  Zap,
+  Key,
+  Flame,
+  Award
 } from 'lucide-react';
+
+import { AppLanguage, TRANSLATIONS } from '../i18n/translations';
 
 interface GamesArenaProps {
   onEarnPrize: (amount: number, gameTitle: string) => void;
+  currentLang?: AppLanguage;
 }
 
-export const GamesArena: React.FC<GamesArenaProps> = ({ onEarnPrize }) => {
-  const [activeGameTab, setActiveGameTab] = useState<'gebeta' | 'trivia' | 'wheel'>('gebeta');
+export type GameTabType = 'trivia' | 'gebeta' | 'dama' | 'speedmath' | 'chests' | 'wheel';
 
-  // Trivia state
-  const [currentTriviaIndex, setCurrentTriviaIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [isAnswered, setIsAnswered] = useState(false);
-  const [triviaScore, setTriviaScore] = useState(0);
-  const currentTrivia = INITIAL_TRIVIA_QUESTIONS[currentTriviaIndex];
+export const GamesArena: React.FC<GamesArenaProps> = ({ onEarnPrize, currentLang = 'am' }) => {
+  const [activeGameTab, setActiveGameTab] = useState<GameTabType>('trivia');
 
   // Wheel state
   const [isSpinning, setIsSpinning] = useState(false);
@@ -34,31 +38,13 @@ export const GamesArena: React.FC<GamesArenaProps> = ({ onEarnPrize }) => {
   const [wheelPrizeWon, setWheelPrizeWon] = useState<string | null>(null);
 
   const wheelSegments = [
-    { label: '50 ብር', amount: 50, color: 'bg-emerald-600' },
-    { label: '20 ነጥብ', amount: 20, color: 'bg-amber-600' },
-    { label: '100 ብር', amount: 100, color: 'bg-indigo-600' },
-    { label: 'ነፃ ዙር', amount: 0, color: 'bg-purple-600' },
-    { label: '250 ብር', amount: 250, color: 'bg-teal-600' },
-    { label: 'ጃክፖት 500 ብር', amount: 500, color: 'bg-rose-600' },
+    { label: '50 ብር', amount: 50, color: 'from-emerald-600 to-teal-800' },
+    { label: '20 ነጥብ', amount: 20, color: 'from-amber-600 to-yellow-800' },
+    { label: '100 ብር', amount: 100, color: 'from-indigo-600 to-blue-800' },
+    { label: 'ነፃ ዙር', amount: 0, color: 'from-purple-600 to-indigo-900' },
+    { label: '250 ብር', amount: 250, color: 'from-teal-600 to-emerald-900' },
+    { label: 'ጃክፖት 1,000 ብር', amount: 1000, color: 'from-rose-600 to-red-900' },
   ];
-
-  const handleTriviaAnswer = (index: number) => {
-    if (isAnswered) return;
-    setSelectedOption(index);
-    setIsAnswered(true);
-
-    if (index === currentTrivia.correctIndex) {
-      confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
-      setTriviaScore((prev) => prev + currentTrivia.rewardETB);
-      onEarnPrize(currentTrivia.rewardETB, `የጥያቄና መልስ ድል (${currentTrivia.category})`);
-    }
-  };
-
-  const nextTriviaQuestion = () => {
-    setSelectedOption(null);
-    setIsAnswered(false);
-    setCurrentTriviaIndex((prev) => (prev + 1) % INITIAL_TRIVIA_QUESTIONS.length);
-  };
 
   const handleSpinWheel = () => {
     if (isSpinning) return;
@@ -79,216 +65,164 @@ export const GamesArena: React.FC<GamesArenaProps> = ({ onEarnPrize }) => {
       const won = wheelSegments[chosenIndex];
       setWheelPrizeWon(won.label);
       if (won.amount > 0) {
-        confetti({ particleCount: 80, spread: 80, origin: { y: 0.6 } });
+        confetti({ particleCount: 90, spread: 80, origin: { y: 0.6 } });
         onEarnPrize(won.amount, `የዕድል መንኰራኵር ሽልማት (${won.label})`);
       }
     }, 4000);
   };
 
+  const tabs: { id: GameTabType; label: string; icon: string; badge?: string }[] = [
+    { id: 'trivia', label: 'ገደብ የለሽ እውቀት (Q&A)', icon: '🧠', badge: 'ዘርፈብዙ' },
+    { id: 'gebeta', label: 'ባህላዊ ገበጣ (Gebeta)', icon: '🏺' },
+    { id: 'dama', label: 'የታክቲክ ዳማ (Dama)', icon: '♟️', badge: 'ታክቲክ' },
+    { id: 'speedmath', label: 'ፈጣን ሂሳብ (Speed Math)', icon: '⚡', badge: 'ፈታኝ' },
+    { id: 'chests', label: 'የወርቅ ሳጥኖች (Chests)', icon: '👑', badge: 'እድል' },
+    { id: 'wheel', label: 'የዕድል መንኰራኵር (Wheel)', icon: '🎡' }
+  ];
+
   return (
     <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
       {/* Top Banner */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-amber-950/40 via-indigo-950/30 to-slate-900 border border-slate-800 p-5 rounded-2xl">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-amber-950/40 via-indigo-950/30 to-slate-900 border border-slate-800 p-5 rounded-3xl shadow-xl">
         <div>
           <div className="flex items-center gap-2">
             <Gamepad2 className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-black text-white">
-              የአለም አቀፍ እውቀት ተኮርና ገቢ ማስገኛ ጨዋታዎች ማዕከል
+              የአለም አቀፍ እውቀት ተኮርና ገቢ ማስገኛ ቻሌንጆች ማዕከል
             </h2>
           </div>
           <p className="text-xs text-slate-400 mt-1 max-w-2xl">
-            የአእምሮ ብቃትን፣ ስልጣኔንና ባህልን ከዘመናዊ ገቢ ማስገኛ ስርአት ጋር ያጣመሩ ፈታኝና አዝናኝ ጨዋታዎች
+            የአእምሮ ብቃትን፣ ስልጣኔን፣ ስትራቴጂንና እድልን ከገቢ ማስገኛ ስርአት ጋር ያጣመሩ ፈታኝና እጅግ ተወዳጅ አማራጮች
           </p>
         </div>
 
-        {/* Game tab switch */}
-        <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 p-1.5 rounded-xl">
-          <button
-            onClick={() => setActiveGameTab('gebeta')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeGameTab === 'gebeta'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            ባህላዊ ገበጣ (Gebeta)
-          </button>
-          <button
-            onClick={() => setActiveGameTab('trivia')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeGameTab === 'trivia'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            የጥያቄና መልስ ውድድር (Trivia)
-          </button>
-          <button
-            onClick={() => setActiveGameTab('wheel')}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeGameTab === 'wheel'
-                ? 'bg-amber-500 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            የዕድል መንኰራኵር (Wheel)
-          </button>
+        <div className="flex items-center gap-2 bg-emerald-950/60 border border-emerald-500/40 px-3.5 py-1.5 rounded-xl text-xs font-bold text-emerald-300">
+          <Trophy className="w-4 h-4 text-emerald-400" />
+          <span>እያንዳንዱ ድል ቀጥታ ወደ ሂሳብዎ ይገባል</span>
         </div>
       </div>
 
-      {/* Tab 1: Gebeta Game */}
+      {/* Game Tabs Navigation Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {tabs.map((tab) => {
+          const isActive = activeGameTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveGameTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shadow-md ${
+                isActive
+                  ? 'bg-gradient-to-r from-amber-500 to-emerald-600 text-slate-950 shadow-amber-500/20 scale-105'
+                  : 'bg-slate-900/80 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+              }`}
+            >
+              <span className="text-sm">{tab.icon}</span>
+              <span>{tab.label}</span>
+              {tab.badge && (
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-mono ${
+                  isActive ? 'bg-slate-950 text-amber-300' : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab 1: Boundless Universal Q&A */}
+      {activeGameTab === 'trivia' && (
+        <GlobalUniversalTrivia onEarnPrize={onEarnPrize} userLang={currentLang} />
+      )}
+
+      {/* Tab 2: Gebeta Game */}
       {activeGameTab === 'gebeta' && (
         <GebetaGame onGameWin={(prize) => onEarnPrize(prize, 'የገበጣ ጨዋታ ድል')} />
       )}
 
-      {/* Tab 2: Trivia Battle */}
-      {activeGameTab === 'trivia' && (
-        <div className="bg-[#101626] border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+      {/* Tab 3: Tactical Dama Game */}
+      {activeGameTab === 'dama' && (
+        <DamaTacticsGame onEarnPrize={onEarnPrize} />
+      )}
+
+      {/* Tab 4: Speed Math Challenge */}
+      {activeGameTab === 'speedmath' && (
+        <SpeedMathChallenge onEarnPrize={onEarnPrize} />
+      )}
+
+      {/* Tab 5: Mystery Gold Chests */}
+      {activeGameTab === 'chests' && (
+        <MysteryChestsGame onEarnPrize={onEarnPrize} userBalanceETB={1000} />
+      )}
+
+      {/* Tab 6: Lucky Fortune Wheel */}
+      {activeGameTab === 'wheel' && (
+        <div className="bg-[#101626] border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-800">
             <div>
               <div className="flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-amber-400" />
+                <Disc className="w-5 h-5 text-amber-400" />
                 <h3 className="text-base font-extrabold text-white">
-                  የአለም አቀፍ እውቀት መፈተኛ ውድድር (Global Knowledge Quiz)
+                  የአንድነት ዕድል መንኰራኵር (Mega Fortune Wheel of Unity)
                 </h3>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                ዘርፍ፡ <strong className="text-indigo-400">{currentTrivia.category}</strong> · ሽልማት፡ <strong className="text-emerald-400">{currentTrivia.rewardETB} ብር</strong>
+                መንኰራኵሩን በማሽከርከር እስከ 1,000 ብር ጃክፖትና የሮያሊቲ ነጥቦችን ያሸንፉ!
               </p>
             </div>
-            <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
-              <Trophy className="w-4 h-4 text-amber-400" />
-              <span className="text-slate-400">የተገኘ አጠቃላይ ድል፡</span>
-              <strong className="text-emerald-400 font-bold">{triviaScore} ብር</strong>
-            </div>
-          </div>
-
-          {/* Question Box */}
-          <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
-            <h4 className="text-sm md:text-base font-bold text-white leading-relaxed">
-              {currentTrivia.questionAm}
-            </h4>
-            <p className="text-xs text-slate-400 italic">
-              {currentTrivia.questionEn}
-            </p>
-
-            {/* Options */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-              {currentTrivia.optionsAm.map((opt, i) => {
-                const isSelected = selectedOption === i;
-                const isCorrect = i === currentTrivia.correctIndex;
-
-                let btnStyle = 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-200';
-                if (isAnswered) {
-                  if (isCorrect) {
-                    btnStyle = 'bg-emerald-950/50 border-emerald-500 text-emerald-300 font-bold ring-1 ring-emerald-500';
-                  } else if (isSelected) {
-                    btnStyle = 'bg-red-950/50 border-red-500 text-red-300 font-bold';
-                  } else {
-                    btnStyle = 'bg-slate-950/50 border-slate-800 text-slate-600 opacity-60';
-                  }
-                }
-
-                return (
-                  <button
-                    key={i}
-                    disabled={isAnswered}
-                    onClick={() => handleTriviaAnswer(i)}
-                    className={`p-3.5 rounded-xl border text-left text-xs font-medium transition-all flex items-center justify-between cursor-pointer ${btnStyle}`}
-                  >
-                    <span>{opt}</span>
-                    {isAnswered && isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
-                    {isAnswered && isSelected && !isCorrect && <XCircle className="w-4 h-4 text-red-400" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Answer explanation */}
-            {isAnswered && (
-              <div className="p-3.5 rounded-xl bg-indigo-950/30 border border-indigo-900/50 text-xs text-indigo-200 space-y-1">
-                <div className="font-bold text-indigo-300">ትክክለኛ ማብራሪያ፡</div>
-                <p>{currentTrivia.explanationAm}</p>
-                <div className="pt-2 flex justify-end">
-                  <button
-                    onClick={nextTriviaQuestion}
-                    className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition-colors cursor-pointer"
-                  >
-                    ቀጣይ ጥያቄ (Next Question)
-                  </button>
-                </div>
-              </div>
+            {wheelPrizeWon && (
+              <span className="text-xs font-bold text-amber-400 animate-pulse">
+                ያሸነፉት፡ {wheelPrizeWon}
+              </span>
             )}
           </div>
-        </div>
-      )}
 
-      {/* Tab 3: Spin Wheel of Fortune */}
-      {activeGameTab === 'wheel' && (
-        <div className="bg-[#101626] border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col items-center text-center space-y-6">
-          <div>
-            <div className="flex items-center justify-center gap-2">
-              <Disc className="w-6 h-6 text-amber-400" />
-              <h3 className="text-base font-extrabold text-white">
-                የዕድል መንኰራኵር (Wheel of Destiny & Fortune)
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              መንኰራኵሩን ያሽከርክሩ፤ እስከ <strong>500 ብር</strong> ድረስ ወዲያውኑ ይሸለሙ
-            </p>
-          </div>
+          <div className="flex flex-col items-center justify-center py-8 relative">
+            {/* Pointer Pin */}
+            <div className="w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[24px] border-t-amber-400 z-20 -mb-3 filter drop-shadow"></div>
 
-          {/* Interactive Wheel Graphic */}
-          <div className="relative w-64 h-64 md:w-72 md:h-72 my-4 flex items-center justify-center">
-            {/* Top Indicator Arrow */}
-            <div className="absolute -top-3 z-20 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[22px] border-t-amber-400 filter drop-shadow-lg"></div>
-
-            {/* Rotating Disc */}
+            {/* Wheel Canvas / SVG */}
             <div
-              className="w-full h-full rounded-full border-4 border-amber-500 shadow-2xl overflow-hidden relative"
+              className="w-72 h-72 rounded-full border-4 border-amber-400 shadow-2xl relative overflow-hidden transition-transform ease-out"
               style={{
-                transition: 'transform 4s cubic-bezier(0.15, 0.9, 0.2, 1)',
                 transform: `rotate(${wheelRotation}deg)`,
-                background: 'conic-gradient(#059669 0deg 60deg, #d97706 60deg 120deg, #4f46e5 120deg 180deg, #9333ea 180deg 240deg, #0d9488 240deg 300deg, #e11d48 300deg 360deg)'
+                transitionDuration: isSpinning ? '4s' : '0s'
               }}
             >
-              {wheelSegments.map((seg, idx) => {
-                const rotation = idx * 60 + 30;
+              {wheelSegments.map((seg, i) => {
+                const angle = 360 / wheelSegments.length;
+                const rotateDeg = i * angle;
                 return (
                   <div
-                    key={idx}
-                    className="absolute w-full h-full flex justify-center items-start pt-6 text-[11px] font-black text-white text-shadow select-none pointer-events-none"
+                    key={i}
+                    className={`absolute inset-0 bg-gradient-to-br ${seg.color} flex items-center justify-center text-center`}
                     style={{
-                      transform: `rotate(${rotation}deg)`
+                      clipPath: 'polygon(50% 50%, 0 0, 100% 0)',
+                      transform: `rotate(${rotateDeg}deg)`,
+                      transformOrigin: '50% 50%'
                     }}
                   >
-                    <span>{seg.label}</span>
+                    <span className="text-xs font-black text-white -mt-20 transform -rotate-90">
+                      {seg.label}
+                    </span>
                   </div>
                 );
               })}
+
+              {/* Center Hub */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 rounded-full bg-slate-950 border-2 border-amber-400 flex items-center justify-center text-lg z-10 shadow-lg">
+                👑
+              </div>
             </div>
 
-            {/* Center Peg */}
-            <div className="absolute z-10 w-14 h-14 rounded-full bg-slate-950 border-2 border-amber-400 flex items-center justify-center text-amber-400 font-extrabold text-xs shadow-xl">
-              ዓለም
-            </div>
+            <button
+              onClick={handleSpinWheel}
+              disabled={isSpinning}
+              className="mt-8 px-8 py-3 bg-gradient-to-r from-amber-500 via-emerald-600 to-indigo-600 hover:from-amber-400 text-slate-950 font-black rounded-2xl text-sm shadow-xl shadow-amber-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSpinning ? 'መንኰራኵሩ እየተሽከረከረ ነው...' : 'ዕድልዎን አሽከርክሩ (Spin Now)'}
+            </button>
           </div>
-
-          {/* Prize announcement */}
-          {wheelPrizeWon && (
-            <div className="p-3.5 bg-emerald-950/40 border border-emerald-500/50 rounded-xl text-emerald-300 text-xs font-bold animate-bounce">
-              🎉 እንኳን ደስ አለዎት! <strong>{wheelPrizeWon}</strong> አሸንፈዋል!
-            </div>
-          )}
-
-          {/* Spin Button */}
-          <button
-            disabled={isSpinning}
-            onClick={handleSpinWheel}
-            className="px-8 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-slate-950 font-black text-sm rounded-xl shadow-xl shadow-amber-950 cursor-pointer transition-all transform hover:scale-105"
-          >
-            {isSpinning ? 'እየተሽከረከረ ነው...' : 'መንኰራኵሩን አሽከርክር (Spin Now)'}
-          </button>
         </div>
       )}
     </div>

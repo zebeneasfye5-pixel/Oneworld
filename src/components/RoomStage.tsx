@@ -33,6 +33,7 @@ import {
 } from '../services/speechService';
 import { GiftModal } from './GiftModal';
 import { PersonalRoomModal } from './PersonalRoomModal';
+import { TRANSLATIONS, AppLanguage } from '../i18n/translations';
 
 interface RoomStageProps {
   rooms: Room[];
@@ -67,6 +68,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   userSeatedNumber,
   onAddRoyalty
 }) => {
+  const t = TRANSLATIONS[userLang as AppLanguage] || TRANSLATIONS.am;
   const [isMicOn, setIsMicOn] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
   const [isUsingRealWebcam, setIsUsingRealWebcam] = useState(false);
@@ -161,6 +163,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
       const translatedTi = await translateTextWithGemini(spokenText, userLang, 'ti');
       const translatedEs = await translateTextWithGemini(spokenText, userLang, 'es');
       const translatedZh = await translateTextWithGemini(spokenText, userLang, 'zh');
+      const translatedDe = await translateTextWithGemini(spokenText, userLang, 'de');
 
       const newMsg: LiveSpeechMessage = {
         id: `voice-${Date.now()}`,
@@ -176,7 +179,8 @@ export const RoomStage: React.FC<RoomStageProps> = ({
           ar: translatedAr || spokenText,
           fr: translatedFr || spokenText,
           es: translatedEs || spokenText,
-          zh: translatedZh || spokenText
+          zh: translatedZh || spokenText,
+          de: translatedDe || spokenText
         },
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         seatNumber: userSeatedNumber || 1
@@ -206,6 +210,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
       const translatedTi = await translateTextWithGemini(textToSend, userLang, 'ti');
       const translatedEs = await translateTextWithGemini(textToSend, userLang, 'es');
       const translatedZh = await translateTextWithGemini(textToSend, userLang, 'zh');
+      const translatedDe = await translateTextWithGemini(textToSend, userLang, 'de');
 
       const newMsg: LiveSpeechMessage = {
         id: `text-${Date.now()}`,
@@ -221,7 +226,8 @@ export const RoomStage: React.FC<RoomStageProps> = ({
           ar: translatedAr || textToSend,
           fr: translatedFr || textToSend,
           es: translatedEs || textToSend,
-          zh: translatedZh || textToSend
+          zh: translatedZh || textToSend,
+          de: translatedDe || textToSend
         },
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         seatNumber: userSeatedNumber || 1
@@ -232,6 +238,64 @@ export const RoomStage: React.FC<RoomStageProps> = ({
     } finally {
       setIsTranslating(false);
     }
+  };
+
+  const langFlags: Record<string, string> = {
+    am: '🇪🇹 አማርኛ',
+    om: '🇪🇹 Oromoo',
+    ti: '🇪🇹 ትግርኛ',
+    en: '🇬🇧 English',
+    fr: '🇫🇷 Français',
+    zh: '🇨🇳 中文',
+    ar: '🇸🇦 العربية',
+    de: '🇩🇪 Deutsch'
+  };
+
+  const getRoomTitle = (room: Room) => {
+    if (userLang === 'en' && room.titleEn) return room.titleEn;
+    if (userLang === 'om') {
+      if (room.id === 'room-1') return 'Waltajjii Yaada Gaarii fi Nageenya Addunyaa';
+      if (room.id === 'room-2') return 'Beekumsa Teeknolojii, AI fi Qaroomina Kalaqaa';
+      if (room.id === 'room-3') return 'Yaada Siyaasaa, Diinagdee fi Qoodiinsa Qabeenyaa';
+      if (room.id === 'room-4') return 'Hojii Tola Ooltummaa fi Gargaarsa Namoomaa';
+    }
+    if (userLang === 'ti') {
+      if (room.id === 'room-1') return 'ሓፈሻዊ ጽቡቕ ኣተሓሳስባን ዓለምለኸ ሰላምን';
+      if (room.id === 'room-2') return 'ቴክኖሎጂ፣ AIን ስልጣነ ፈጠራን';
+      if (room.id === 'room-3') return 'ፖለቲካዊን ቁጠባዊን ሓሳብን ፍትሓዊ ምክፍፋል ጸጋታትን';
+      if (room.id === 'room-4') return 'መረብ ገበርቲ ሰናይን ሰብኣዊ ሓገዝን';
+    }
+    if (userLang === 'fr') {
+      if (room.id === 'room-1') return 'Agora Mondiale de la Bienveillance et de la Paix';
+      if (room.id === 'room-2') return 'Frontière Technologique, IA et Civilisation Innovante';
+      if (room.id === 'room-3') return 'Pensée Politique & Économique et Équité Mondiale';
+      if (room.id === 'room-4') return 'Réseau Mondial de Solidarité et d\'Aide Humanitaire';
+    }
+    if (userLang === 'zh') {
+      if (room.id === 'room-1') return '全球善念与世界和平议会';
+      if (room.id === 'room-2') return '科技前沿、AI与人类创新文明';
+      if (room.id === 'room-3') return '政治与经济思潮及全球财富公平';
+      if (room.id === 'room-4') return '全人类慈善互助与人道关怀网络';
+    }
+    if (userLang === 'ar') {
+      if (room.id === 'room-1') return 'مجلس الفكر الإيجابي والسلام العالمي المشترك';
+      if (room.id === 'room-2') return 'آفاق التكنولوجيا والذكاء الاصطناعي والحضارة الإنسانية';
+      if (room.id === 'room-3') return 'الفكر السياسي والاقتصادي والعدالة العالمية';
+      if (room.id === 'room-4') return 'شبكة التكافل الإنساني والعمل الخيري العالمي';
+    }
+    if (userLang === 'de') {
+      if (room.id === 'room-1') return 'Weltweite Agora für Wohlwollen und globalen Frieden';
+      if (room.id === 'room-2') return 'Technologie-Zukunft, KI & innovative Zivilisation';
+      if (room.id === 'room-3') return 'Politisches & ökonomisches Denken für Gerechtigkeit';
+      if (room.id === 'room-4') return 'Globales Netzwerk für Philanthropie & humanitäre Hilfe';
+    }
+    return room.titleEn && userLang !== 'am' ? room.titleEn : room.titleAm;
+  };
+
+  const getRoomDesc = (room: Room) => {
+    if (userLang === 'en' && room.descriptionEn) return room.descriptionEn;
+    if (userLang !== 'am' && room.descriptionEn) return room.descriptionEn;
+    return room.descriptionAm;
   };
 
   const filteredRooms = activeTabCategory === 'all'
@@ -264,7 +328,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 : 'text-slate-400 hover:text-white bg-slate-800/40'
             }`}
           >
-            ሁሉም አዳራሾች (All Halls)
+            {t.roomStage.allHalls}
           </button>
           <button
             onClick={() => setActiveTabCategory('philosophy')}
@@ -274,7 +338,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 : 'text-slate-400 hover:text-white bg-slate-800/40'
             }`}
           >
-            መልካም አስተሳሰብ
+            {t.roomStage.philosophy}
           </button>
           <button
             onClick={() => setActiveTabCategory('tech')}
@@ -284,7 +348,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 : 'text-slate-400 hover:text-white bg-slate-800/40'
             }`}
           >
-            ቴክኖሎጂና AI
+            {t.roomStage.tech}
           </button>
           <button
             onClick={() => setActiveTabCategory('politics')}
@@ -294,7 +358,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 : 'text-slate-400 hover:text-white bg-slate-800/40'
             }`}
           >
-            ፓለቲካና ኢኮኖሚ
+            {t.roomStage.politics}
           </button>
           <button
             onClick={() => setActiveTabCategory('charity')}
@@ -304,7 +368,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 : 'text-slate-400 hover:text-white bg-slate-800/40'
             }`}
           >
-            በጎ አድራጎት
+            {t.roomStage.charity}
           </button>
           <button
             onClick={() => setActiveTabCategory('community')}
@@ -314,7 +378,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 : 'text-slate-400 hover:text-white bg-slate-800/40'
             }`}
           >
-            የአባላት የግል ቤቶች
+            {t.roomStage.community}
           </button>
         </div>
 
@@ -324,7 +388,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
           className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-indigo-950 cursor-pointer whitespace-nowrap"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>የግል አዳራሽ ክፈት (Open Sub-Hall)</span>
+          <span>{t.roomStage.openSubHall}</span>
         </button>
       </div>
 
@@ -349,15 +413,15 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 {room.isLive && (
                   <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded-full">
                     <Radio className="w-2.5 h-2.5 animate-pulse text-emerald-400" />
-                    በቀጥታ (Live)
+                    {t.chairs.liveBadge}
                   </span>
                 )}
               </div>
               <h4 className="text-xs font-bold text-white line-clamp-1 mb-1">
-                {room.titleAm}
+                {getRoomTitle(room)}
               </h4>
               <p className="text-[11px] text-slate-400 line-clamp-2 mb-2">
-                {room.descriptionAm}
+                {getRoomDesc(room)}
               </p>
               <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-800/60">
                 <div className="flex items-center gap-1.5">
@@ -368,7 +432,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   />
                   <span className="truncate max-w-[110px] text-slate-300">{room.hostName}</span>
                 </div>
-                <span>{room.totalAudience.toLocaleString()} ተሳታፊ</span>
+                <span>{room.totalAudience.toLocaleString()} {t.chairs.audienceCount}</span>
               </div>
             </div>
           );
@@ -387,11 +451,11 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
                   <h2 className="text-base font-extrabold text-white">
-                    {currentRoom.titleAm}
+                    {getRoomTitle(currentRoom)}
                   </h2>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  አስተናጋጅ፡ <strong className="text-amber-300">{currentRoom.hostName}</strong> · {currentRoom.topics.join(' · ')}
+                  {t.chairs.hostLabel} <strong className="text-amber-300">{currentRoom.hostName}</strong> · {currentRoom.topics.join(' · ')}
                 </p>
               </div>
 
@@ -406,7 +470,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   }`}
                 >
                   <Hand className="w-3.5 h-3.5" />
-                  <span>{handRaised ? 'እጅ ዝቅ አድርግ' : 'እጅ አውጣ (Raise Hand)'}</span>
+                  <span>{handRaised ? t.chairs.lowerHand : t.chairs.raiseHand}</span>
                 </button>
               </div>
             </div>
@@ -422,25 +486,25 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 <div className="relative z-10 flex items-center justify-between">
                   <span className="flex items-center gap-1 bg-amber-500/90 text-slate-950 font-bold text-[10px] px-2 py-0.5 rounded">
                     <Award className="w-3 h-3" />
-                    የመድረክ መሪ (Host) · ወንበር #2
+                    {t.chairs.host} · #{2}
                   </span>
                   <span className="bg-black/60 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded font-medium flex items-center gap-1">
-                    🇪🇹 አማርኛ (Amharic)
+                    {langFlags[userLang] || 'Oneworld'}
                   </span>
                 </div>
 
                 {/* Soundwave active speaking animation */}
                 <div className="relative z-10 flex items-end justify-between">
                   <div>
-                    <h4 className="text-white font-bold text-xs">ዶ/ር ዘበነ አስፋው (Host)</h4>
-                    <p className="text-[10px] text-amber-300">የሰላም አምባሳደር</p>
+                    <h4 className="text-white font-bold text-xs">{currentRoom.hostName}</h4>
+                    <p className="text-[10px] text-amber-300">{t.chairs.leadSpeaker}</p>
                   </div>
                   <div className="flex items-center gap-1 bg-black/60 px-2 py-1 rounded">
                     <div className="w-1 bg-emerald-400 animate-soundwave-1"></div>
                     <div className="w-1 bg-emerald-400 animate-soundwave-2"></div>
                     <div className="w-1 bg-emerald-400 animate-soundwave-3"></div>
                     <div className="w-1 bg-emerald-400 animate-soundwave-4"></div>
-                    <span className="text-[10px] text-emerald-400 font-bold ml-1">እየተናገረ ነው</span>
+                    <span className="text-[10px] text-emerald-400 font-bold ml-1">{t.chairs.speakingNow}</span>
                   </div>
                 </div>
               </div>
@@ -466,7 +530,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 ) : (
                   <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-slate-500">
                     <VideoOff className="w-8 h-8 mb-2" />
-                    <span className="text-xs">ካሜራ ጠፍቷል (Camera Off)</span>
+                    <span className="text-xs">{t.chairs.camOff}</span>
                   </div>
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-black/40"></div>
@@ -474,18 +538,18 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 {/* Top overlay */}
                 <div className="relative z-10 flex items-center justify-between">
                   <span className="bg-indigo-600/90 text-white font-bold text-[10px] px-2 py-0.5 rounded">
-                    {userSeatedNumber ? `እርስዎ በወንበር #${userSeatedNumber}` : 'እርስዎ (ተሳታፊ)'}
+                    {userSeatedNumber ? `${t.chairs.youOnSeat}${userSeatedNumber}` : t.chairs.youParticipant}
                   </span>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setIsUsingRealWebcam(!isUsingRealWebcam)}
                       className="bg-black/70 hover:bg-black text-[10px] text-slate-300 px-2 py-0.5 rounded border border-slate-700 cursor-pointer"
-                      title="ቀጥታ ዌብካም ቀይር (Toggle Webcam)"
+                      title={t.chairs.toggleWebcam}
                     >
-                      {isUsingRealWebcam ? 'HD አቫታር' : 'ቀጥታ ዌብካም'}
+                      {isUsingRealWebcam ? t.chairs.avatarMode : t.chairs.toggleWebcam}
                     </button>
                     <span className="bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded">
-                      🇪🇹 አማርኛ
+                      {langFlags[userLang] || 'Oneworld'}
                     </span>
                   </div>
                 </div>
@@ -493,19 +557,19 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 {/* Bottom audio indicator */}
                 <div className="relative z-10 flex items-end justify-between">
                   <div>
-                    <h4 className="text-white font-bold text-xs">እርስዎ (You - User)</h4>
-                    <p className="text-[10px] text-indigo-300">ተሳታፊ አባል</p>
+                    <h4 className="text-white font-bold text-xs">{t.chairs.you}</h4>
+                    <p className="text-[10px] text-indigo-300">{t.chairs.activeMember}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {isMicOn ? (
                       <span className="flex items-center gap-1 bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-[10px] px-2 py-0.5 rounded">
                         <Mic className="w-3 h-3 text-emerald-400" />
-                        ማይክ በርቷል
+                        {t.chairs.micLive}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 bg-red-950/80 border border-red-500/50 text-red-300 text-[10px] px-2 py-0.5 rounded">
                         <MicOff className="w-3 h-3 text-red-400" />
-                        ድምፅ ተዘግቷል
+                        {t.chairs.micMuted}
                       </span>
                     )}
                   </div>
@@ -526,7 +590,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   }`}
                 >
                   {isMicOn ? <Mic className="w-4 h-4 text-white animate-pulse" /> : <MicOff className="w-4 h-4 text-red-400" />}
-                  <span>{isMicOn ? 'ማይክ ዝጋ (Mute)' : 'ማይክ ክፈት (Unmute)'}</span>
+                  <span>{isMicOn ? t.roomStage.micMute : t.roomStage.micUnmute}</span>
                 </button>
 
                 {/* Camera Button */}
@@ -539,7 +603,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   }`}
                 >
                   {isVideoOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4 text-red-400" />}
-                  <span>{isVideoOn ? 'ካሜራ ዝጋ' : 'ካሜራ ክፈት'}</span>
+                  <span>{isVideoOn ? t.roomStage.camClose : t.roomStage.camOpen}</span>
                 </button>
               </div>
 
@@ -551,7 +615,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-red-950/50 hover:text-red-300 text-slate-300 border border-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                   >
                     <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>ወንበር #{userSeatedNumber} ልቀቅ (Leave Seat)</span>
+                    <span>#{userSeatedNumber} {t.roomStage.leaveTheSeat}</span>
                   </button>
                 ) : (
                   <button
@@ -559,7 +623,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     className="flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-lg text-xs font-bold transition-all shadow-md shadow-amber-950 cursor-pointer"
                   >
                     <UserCheck className="w-3.5 h-3.5" />
-                    <span>ወንበር ያዙ (Take a Seat)</span>
+                    <span>{t.roomStage.takeASeat}</span>
                   </button>
                 )}
 
@@ -573,23 +637,23 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                 >
                   <Gift className="w-3.5 h-3.5 text-amber-400" />
-                  <span>ስጦታ ላክ</span>
+                  <span>{t.roomStage.sendGift}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Numbered Chairs Section (በቁጥራቸው ያልተገደቡ ወንበሮች) */}
+          {/* Numbered Chairs Section */}
           <div className="bg-[#0e1320] border border-slate-800 rounded-2xl p-5 shadow-xl">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <Layers className="w-4 h-4 text-amber-400" />
                 <h3 className="text-sm font-extrabold text-white">
-                  የአዳራሹ የተራ ቁጥር ወንበሮች (Hall Numbered Chairs)
+                  {t.roomStage.numberedChairs}
                 </h3>
               </div>
               <span className="text-[11px] text-slate-400">
-                የተያዙ ወንበሮች፡ <strong className="text-amber-400">{occupants.length}</strong> / 24
+                {t.chairs.occupiedChairs} <strong className="text-amber-400">{occupants.length}</strong> / 24
               </span>
             </div>
 
@@ -655,7 +719,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       <div className="w-8 h-8 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-slate-600 mb-1">
                         +
                       </div>
-                      <span className="text-[10px] text-slate-400 font-medium">ክፍት ወንበር</span>
+                      <span className="text-[10px] text-slate-400 font-medium">{t.chairs.openSeat}</span>
                     </div>
                   )}
                 </div>
@@ -672,10 +736,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               <Globe2 className="w-4 h-4 text-emerald-400" />
               <div>
                 <h3 className="text-xs font-extrabold text-white">
-                  አውቶማቲክ የቀጥታ ቋንቋ ተርጓሚ (Live Speech Translation)
+                  {t.announcements.liveTranslatorTitle}
                 </h3>
                 <p className="text-[10px] text-slate-400">
-                  ማንኛውም ሰው በራሱ ቋንቋ ሲናገር በራስዎ ቋንቋ ወዲያው ይሰማሉ
+                  {t.announcements.liveTranslatorSubtitle}
                 </p>
               </div>
             </div>
@@ -685,7 +749,6 @@ export const RoomStage: React.FC<RoomStageProps> = ({
           <div className="flex-1 p-4 overflow-y-auto space-y-3.5 text-xs">
             {messages.map((msg) => {
               const translatedDisplay = msg.translations[userLang] || msg.originalText;
-              const isAmharic = userLang === 'am';
 
               return (
                 <div
@@ -707,7 +770,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       <button
                         onClick={() => speakText(translatedDisplay, userLang)}
                         className="p-1 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded cursor-pointer"
-                        title="በትርጉም ድምፅ ያዳምጡ (Speak Translation)"
+                        title={t.announcements.speakTranslation}
                       >
                         <Volume2 className="w-3.5 h-3.5" />
                       </button>
@@ -717,7 +780,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   {/* Translated text prominently */}
                   <div className="p-2 rounded-lg bg-emerald-950/20 border border-emerald-900/40 text-emerald-200 font-medium leading-relaxed">
                     <div className="text-[9px] uppercase tracking-wider text-emerald-400 font-bold mb-0.5">
-                      {isAmharic ? 'የቀጥታ ትርጉም (ወደ አማርኛ)፡' : `Live Translation (${userLang.toUpperCase()}):`}
+                      {t.announcements.liveTranslationTo}
                     </div>
                     "{translatedDisplay}"
                   </div>
@@ -725,7 +788,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   {/* Original text quiet */}
                   {msg.sourceLang !== userLang && (
                     <div className="text-[10px] text-slate-400 italic">
-                      የመጀመሪያ ንግግር ({msg.sourceLang.toUpperCase()}): "{msg.originalText}"
+                      {t.announcements.originalSpeech} ({msg.sourceLang.toUpperCase()}): "{msg.originalText}"
                     </div>
                   )}
                 </div>
@@ -740,7 +803,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  placeholder="በራስዎ ቋንቋ ይፃፉ... (Type in your language, auto-translates to world)"
+                  placeholder={t.roomStage.inputPlaceholder}
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   className="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
@@ -784,6 +847,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         onClose={() => setIsGiftModalOpen(false)}
         recipient={selectedRecipient}
         userBalanceETB={userBalanceETB}
+        userLang={userLang}
         onSendGift={(gift, recipient) => {
           onSendGift(gift, recipient);
           setIsGiftModalOpen(false);

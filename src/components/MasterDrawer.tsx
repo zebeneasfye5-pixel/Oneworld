@@ -80,21 +80,21 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
   if (!isOpen) return null;
 
   const housesList: { id: HouseId; num: number; icon: any; title: string; desc: string; tag: string }[] = [
-    { id: 'h1', num: 1, icon: Home, title: t.houses.h1.title, desc: t.houses.h1.desc, tag: 'ክፍት' },
-    { id: 'h2', num: 2, icon: Users, title: t.houses.h2.title, desc: t.houses.h2.desc, tag: 'ውልድና' },
-    { id: 'h3', num: 3, icon: ShieldAlert, title: t.houses.h3.title, desc: t.houses.h3.desc, tag: 'መሪነት' },
-    { id: 'h4', num: 4, icon: HeartHandshake, title: t.houses.h4.title, desc: t.houses.h4.desc, tag: 'ሚስጥር' },
-    { id: 'h5', num: 5, icon: Sparkles, title: t.houses.h5.title, desc: t.houses.h5.desc, tag: 'ሰርግ' },
-    { id: 'h6', num: 6, icon: BookOpen, title: t.houses.h6.title, desc: t.houses.h6.desc, tag: 'እምነት' },
-    { id: 'h7', num: 7, icon: ShieldCheck, title: t.houses.h7.title, desc: t.houses.h7.desc, tag: 'ደህንነት' },
-    { id: 'h8', num: 8, icon: Flame, title: t.houses.h8.title, desc: t.houses.h8.desc, tag: 'ታለንት' },
-    { id: 'h9', num: 9, icon: Store, title: t.houses.h9.title, desc: t.houses.h9.desc, tag: 'ገበያ' },
-    { id: 'h10', num: 10, icon: GraduationCap, title: t.houses.h10.title, desc: t.houses.h10.desc, tag: 'ትምህርት' },
-    { id: 'h11', num: 11, icon: Briefcase, title: t.houses.h11.title, desc: t.houses.h11.desc, tag: 'ስልጠና' },
-    { id: 'h12', num: 12, icon: Brain, title: t.houses.h12.title, desc: t.houses.h12.desc, tag: 'ሳይኮሎጂ' },
-    { id: 'h13', num: 13, icon: Compass, title: t.houses.h13.title, desc: t.houses.h13.desc, tag: 'ድለላ' },
-    { id: 'h14', num: 14, icon: Scale, title: t.houses.h14.title, desc: t.houses.h14.desc, tag: 'ዳኝነት' },
-    { id: 'h15', num: 15, icon: Receipt, title: t.houses.h15.title, desc: t.houses.h15.desc, tag: 'ክፍያ' },
+    { id: 'h1', num: 1, icon: Home, title: t.houses.h1.title, desc: t.houses.h1.desc, tag: t.drawer.tags.h1 || '1' },
+    { id: 'h2', num: 2, icon: Users, title: t.houses.h2.title, desc: t.houses.h2.desc, tag: t.drawer.tags.h2 || '2' },
+    { id: 'h3', num: 3, icon: ShieldAlert, title: t.houses.h3.title, desc: t.houses.h3.desc, tag: t.drawer.tags.h3 || '3' },
+    { id: 'h4', num: 4, icon: HeartHandshake, title: t.houses.h4.title, desc: t.houses.h4.desc, tag: t.drawer.tags.h4 || '4' },
+    { id: 'h5', num: 5, icon: Sparkles, title: t.houses.h5.title, desc: t.houses.h5.desc, tag: t.drawer.tags.h5 || '5' },
+    { id: 'h6', num: 6, icon: BookOpen, title: t.houses.h6.title, desc: t.houses.h6.desc, tag: t.drawer.tags.h6 || '6' },
+    { id: 'h7', num: 7, icon: ShieldCheck, title: t.houses.h7.title, desc: t.houses.h7.desc, tag: t.drawer.tags.h7 || '7' },
+    { id: 'h8', num: 8, icon: Flame, title: t.houses.h8.title, desc: t.houses.h8.desc, tag: t.drawer.tags.h8 || '8' },
+    { id: 'h9', num: 9, icon: Store, title: t.houses.h9.title, desc: t.houses.h9.desc, tag: t.drawer.tags.h9 || '9' },
+    { id: 'h10', num: 10, icon: GraduationCap, title: t.houses.h10.title, desc: t.houses.h10.desc, tag: t.drawer.tags.h10 || '10' },
+    { id: 'h11', num: 11, icon: Briefcase, title: t.houses.h11.title, desc: t.houses.h11.desc, tag: t.drawer.tags.h11 || '11' },
+    { id: 'h12', num: 12, icon: Brain, title: t.houses.h12.title, desc: t.houses.h12.desc, tag: t.drawer.tags.h12 || '12' },
+    { id: 'h13', num: 13, icon: Compass, title: t.houses.h13.title, desc: t.houses.h13.desc, tag: t.drawer.tags.h13 || '13' },
+    { id: 'h14', num: 14, icon: Scale, title: t.houses.h14.title, desc: t.houses.h14.desc, tag: t.drawer.tags.h14 || '14' },
+    { id: 'h15', num: 15, icon: Receipt, title: t.houses.h15.title, desc: t.houses.h15.desc, tag: t.drawer.tags.h15 || '15' },
   ];
 
   const filteredHouses = housesList.filter(
@@ -149,7 +149,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
             }}
             className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold rounded-lg border border-slate-700 cursor-pointer"
           >
-            መገለጫ (Profile)
+            {t.header.profile}
           </button>
         </div>
 
@@ -159,7 +159,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="ቤቶችን በስም ወይም በቁጥር ፈልግ (1-15)..."
+              placeholder={t.drawer.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
@@ -170,7 +170,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
         {/* 15 Houses List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            15ቱ ዋና ዋና ቤቶች በቅደም ተከተል (Houses 1-15)
+            {t.drawer.housesHeading}
           </div>
 
           {filteredHouses.map((house) => {
@@ -229,7 +229,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
           >
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-amber-400" />
-              <span>የገንቢው ሚስጥራዊ ካዝና (PIN 2026)</span>
+              <span>{t.announcements.vaultBtn}</span>
             </div>
             <span className="text-[10px] font-mono bg-amber-900/60 px-1.5 py-0.5 rounded">
               CBE 1000167413618
@@ -245,7 +245,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
             className="w-full flex items-center gap-2 p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors"
           >
             <BookOpen className="w-4 h-4 text-indigo-400" />
-            <span>የመድረኩ ህግ፣ ደንብና አመሰራረት (Charter)</span>
+            <span>{t.announcements.charterBtn}</span>
           </button>
 
           {/* Install PWA Button */}
@@ -255,7 +255,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
               className="w-full flex items-center justify-center gap-2 p-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white font-bold rounded-xl text-xs shadow-md cursor-pointer transition-colors"
             >
               <Smartphone className="w-4 h-4" />
-              <span>መተግበሪያውን ወደ ስልክ ጫን (Install PWA)</span>
+              <span>{t.installApp}</span>
             </button>
           )}
 
@@ -263,9 +263,9 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
           <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
             <span className="flex items-center gap-1 text-emerald-400">
               <CheckCircle2 className="w-3 h-3" />
-              ከኢንተርኔት ውጭ ይሰራል (Offline Ready)
+              {t.announcements.offlineReadyNotice}
             </span>
-            <span>መስራች፡ ዘበነ አስፍዬ (2026)</span>
+            <span>{t.announcements.founderNotice}</span>
           </div>
         </div>
       </div>

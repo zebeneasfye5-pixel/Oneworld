@@ -34,7 +34,8 @@ export async function translateTextWithGemini(
     ar: 'Arabic',
     fr: 'French',
     es: 'Spanish',
-    zh: 'Mandarin Chinese'
+    zh: 'Mandarin Chinese',
+    de: 'German'
   };
 
   // If Gemini client is active, use gemini-3.8-flash for rapid, accurate translation
@@ -67,17 +68,19 @@ Original text:
       ar: 'السلام عليكم جميعاً',
       fr: 'Paix et salutations à vous tous',
       es: 'Paz y saludos a todos ustedes',
-      zh: '愿和平与问候与大家同在'
+      zh: '愿和平与问候与大家同在',
+      de: 'Friede und Grüße an euch alle'
     },
     'እንኳን ወደ አለም አንድ መድረክ በደህና መጣችሁ': {
       am: 'እንኳን ወደ አለም አንድ መድረክ በደህና መጣችሁ',
-      en: 'Welcome to the AlemAnd Global Unity Agora',
-      om: 'Baga gara waltajjii AlemAnd nagaan dhuftan',
-      ti: 'እንቋዕ ናብ ኣለም አንድ መድረኽ ብሰላም መጻእኹም',
-      ar: 'مرحباً بكم في منصة AlemAnd للوحدة العالمية',
-      fr: 'Bienvenue sur la plateforme AlemAnd pour l\'unité mondiale',
-      es: 'Bienvenidos a la plataforma AlemAnd para la unidad global',
-      zh: '欢迎来到 AlemAnd 全球团结大会堂'
+      en: 'Welcome to the Oneworld Global Unity Agora',
+      om: 'Baga gara waltajjii Oneworld nagaan dhuftan',
+      ti: 'እንቋዕ ናብ Oneworld መድረኽ ብሰላም መጻእኹም',
+      ar: 'مرحباً بكم في منصة Oneworld للوحدة العالمية',
+      fr: 'Bienvenue sur la plateforme Oneworld pour l\'unité mondiale',
+      es: 'Bienvenidos a la plataforma Oneworld para la unidad global',
+      zh: '欢迎来到 Oneworld 全球团结大会堂',
+      de: 'Willkommen in der Oneworld Versammlung'
     },
     'ቴክኖሎጂን ለሰው ልጅ አንድነት እና ለድህነት ቅነሳ እናውለው': {
       am: 'ቴክኖሎጂን ለሰው ልጅ አንድነት እና ለድህነት ቅነሳ እናውለው',
@@ -87,7 +90,8 @@ Original text:
       ar: 'دعونا نستخدم التكنولوجيا لوحدة الإنسانية والحد من الفقر',
       fr: 'Utilisons la technologie pour l\'unité humaine et la réduction de la pauvreté',
       es: 'Usemos la tecnología para la unidad humana y la erradicación de la pobreza',
-      zh: '让我们利用技术促进人类团结并消除贫困'
+      zh: '让我们利用技术促进人类团结并消除贫困',
+      de: 'Lasst uns Technologie für menschliche Einheit und Armutsbekämpfung einsetzen'
     }
   };
 

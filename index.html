@@ -1,26 +1,69 @@
 <!doctype html>
-<html lang="en">
+<html lang="am" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>OneWorld (ዓለም አንድ) - 15ቱ ዋና ዋና ቤቶች ማህበራዊ መድረክ | መስራች ዘበነ አስፍዬ</title>
-    <meta name="description" content="OneWorld (ዓለም አንድ) - የአለማችን ህዝቦች የጋራ 15ቱ ዋና ዋና ቤቶች፣ የቀጥታ ቪዲዮና ድምፅ ውይይት፣ የሰርግ አዳራሽ፣ ፍርድ ቤት፣ የንግድ ማዕከልና የባንክ አገልግሎት። መስራች፡ ዘበነ አስፍዬ" />
-    <meta property="og:title" content="OneWorld (ዓለም አንድ) - Global Unity Agora | መስራች ዘበነ አስፍዬ" />
-    <meta property="og:description" content="OneWorld (ዓለም አንድ) - የአለማችን ህዝቦች የጋራ 15ቱ ዋና ዋና ቤቶች፣ የቀጥታ ቪዲዮና ድምፅ ውይይት፣ የሰርግ አዳራሽ፣ ፍርድ ቤት፣ የንግድ ማዕከልና የባንክ አገልግሎት። መስራች፡ ዘበነ አስፍዬ" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Oneworld</title>
+    <meta name="description" content="Oneworld" />
+    <meta property="og:title" content="Oneworld" />
+    <meta property="og:description" content="Oneworld - የ15ቱ ዋና ዋና ቤቶች ማህበራዊና የቴክኖሎጂ አጎራ" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="theme-color" content="#0c0f17" />
+    <meta name="color-scheme" content="dark" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Oneworld" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Non-blocking font loading with system fallbacks for weak/offline networks -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap">
+    </noscript>
+
+    <style>
+      /* Ensure base background is always dark so user never sees a white screen */
+      html, body {
+        background-color: #0c0f17;
+        color: #f1f5f9;
+        margin: 0;
+        padding: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Ethiopic", Helvetica, Arial, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        overflow-x: hidden;
+      }
+    </style>
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="bg-[#0c0f17] text-slate-100 antialiased selection:bg-amber-500 selection:text-slate-950">
+    <div id="root">
+      <!-- Instant Mobile Pre-render Shell to eliminate white screen -->
+      <div style="min-height: 100vh; background-color: #0c0f17; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; color: #f8fafc;">
+        <div style="width: 58px; height: 58px; border-radius: 50%; border: 3px solid rgba(245, 158, 11, 0.2); border-top-color: #f59e0b; animation: owSpin 0.7s linear infinite; margin-bottom: 20px;"></div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <h1 style="font-size: 26px; font-weight: 900; letter-spacing: -0.5px; margin: 0; background: linear-gradient(to right, #fbbf24, #10b981, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Oneworld</h1>
+        </div>
+        <p style="font-size: 13px; color: #94a3b8; margin: 0; font-weight: 500;">በከፍተኛ ፍጥነት በመከፈት ላይ... እባክዎ ይጠብቁ</p>
+        <style>
+          @keyframes owSpin { to { transform: rotate(360deg); } }
+        </style>
+      </div>
+    </div>
+    
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Register Offline Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>
-

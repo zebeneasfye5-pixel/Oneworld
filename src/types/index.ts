@@ -1,4 +1,4 @@
-export type LanguageCode = 'am' | 'en' | 'om' | 'ti' | 'ar' | 'fr' | 'es' | 'zh';
+export type LanguageCode = 'am' | 'en' | 'om' | 'ti' | 'ar' | 'fr' | 'es' | 'zh' | 'de';
 
 export interface SupportedLanguage {
   code: LanguageCode;

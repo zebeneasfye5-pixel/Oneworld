@@ -254,30 +254,38 @@ export const EqubAndLottery: React.FC<EqubAndLotteryProps> = ({
               </div>
             )}
 
-            {/* Financial Split Breakdown Visual */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Financial Split Breakdown Visual (60/10/10/20) */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-                <span className="text-[10px] text-emerald-400 font-bold">ለአሸናፊው የሚከፈል (85%)</span>
+                <span className="text-[10px] text-emerald-400 font-bold">ለአሸናፊው/አባሉ (60%)</span>
                 <div className="text-base font-black text-white mt-1">
-                  {activePool.netWinnerPayout85Percent.toLocaleString()} {activePool.currency}
+                  {Math.round(activePool.amountPerMember * activePool.maxMembers * 0.60).toLocaleString()} {activePool.currency}
                 </div>
-                <p className="text-[10px] text-slate-400">ሙሉ የተጣራ ገቢ</p>
+                <p className="text-[10px] text-slate-400">የአባሉ ቀጥታ ድርሻ</p>
               </div>
 
               <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-                <span className="text-[10px] text-amber-400 font-bold">ለባንኮች ዋስትና (10%)</span>
+                <span className="text-[10px] text-amber-400 font-bold">ለባንክ ዋስትና (10%)</span>
                 <div className="text-base font-black text-white mt-1">
-                  {activePool.reserveBank10Percent.toLocaleString()} {activePool.currency}
+                  {Math.round(activePool.amountPerMember * activePool.maxMembers * 0.10).toLocaleString()} {activePool.currency}
                 </div>
                 <p className="text-[10px] text-slate-400">የብሄራዊ ባንክ ተቆጣቢ</p>
               </div>
 
               <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-                <span className="text-[10px] text-indigo-400 font-bold">የገንቢው ተቆጣቢ (5%)</span>
+                <span className="text-[10px] text-indigo-400 font-bold">ለገንቢው/ድርጅቱ (10%)</span>
                 <div className="text-base font-black text-white mt-1">
-                  {activePool.reserveBuilder5Percent.toLocaleString()} {activePool.currency}
+                  {Math.round(activePool.amountPerMember * activePool.maxMembers * 0.10).toLocaleString()} {activePool.currency}
                 </div>
-                <p className="text-[10px] text-slate-400">የስርአት ልማት ፈንድ</p>
+                <p className="text-[10px] text-slate-400">ዘበነ አስፍዬ (CBE)</p>
+              </div>
+
+              <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
+                <span className="text-[10px] text-teal-400 font-bold">ለማህበረሰብ እቁብ (20%)</span>
+                <div className="text-base font-black text-white mt-1">
+                  {Math.round(activePool.amountPerMember * activePool.maxMembers * 0.20).toLocaleString()} {activePool.currency}
+                </div>
+                <p className="text-[10px] text-slate-400">የጋራ እድገት ፈንድ</p>
               </div>
             </div>
 
