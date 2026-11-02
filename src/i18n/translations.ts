@@ -75,6 +75,7 @@ export interface TranslationDictionary {
     h13: string;
     h14: string;
     h15: string;
+    h16: string;
     equb: string;
     games: string;
     bank: string;
@@ -233,6 +234,7 @@ export interface TranslationDictionary {
     h13: HouseInfo;
     h14: HouseInfo;
     h15: HouseInfo;
+    h16: HouseInfo;
   };
 }
 
@@ -285,6 +287,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h13: '፲፫. ድለላና ፈላጊ',
       h14: '፲፬. አቤቱታና ዳኝነት',
       h15: '፲፭. የአገልግሎት ክፍያ',
+      h16: '፲፮. ቱሪዝም እና ቅርስ',
       equb: 'ዲጂታል እቁብና ሎተሪ',
       games: 'ጨዋታዎች (ገበጣ)',
       bank: 'ባንክና ሮያሊቲ'
@@ -440,7 +443,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h12: { title: '12. የምክርና ሳይኮሎጂ ትሪትመንት ቤት', desc: 'የስነ-ልቦና ህክምናና የምክር አገልግሎት ሰጪዎች ከተገልጋዮች ጋር በቪዲዮና ድምፅ የሚገናኙበት', roles: ['ክሊኒካል ሳይኮሎጂስት', 'የአዕምሮ ጤና አማካሪ', 'ተገልጋይ / ታካሚ', 'የማገገሚያ አስተባባሪ'] },
       h13: { title: '13. የድለላና ፈላጊ/ተፈላጊ ቤት', desc: 'ደላሎችና ተገልጋዮች እንዲሁም በቀጥታ ፈላጊና ተፈላጊ ተገናኝተው ጉዳያቸውን የሚፈፅሙበት', roles: ['ህጋዊ የሪልስቴትና መኪና ደላላ', 'የሸቀጥ አቅራቢ / ፈላጊ', 'ቀጥታ ገዥ / ተከራይ', 'የንግድ አማካሪ'] },
       h14: { title: '14. የአቤቱታና የዳኝነት ቤት', desc: 'ዳኞችና በደል የደረሰባቸው አቤቱታ አቅራቢዎች ተገናኝተው ውሳኔ በድምፅና በሰነድ የሚያገኙበት ፍርድ ቤት', roles: ['የግልግል ዳኛ', 'ጠበቃና የህግ አማካሪ', 'አቤቱታ አቅራቢ', 'ተከሳሽ / መልስ ሰጪ'] },
-      h15: { title: '15. የአገልግሎት ክፍያ ቤት', desc: 'የመብራት፣ የውሃ፣ የትራንስፖርትና ሌሎች አገልግሎቶች ክፍያ በCBE እና ቴሌብር የሚፈፀምበት', roles: ['የመብራትና ውሃ ተጠቃሚ', 'የክፍያ ዴስክ ኦፊሰር', 'የባንክ አስተባባሪ', 'የቴሌኮም ተጠቃሚ'] }
+      h15: { title: '15. የአገልግሎት ክፍያ ቤት', desc: 'የመብራት፣ የውሃ፣ የትራንስፖርትና ሌሎች አገልግሎቶች ክፍያ በCBE እና ቴሌብር የሚፈፀምበት', roles: ['የመብራትና ውሃ ተጠቃሚ', 'የክፍያ ዴስክ ኦፊሰር', 'የባንክ አስተባባሪ', 'የቴሌኮም ተጠቃሚ'] },
+      h16: { title: '16. የቱሪዝም እና የቅርስ ቤት (Global Tourism & Heritage Expo)', desc: 'የአለማችን ታሪካዊ፣ ባህላዊና ተፈጥሯዊ ቅርሶች፣ የቱሪዝም መዳረሻዎች እና የስልጣኔ ኤክስፖ', roles: ['ቅርስ አስጎብኝ (Tour Guide)', 'ጎብኝ / ቱሪስት (Tourist / Visitor)', 'የቅርስ ተመራማሪ (Researcher)', 'የዩኔስኮ / መንግስት ተወካይ (UNESCO / Govt Official)'] }
     }
   },
   om: {
@@ -491,6 +495,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h13: '13. Dilaalaa fi Barbaadduu',
       h14: '14. Komii fi Murtii',
       h15: '15. Kaffaltii Tajaajilaa',
+      h16: '16. Tuuriizimii fi Dhaala',
       equb: 'Iqubii fi Lootarii',
       games: 'Taphawwan (Sadeeqa)',
       bank: 'Baankii fi Qooda'
@@ -646,7 +651,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h12: { title: '12. Mana Yaala Saayikooloojii fi Gorsaa', desc: 'Tajaajila yaala sammuu fi gorsaa ogeessota waliin kallattiin', roles: ['Saayikooloojistii Kiliinikaa', 'Gorsaa Fayyaa Sammuu', 'Fayyadamaa / Dhukkubsataa', 'Qindeessaa Haaromsaa'] },
       h13: { title: '13. Mana Dilaalaa fi Barbaaddotaa', desc: 'Dilaalotaa fi maamiltoota walqunnamsiisuun dhimmoota isaanii raawwachiisan', roles: ['Dilaalaa Qabeenyaa Seeraa', 'Dhiyeessaa Qabeenyaa', 'Bitaa Kallattii', 'Gorsaa Daldalaa'] },
       h14: { title: '14. Mana Komii fi Murtii Seeraa', desc: 'Abbootiin seeraa komii dhiyaate dhaggeeffatanii murtii itti kennan', roles: ['Abbaa Murtii Seeraa', 'Abukaatoo Seeraa', 'Komii Dhiyeessaa', 'Himatamaa'] },
-      h15: { title: '15. Mana Kaffaltii Tajaajilaa', desc: 'Kaffaltii ibsaa, bishaanii, geejjibaa fi tajaajila adda addaa', roles: ['Fayyadamaa Ibsaa fi Bishaanii', 'Ofiisara Kaffaltii', 'Qindeessaa Baankii', 'Fayyadamaa Telekoomii'] }
+      h15: { title: '15. Mana Kaffaltii Tajaajilaa', desc: 'Kaffaltii ibsaa, bishaanii, geejjibaa fi tajaajila adda addaa', roles: ['Fayyadamaa Ibsaa fi Bishaanii', 'Ofiisara Kaffaltii', 'Qindeessaa Baankii', 'Fayyadamaa Telekoomii'] },
+      h16: { title: '16. Mana Tuuriizimii fi Dhaala (Global Tourism & Heritage Expo)', desc: 'Agarsiisa dhaala seenaa, aadaa fi uumamaa addunyaa fi bakkeewwan tuuriizimii', roles: ['Daawwachiisaa Dhaalaa (Tour Guide)', 'Daawwataa / Tuuriistii (Tourist)', 'Qorataa Dhaalaa (Researcher)', 'Bakka Bu\'aa Mootummaa / UNESCO'] }
     }
   },
   ti: {
@@ -697,6 +703,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h13: '13. ድላላን ፈላጊን',
       h14: '14. ጥርዓንን ፍርድን',
       h15: '15. ክፍሊት ኣገልግሎት',
+      h16: '16. ቱሪዝምን ቅርሲን',
       equb: 'ዲጂታል ዕቁብን ሎተሪን',
       games: 'ጸወታታት (ገበጣ)',
       bank: 'ባንክን ሮያሊቲን'
@@ -852,7 +859,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h12: { title: '12. ሳይኮሎጂን ምኽርን ቤት', desc: 'ናይ ኣእምሮ ሕክምናን ምኽርን ብቀጥታ ቪድዮን ድምጽን', roles: ['ክሊኒካል ሳይኮሎጂስት', 'ኣማኻሪ ጥዕና ኣእምሮ', 'ተጠቃሚ / ተሓካሚ', 'ኣተሓባባሪ ምሕዋይ'] },
       h13: { title: '13. ድላላን ፈላጊን ቤት', desc: 'ደላሎን ተገልገልትን ብቀጥታ ተራኺቦም ጉዳዮም ዝፍጽሙሉ', roles: ['ሕጋዊ ደላሊ ንብረት', 'ኣቕራቢ ንብረት', 'ቀጥታ ዓዳጊ', 'ኣማኻሪ ንግዲ'] },
       h14: { title: '14. ጥርዓንን ፍርድን ቤት', desc: 'ዳያኑን ጥርዓን ዘለዎምን ተራኺቦም ፍርዲ ብሰነድ ዝረኽቡሉ', roles: ['ዳኛ ዕርቂ', 'ጠበቓን ኣማኻሪ ሕግን', 'ጥርዓን ኣቕራቢ', 'ተኸሳሲ'] },
-      h15: { title: '15. ክፍሊት ኣገልግሎት ቤት', desc: 'ናይ መብራህቲ፣ ማይ፣ መጓዓዝያን ካልኦትን ክፍሊት', roles: ['ተጠቃሚ መብራህትን ማይን', 'ኦፊሰር ክፍሊት', 'ኣተሓባባሪ ባንክ', 'ተጠቃሚ ቴሌኮም'] }
+      h15: { title: '15. ክፍሊት ኣገልግሎት ቤት', desc: 'ናይ መብራህቲ፣ ማይ፣ መጓዓዝያን ካልኦትን ክፍሊት', roles: ['ተጠቃሚ መብራህትን ማይን', 'ኦፊሰር ክፍሊት', 'ኣተሓባባሪ ባንክ', 'ተጠቃሚ ቴሌኮም'] },
+      h16: { title: '16. ቤት ቱሪዝምን ቅርሲን (Global Tourism & Heritage Expo)', desc: 'ታሪኻዊ፣ ባህላውን ተፈጥሮኣውን ቅርስታትን መባጽሕቲ ቱሪዝምን ዓለምና', roles: ['ኣስጎብናይ ቅርሲ (Tour Guide)', 'በጻሒ / ቱሪስት (Tourist)', 'ተመራማሪ ቅርሲ (Researcher)', 'ተወካሊ መንግስቲ / UNESCO'] }
     }
   },
   en: {
@@ -903,6 +911,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h13: '13. Brokerage & Exchange',
       h14: '14. Judicial Tribunal',
       h15: '15. Utility Payments',
+      h16: '16. Tourism & Heritage',
       equb: 'Digital Equb & Lottery',
       games: 'Games Arena (Gebeta)',
       bank: 'Bank & Royalties'
@@ -1058,7 +1067,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h12: { title: '12. Clinic of Psychology & Treatment', desc: 'Licensed psychological counseling, mental wellness, and therapeutic video sessions', roles: ['Clinical Psychologist', 'Mental Health Counselor', 'Client / Patient', 'Recovery Coordinator'] },
       h13: { title: '13. Brokerage & Direct Matching Exchange', desc: 'Certified real estate, auto, and commodity brokers linking buyers and sellers seamlessly', roles: ['Licensed Broker', 'Asset Provider', 'Direct Buyer / Tenant', 'Trade Consultant'] },
       h14: { title: '14. High Judicial & Arbitration Tribunal', desc: 'Official arbiters and certified judges resolving claims with binding audio-visual decrees', roles: ['Senior Arbitrator / Judge', 'Legal Advocate', 'Claimant / Complainant', 'Respondent'] },
-      h15: { title: '15. Global Utility Payment Hub', desc: 'Instant settlement for power, water, telecom, and transit via CBE and Telebirr', roles: ['Utility Subscriber', 'Payment Desk Officer', 'Bank Coordinator', 'Telecom User'] }
+      h15: { title: '15. Global Utility Payment Hub', desc: 'Instant settlement for power, water, telecom, and transit via CBE and Telebirr', roles: ['Utility Subscriber', 'Payment Desk Officer', 'Bank Coordinator', 'Telecom User'] },
+      h16: { title: '16. Global Tourism & World Heritage Expo', desc: 'Universal platform showcasing historical monuments, cultural treasures, and eco-tourism sanctuaries', roles: ['Heritage Tour Guide', 'Tourist / Global Visitor', 'Archaeological Researcher', 'Govt / UNESCO Delegate'] }
     }
   },
   fr: {
@@ -1109,6 +1119,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h13: '13. Courtage & Échange',
       h14: '14. Tribunal & Justice',
       h15: '15. Paiement de Services',
+      h16: '16. Tourisme & Patrimoine',
       equb: 'Tontine & Loterie',
       games: 'Arène de Jeux',
       bank: 'Banque & Droits'
@@ -1264,7 +1275,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h12: { title: '12. Clinique de Psychologie et Soins Mentaux', desc: 'Consultations thérapeutiques vidéo certifiées pour la santé mentale et le bien-être', roles: ['Psychologue Clinicien', 'Conseiller en Santé Mentale', 'Patient / Bénéficiaire', 'Coordinateur Thérapeutique'] },
       h13: { title: '13. Bourse de Courtage et Mise en Relation', desc: 'Courtiers certifiés facilitant les transactions immobilières, automobiles et commerciales', roles: ['Courtier Agréé', 'Fournisseur de Biens', 'Acheteur Direct', 'Conseiller d\'Affaires'] },
       h14: { title: '14. Tribunal Judiciaire et Arbitrage', desc: 'Magistrats et arbitres rendant des jugements légaux équitables sur documents et vidéo', roles: ['Juge Arbitre', 'Avocat Conseil', 'Plaignant', 'Défendeur'] },
-      h15: { title: '15. Centre de Paiement des Services Publics', desc: 'Règlement instantané des factures d\'eau, d\'électricité et de transport via les banques', roles: ['Abonné Eau & Électricité', 'Agent de Caisse', 'Coordinateur Bancaire', 'Client Télécom'] }
+      h15: { title: '15. Centre de Paiement des Services Publics', desc: 'Règlement instantané des factures d\'eau, d\'électricité et de transport via les banques', roles: ['Abonné Eau & Électricité', 'Agent de Caisse', 'Coordinateur Bancaire', 'Client Télécom'] },
+      h16: { title: '16. Exposition Mondiale du Tourisme et du Patrimoine', desc: 'Plateforme mondiale valorisant les trésors historiques, culturels et les merveilles naturelles du monde', roles: ['Guide Touristique Officiel', 'Touriste / Visiteur Mondial', 'Chercheur en Patrimoine', 'Délégué UNESCO / État'] }
     }
   },
   zh: {
@@ -1315,6 +1327,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h13: '13. 商业撮合与中介',
       h14: '14. 司法仲裁法庭',
       h15: '15. 公共事业账单支付',
+      h16: '16. 旅游与文化遗产',
       equb: '数字互助基金与彩票',
       games: '智慧游戏竞技场',
       bank: '银行与分成金库'
@@ -1470,7 +1483,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h12: { title: '12. 心理咨询诊所', desc: '资深心理医生与心理咨询师一对一视频疏导与治疗', roles: ['临床心理医生', '心理健康顾问', '求助来访者', '心理康复专员'] },
       h13: { title: '13. 商业撮合与中介', desc: '持牌房地产、汽车及大宗物资经纪人高效匹配买卖双方', roles: ['持牌专业经纪人', '货源及资产方', '直接买方 / 承租人', '商业撮合顾问'] },
       h14: { title: '14. 司法仲裁法庭', desc: '权威法官与仲裁员为纠纷出具具法律约束力的视听判决书', roles: ['首席仲裁法官', '出庭律师', '申诉原告', '答辩被告'] },
-      h15: { title: '15. 公共事业账单支付', desc: '快捷缴纳水、电、通信及交通费用，直通商业银行与Telebirr', roles: ['公用事业用户', '缴费窗口主管', '银行协同员', '通信网络用户'] }
+      h15: { title: '15. 公共事业账单支付', desc: '快捷缴纳水、电、通信及交通费用，直通商业银行与Telebirr', roles: ['公用事业用户', '缴费窗口主管', '银行协同员', '通信网络用户'] },
+      h16: { title: '16. 全球旅游与世界文化遗产博览会', desc: '展示全人类古老文明、自然遗产与旅游胜地的国际主权展厅', roles: ['认证遗产导游', '全球游客 / 访问者', '历史文化研究员', '政府 / 联合国教科文组织代表'] }
     }
   },
   ar: {
@@ -1521,6 +1535,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h13: '13. بورصة الوساطة والتبادل',
       h14: '14. محكمة العدل والتحكيم',
       h15: '15. سداد الفواتير والخدمات',
+      h16: '16. السياحة والتراث العالمي',
       equb: 'الإكوب الرقمي واليانصيب',
       games: 'ألعاب الذكاء (الجبطة)',
       bank: 'البنك وصندوق الإيرادات'
@@ -1676,7 +1691,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h12: { title: '12. عيادة العلاج والاستشارات النفسية', desc: 'جلسات استشارية وعلاج نفسي معتمد بالصوت والفيديو لتعزيز الصحة النفسية', roles: ['طبيب نفسي إكلينيكي', 'مستشار الصحة النفسية', 'مراجع / مستفيد', 'منسق التأهيل النفسي'] },
       h13: { title: '13. بورصة الوساطة والوساطة المباشرة', desc: 'الوسطاء والمستثمرون لعقد الصفقات العقارية والتجارية المباشرة بكل ثقة', roles: ['وسيط عقاري وتجاري معتمد', 'مزود أصول وبضائع', 'مشترٍ مباشر', 'مستشار استثماري'] },
       h14: { title: '14. محكمة التظلمات والتحكيم القضائي', desc: 'قضاة معتمدون لإصدار أحكام ملزمة قانونياً للمتظلمين عبر جلسات موثقة', roles: ['قاضي تحكيم معتمد', 'محامٍ ومستشار قانوني', 'صاحب مظلمة', 'مدعى عليه'] },
-      h15: { title: '15. قاعة دفع الفواتير والخدمات', desc: 'سداد فواتير الكهرباء، المياه والمواصلات عبر البنوك المعتمدة وTelebirr', roles: ['مستهلك مياه وكهرباء', 'موظف نافذة الدفع', 'منسق بنكي', 'مستخدم الاتصالات'] }
+      h15: { title: '15. قاعة دفع الفواتير والخدمات', desc: 'سداد فواتير الكهرباء، المياه والمواصلات عبر البنوك المعتمدة وTelebirr', roles: ['مستهلك مياه وكهرباء', 'موظف نافذة الدفع', 'منسق بنكي', 'مستخدم الاتصالات'] },
+      h16: { title: '16. معرض السياحة والتراث الحضاري العالمي', desc: 'منصة دولية لعرض المعالم التاريخية والثقافية والطبيعية ومقاصد السياحة العالمية', roles: ['مرشد سياحي معتمد', 'زائر / سائح دولي', 'باحث في الآثار والتراث', 'ممثل اليونسكو / الحكومة'] }
     }
   },
   de: {
@@ -1727,6 +1743,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h13: '13. Makler & Vermittlung',
       h14: '14. Justiz & Schiedsgericht',
       h15: '15. Versorgungs-Zahlungen',
+      h16: '16. Tourismus & Welterbe',
       equb: 'Digitaler Equb & Lotterie',
       games: 'Spiele-Arena (Gebeta)',
       bank: 'Bank & Tantiemen'
@@ -1882,7 +1899,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h12: { title: '12. Psychologische Behandlung & Beratung', desc: 'Therapie und mentale Beratung per Video und Audio', roles: ['Klinischer Psychologe', 'Mental Health Berater', 'Klient / Patient', 'Genesungskoordinator'] },
       h13: { title: '13. Globale Makler- und Vermittlungsbörse', desc: 'Direkter Handel von Immobilien, Waren und Dienstleistungen', roles: ['Zugelassener Makler', 'Warenanbieter', 'Direktkäufer / Mieter', 'Unternehmensberater'] },
       h14: { title: '14. Schiedsgericht & Justizkammer', desc: 'Offizielle Richter zur Urteilsfindung bei Beschwerden', roles: ['Schiedsrichter / Richter', 'Rechtsbeistand', 'Kläger', 'Beklagter'] },
-      h15: { title: '15. Rechnungszahlung & Finanzdrehscheibe', desc: 'Bezahlung von Strom, Wasser und Transport über Banken und Telebirr', roles: ['Versorgungsabonnent', 'Zahlungsschalter-Beauftragter', 'Bankkoordinator', 'Telekom-Kunde'] }
+      h15: { title: '15. Rechnungszahlung & Finanzdrehscheibe', desc: 'Bezahlung von Strom, Wasser und Transport über Banken und Telebirr', roles: ['Versorgungsabonnent', 'Zahlungsschalter-Beauftragter', 'Bankkoordinator', 'Telekom-Kunde'] },
+      h16: { title: '16. Globale Tourismus- und Welterbe-Expo', desc: 'Internationale Plattform zur Präsentation historischer, kultureller und natürlicher Schätze der Welt', roles: ['Offizieller Reiseleiter', 'Tourist / Weltbürger-Gast', 'Welterbe-Forscher', 'UNESCO- / Regierungs-Vertreter'] }
     }
   }
 };

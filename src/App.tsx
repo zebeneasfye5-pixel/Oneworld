@@ -37,6 +37,8 @@ import { HousePsychologyCounseling } from './components/houses/HousePsychologyCo
 import { HouseBrokerageMatching } from './components/houses/HouseBrokerageMatching';
 import { HouseJudicialTribunal } from './components/houses/HouseJudicialTribunal';
 import { HouseUtilityPayments } from './components/houses/HouseUtilityPayments';
+import { HouseTourismHeritage } from './components/houses/HouseTourismHeritage';
+import { useRealtimeRoom } from './services/realtimeMesh';
 
 // Auxiliary views
 import { GamesArena } from './components/GamesArena';
@@ -185,6 +187,26 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  // Live Multi-User WebRTC & WebSocket Mesh Connection
+  const realtime = useRealtimeRoom({
+    roomId: activeTarget.startsWith('h') ? activeTarget : 'h1',
+    currentUser: {
+      id: currentUser.idNumber || 'user-self',
+      fullName: currentUser.fullName,
+      avatarUrl: currentUser.avatarUrl,
+      roleTitle: currentUser.roleTitle,
+      nationality: currentUser.nationality
+    },
+    initialOccupants: INITIAL_OCCUPANTS,
+    onMessageReceived: (msg) => {
+      setMessages((prev) => [...prev, msg]);
+    },
+    onGiftReceived: (gift, senderName) => {
+      showToast(`🎁 ${gift.nameAm} ከ ${senderName} ተልኮልዎታል!`);
+      safeConfetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+    }
+  });
+
   // Synchronized Language Change (Switches both UI text and Voice Audio)
   const handleLanguageChange = (lang: AppLanguage) => {
     setCurrentLang(lang);
@@ -218,6 +240,7 @@ export default function App() {
   // House 1 actions
   const handleClaimSeat = (seatNumber: number) => {
     setUserSeatedNumber(seatNumber);
+    realtime.claimSeatRealtime(seatNumber);
     setOccupants((prev) => {
       const updated = prev.filter((o) => o.id !== 'user-self');
       const userOccupant: RoomOccupant = {
@@ -241,12 +264,14 @@ export default function App() {
 
   const handleLeaveSeat = () => {
     setUserSeatedNumber(null);
+    realtime.leaveSeatRealtime();
     setOccupants((prev) => prev.filter((o) => o.id !== 'user-self'));
     showToast(t.announcements.seatLeft);
   };
 
   const handleSendMessage = (msg: LiveSpeechMessage) => {
     setMessages((prev) => [...prev, msg]);
+    realtime.sendRealtimeMessage(msg);
   };
 
   const handleSendGift = (gift: VirtualGift, recipient: RoomOccupant) => {
@@ -257,6 +282,7 @@ export default function App() {
     setBalanceETB((prev) => prev - gift.priceETB);
     const builderCut = Math.round(gift.priceETB * 0.10); // 10% to Developer
     setBuilderReserveETB((prev) => prev + builderCut);
+    realtime.sendGiftRealtime(gift, recipient.id);
     showToast(`${gift.icon} ${gift.nameAm} -> ${recipient.name} (${t.announcements.giftSent})`);
     safeConfetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
   };
@@ -424,7 +450,7 @@ export default function App() {
             onSelectRoom={setCurrentRoom}
             userLang={currentLang as any}
             userBalanceETB={balanceETB}
-            occupants={occupants}
+            occupants={realtime.combinedOccupants}
             messages={messages}
             onSendMessage={handleSendMessage}
             onSendGift={handleSendGift}
@@ -690,6 +716,28 @@ export default function App() {
           </div>
         )}
 
+        {/* House 16: የቱሪዝም እና የቅርስ ቤት (Global Tourism & Heritage Expo) */}
+        {activeTarget === 'h16' && (
+          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
+            <HouseStageMedia
+              houseId="h16"
+              houseTitle={houseMeta('h16').title}
+              houseDescription={houseMeta('h16').desc}
+              houseRoleOptions={houseMeta('h16').roles}
+              currentUser={currentUser}
+              currentLang={currentLang}
+              houseMemberships={houseMemberships}
+              onRegisterHouseMember={handleRegisterHouseMember}
+              onShowToast={showToast}
+            />
+            {houseMemberships['h16'] && (
+              <HouseTourismHeritage
+                currentLang={currentLang}
+              />
+            )}
+          </div>
+        )}
+
         {/* Aux Modules */}
         {activeTarget === 'equb' && (
           <EqubAndLottery
@@ -724,11 +772,9 @@ export default function App() {
           <div className="flex flex-wrap items-center justify-center gap-6 text-slate-400 font-medium">
             <span>Oneworld · መስራች፡ ዘበነ አስፍዬ (Zebene Asfaye)</span>
             <span>·</span>
-            <span>የኢትዮጵያ ንግድ ባንክ (CBE 1000167413618)</span>
+            <span>16ቱ ዋና ዋና ቤቶች (16 Sovereign Houses)</span>
             <span>·</span>
-            <span>የ2026 ሚስጥራዊ ካዝና ጥበቃ</span>
-            <span>·</span>
-            <span>15ቱ ዋና ዋና ቤቶች</span>
+            <span>የ2026 ሚስጥራዊ ካዝና እና አለም አቀፍ የክፍያ ጥበቃ</span>
           </div>
           <p className="text-[11px] text-slate-600">
             የአለማችን ህዝቦች በሁለንተናዊ መልካም አስተሳሰብ፣ በቴክኖሎጂ እውቀት፣ በስጋ ዝምድና፣ በሰርግ ውል፣ በፍትህና በጋራ ልማት ተሳስረው የሚኖሩበት አለም አቀፍ ሉዓላዊ አጎራ።

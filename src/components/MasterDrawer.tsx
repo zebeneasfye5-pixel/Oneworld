@@ -43,7 +43,8 @@ export type HouseId =
   | 'h12' // የምክርና ሳይኮሎጂ ትሪትመንት ቤት
   | 'h13' // የድለላና ፈላጊ/ተፈላጊ ቤት
   | 'h14' // የአቤቱታና የዳኝነት ቤት
-  | 'h15'; // የአገልግሎት ክፍያ ቤት
+  | 'h15' // የአገልግሎት ክፍያ ቤት
+  | 'h16'; // የቱሪዝም እና የቅርስ ቤት (Global Tourism & Heritage Expo)
 
 interface MasterDrawerProps {
   isOpen: boolean;
@@ -95,6 +96,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
     { id: 'h13', num: 13, icon: Compass, title: t.houses.h13.title, desc: t.houses.h13.desc, tag: t.drawer.tags.h13 || '13' },
     { id: 'h14', num: 14, icon: Scale, title: t.houses.h14.title, desc: t.houses.h14.desc, tag: t.drawer.tags.h14 || '14' },
     { id: 'h15', num: 15, icon: Receipt, title: t.houses.h15.title, desc: t.houses.h15.desc, tag: t.drawer.tags.h15 || '15' },
+    { id: 'h16', num: 16, icon: Globe2, title: t.houses.h16.title, desc: t.houses.h16.desc, tag: t.drawer.tags.h16 || '16' },
   ];
 
   const filteredHouses = housesList.filter(
@@ -232,7 +234,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
               <span>{t.announcements.vaultBtn}</span>
             </div>
             <span className="text-[10px] font-mono bg-amber-900/60 px-1.5 py-0.5 rounded">
-              CBE 1000167413618
+              PIN: 2026
             </span>
           </button>
 

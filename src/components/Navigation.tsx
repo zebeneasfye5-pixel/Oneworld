@@ -15,6 +15,7 @@ import {
   Compass, 
   Scale, 
   Receipt,
+  Globe2,
   Coins,
   Gamepad2,
   Landmark
@@ -57,6 +58,7 @@ export const Navigation: React.FC<NavigationProps> = ({
     { id: 'h13', num: 13, label: t.nav.h13, icon: Compass },
     { id: 'h14', num: 14, label: t.nav.h14, icon: Scale },
     { id: 'h15', num: 15, label: t.nav.h15, icon: Receipt },
+    { id: 'h16', num: 16, label: t.nav.h16, icon: Globe2 },
     { id: 'equb', label: t.nav.equb, icon: Coins },
     { id: 'games', label: t.nav.games, icon: Gamepad2 },
     { id: 'bank', label: t.nav.bank, icon: Landmark },
