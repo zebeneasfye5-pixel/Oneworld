@@ -67,7 +67,7 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
   const [peerLoans, setPeerLoans] = useState<PeerCreditItem[]>([
     {
       id: 'loan-1',
-      borrowerName: 'ዘበነ አስፋው (Zebene)',
+      borrowerName: 'ዘበነ አስፍዬ (Zebene Asfye)',
       borrowerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120',
       amount: 10000,
       currency: 'ETB',

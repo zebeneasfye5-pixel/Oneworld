@@ -220,21 +220,21 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
         </div>
 
         {/* Bottom Drawer Actions */}
-        <div className="p-3 border-t border-slate-800 bg-[#0f1422] space-y-2">
-          {/* Builder Secret Vault (PIN 2026) */}
+        <div className="p-3.5 border-t border-slate-800 bg-[#0f1422] space-y-2.5">
+          {/* Builder Sovereign Vault (Direct Sovereign Access - Founder Zebene Asfye) */}
           <button
             onClick={() => {
               onClose();
               onOpenBuilderVault();
             }}
-            className="w-full flex items-center justify-between p-2.5 bg-amber-950/30 hover:bg-amber-950/50 border border-amber-600/40 rounded-xl text-xs font-bold text-amber-300 cursor-pointer transition-colors"
+            className="w-full flex items-center justify-between p-3 bg-amber-950/40 hover:bg-amber-950/60 border border-amber-600/50 rounded-2xl text-xs sm:text-sm font-black text-amber-300 cursor-pointer transition-colors shadow-sm"
           >
             <div className="flex items-center gap-2">
               <Lock className="w-4 h-4 text-amber-400" />
               <span>{t.announcements.vaultBtn}</span>
             </div>
-            <span className="text-[10px] font-mono bg-amber-900/60 px-1.5 py-0.5 rounded">
-              PIN: 2026
+            <span className="text-xs font-mono font-bold bg-amber-900/60 text-amber-300 px-2 py-0.5 rounded-lg border border-amber-500/30">
+              ቀጥታ መግቢያ
             </span>
           </button>
 
@@ -244,9 +244,9 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
               onClose();
               onOpenCharter();
             }}
-            className="w-full flex items-center gap-2 p-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors"
+            className="w-full flex items-center gap-2 p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs sm:text-sm font-extrabold text-slate-200 cursor-pointer transition-colors"
           >
-            <BookOpen className="w-4 h-4 text-indigo-400" />
+            <BookOpen className="w-4 h-4 text-amber-400" />
             <span>{t.announcements.charterBtn}</span>
           </button>
 
@@ -254,7 +254,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
           {isInstallable && (
             <button
               onClick={onInstallPwa}
-              className="w-full flex items-center justify-center gap-2 p-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white font-bold rounded-xl text-xs shadow-md cursor-pointer transition-colors"
+              className="w-full flex items-center justify-center gap-2 p-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white font-black rounded-2xl text-xs sm:text-sm shadow-md cursor-pointer transition-colors"
             >
               <Smartphone className="w-4 h-4" />
               <span>{t.installApp}</span>
@@ -262,12 +262,12 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
           )}
 
           {/* Offline Ready Indicator */}
-          <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1">
-            <span className="flex items-center gap-1 text-emerald-400">
-              <CheckCircle2 className="w-3 h-3" />
+          <div className="flex items-center justify-between text-xs font-bold text-slate-400 pt-1">
+            <span className="flex items-center gap-1.5 text-emerald-400">
+              <CheckCircle2 className="w-3.5 h-3.5" />
               {t.announcements.offlineReadyNotice}
             </span>
-            <span>{t.announcements.founderNotice}</span>
+            <span className="text-amber-400">ዘበነ አስፍዬ (Zebene Asfye)</span>
           </div>
         </div>
       </div>

@@ -17,7 +17,9 @@ import {
   Shield,
   Briefcase,
   Lock,
-  Volume2
+  Volume2,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import { UserProfile } from './AuthModal';
 import { AppLanguage, TRANSLATIONS } from '../i18n/translations';
@@ -86,12 +88,17 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   // Zoom & Display Controls
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullBodyMode, setIsFullBodyMode] = useState(false);
   const stageContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Live Media State
   const [isMicOn, setIsMicOn] = useState(false);
   const [isVideoOn, setIsVideoOn] = useState(true);
-  const [userSeat, setUserSeat] = useState<number | null>(null);
+  const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [userSeat, setUserSeat] = useState<number | null>(1); // Default to seat #1 when member enters
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
 
@@ -108,7 +115,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     if (isHouse4) {
       return [
         {
-          seatNumber: 1,
+          seatNumber: 2,
           name: 'ሚስጥራዊ አማካሪ (Sanctuary Peer)',
           role: houseRoleOptions[0] || 'Confidential Peer',
           avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
@@ -121,7 +128,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     }
     return [
       {
-        seatNumber: 1,
+        seatNumber: 2,
         name: 'ዶ/ር ተስፋዬ መንግስቱ',
         role: houseRoleOptions[0] || 'Leader',
         avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
@@ -131,7 +138,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         countryFlag: '🇪🇹'
       },
       {
-        seatNumber: 2,
+        seatNumber: 3,
         name: 'ወ/ሮ ራሔል ሰለሞን',
         role: houseRoleOptions[1] || 'Coordinator',
         avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80',
@@ -141,7 +148,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         countryFlag: '🇪🇹'
       },
       {
-        seatNumber: 3,
+        seatNumber: 4,
         name: 'ኢንጂነር ዳንኤል ከበደ',
         role: houseRoleOptions[2] || 'Advisor',
         avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
@@ -153,46 +160,111 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     ];
   });
 
-  // Handle local camera
-  useEffect(() => {
-    let active = true;
+  // Ultra-Fast Zero-Latency Camera Initializer with Warm Track Support
+  const startCamera = async (facing: 'user' | 'environment' = cameraFacing) => {
+    setCameraLoading(true);
+    setCameraError(null);
 
-    async function setupCamera() {
-      if (isVideoOn && userSeat !== null) {
-        try {
-          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            const stream = await navigator.mediaDevices.getUserMedia({
-              video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-              audio: true
-            });
-            if (active) {
-              mediaStreamRef.current = stream;
-              if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.play().catch(() => {});
-              }
-            }
-          }
-        } catch {
-          // Camera permission fallback
-        }
-      } else {
-        if (mediaStreamRef.current) {
-          mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-          mediaStreamRef.current = null;
-        }
+    // Warm-track instant activation (0ms): If video track exists, just enable it!
+    if (mediaStreamRef.current && mediaStreamRef.current.getVideoTracks().length > 0 && cameraFacing === facing) {
+      mediaStreamRef.current.getVideoTracks().forEach((trk) => {
+        trk.enabled = true;
+      });
+      setCameraActive(true);
+      setIsVideoOn(true);
+      setCameraLoading(false);
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStreamRef.current;
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+        videoRef.current.play().catch(() => {});
+      }
+      return;
+    }
+
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getVideoTracks().forEach((trk) => trk.stop());
+    }
+
+    let stream: MediaStream | null = null;
+
+    // Fast-capture Tier 1: Zero resolution-probing delay with warm audio track
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: facing },
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+      });
+      // Synchronize audio track enabled state with current mic state
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = isMicOn;
+      });
+    } catch (e1) {
+      console.warn('House Tier 1 failed, trying Tier 2 (video-only):', e1);
+      // Fast-capture Tier 2: Universal constraint without audio if microphone blocked
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      } catch (e2: any) {
+        console.warn('All camera attempts failed in house:', e2);
+        setCameraLoading(false);
+        setCameraActive(false);
+        setCameraError(
+          e2?.name === 'NotAllowedError' || e2?.name === 'PermissionDeniedError'
+            ? 'የካሜራ ፍቃድ አልተሰጠም። እባክዎ ከላይ በብራውዘርዎ የካሜራ ፍቃድ (Allow) ይስጡና እንደገና ይሞክሩ።'
+            : 'ካሜራ ማግኘት አልተቻለም። እባክዎ እንደገና ይሞክሩ።'
+        );
+        return;
       }
     }
 
-    setupCamera();
+    if (stream) {
+      mediaStreamRef.current = stream;
+      setCameraFacing(facing);
+      setCameraActive(true);
+      setIsVideoOn(true);
+      setCameraLoading(false);
+      setCameraError(null);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  };
+
+  // Instant 0ms Camera Off (Soft-disable video track while keeping driver warm)
+  const stopCamera = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getVideoTracks().forEach((track) => {
+        track.enabled = false;
+      });
+    }
+    setCameraActive(false);
+    setIsVideoOn(false);
+  };
+
+  const handleFlipCamera = () => {
+    const nextFacing = cameraFacing === 'user' ? 'environment' : 'user';
+    setCameraFacing(nextFacing);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getVideoTracks().forEach((trk) => trk.stop());
+    }
+    startCamera(nextFacing);
+  };
+
+  // Auto start camera if member exists
+  useEffect(() => {
+    if (membership && isVideoOn) {
+      startCamera(cameraFacing).catch(() => {});
+    }
 
     return () => {
-      active = false;
       if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current.getTracks().forEach((trk) => trk.stop());
       }
     };
-  }, [isVideoOn, userSeat]);
+  }, [membership]);
 
   // Photo Upload Handler
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,13 +295,33 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     }
   };
 
-  const toggleMic = () => {
+  const toggleMic = async () => {
     if (!membership) {
       onShowToast(t.stageMedia.regRequired);
       return;
     }
     const nextMic = !isMicOn;
     setIsMicOn(nextMic);
+
+    const audioTracks = mediaStreamRef.current?.getAudioTracks() || [];
+    if (audioTracks.length > 0) {
+      audioTracks.forEach((trk) => {
+        trk.enabled = nextMic;
+      });
+    } else if (nextMic) {
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+        const newTrack = audioStream.getAudioTracks()[0];
+        if (newTrack && mediaStreamRef.current) {
+          mediaStreamRef.current.addTrack(newTrack);
+        }
+      } catch (err) {
+        console.warn('Microphone activation notice:', err);
+      }
+    }
+
     onShowToast(nextMic ? `🎙️ ${t.stageMedia.micOn}` : `🔇 ${t.stageMedia.micOff}`);
     if (nextMic) {
       speakText(t.stageMedia.speaking, currentLang as any);
@@ -241,8 +333,13 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
       onShowToast(t.stageMedia.regRequired);
       return;
     }
-    setIsVideoOn((prev) => !prev);
-    onShowToast(!isVideoOn ? `📹 ${t.stageMedia.camOff}` : t.stageMedia.camOn);
+    if (isVideoOn && cameraActive) {
+      stopCamera();
+      onShowToast(`📹 ${t.stageMedia.camOff}`);
+    } else {
+      startCamera(cameraFacing);
+      onShowToast(`📹 ${t.stageMedia.camOn}`);
+    }
   };
 
   const handleClaimSeat = (seatNo: number) => {
@@ -259,7 +356,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
     setUserSeat(seatNo);
     setIsVideoOn(true);
-    setIsMicOn(true);
+    startCamera(cameraFacing);
     onShowToast(`${t.chairs.seatPrefix}${seatNo}: ${t.stageMedia.takeSeat}`);
   };
 
@@ -530,10 +627,24 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             </button>
           </div>
 
+          {/* Full-Body / Fullscreen Mode Toggle */}
+          <button
+            onClick={() => setIsFullBodyMode(!isFullBodyMode)}
+            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              isFullBodyMode
+                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                : 'bg-slate-900 text-slate-300 border-slate-700 hover:text-white'
+            }`}
+            title="ሙሉ አካልና ቁመት ማሳያ (Full Body Mode)"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span>{isFullBodyMode ? 'መደበኛ ስክሪን' : 'ሙሉ አካል (Full-Body)'}</span>
+          </button>
+
           <button
             onClick={toggleFullscreen}
             title={isFullscreen ? 'ውጣ' : 'ሙሉ ስክሪን (Fullscreen)'}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer"
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -542,11 +653,11 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             onClick={toggleMic}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer ${
               isMicOn
-                ? 'bg-emerald-600 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/50'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400/50'
+                : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
             }`}
           >
-            {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4 text-red-400" />}
+            {isMicOn ? <Mic className="w-4 h-4 text-slate-950" /> : <MicOff className="w-4 h-4 text-red-400" />}
             <span>{isMicOn ? t.stageMedia.micOn : t.stageMedia.micOff}</span>
           </button>
 
@@ -554,11 +665,11 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             onClick={toggleVideo}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer ${
               isVideoOn
-                ? 'bg-indigo-600 text-white shadow-indigo-600/30'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400/50'
+                : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
             }`}
           >
-            {isVideoOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4 text-red-400" />}
+            {isVideoOn ? <Video className="w-4 h-4 text-slate-950" /> : <VideoOff className="w-4 h-4 text-red-400" />}
             <span>{isVideoOn ? t.stageMedia.camOn : t.stageMedia.camOff}</span>
           </button>
 
@@ -573,7 +684,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         </div>
       </div>
 
-      {/* Scalable Large Video Grid Stage (Zoom Controlled) */}
+      {/* Scalable Substantially Enlarged Video Grid Stage (Zoom & Full-Body Controlled) */}
       <div 
         className="transition-transform duration-200 origin-top overflow-hidden"
         style={{ transform: `scale(${zoomScale})` }}
@@ -581,46 +692,101 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         <div className={`grid gap-4 ${
           isHouse4 
             ? 'grid-cols-1 sm:grid-cols-2 max-w-4xl mx-auto' 
-            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2'
         }`}>
           {/* User's Own Video Tile */}
           {userSeat !== null && (
-            <div className="relative rounded-3xl bg-slate-950 border-2 border-emerald-500 overflow-hidden min-h-[220px] aspect-video flex items-center justify-center shadow-2xl group">
-              {isVideoOn ? (
+            <div className={`relative rounded-3xl bg-slate-950 border-2 border-amber-500 overflow-hidden flex items-center justify-center shadow-2xl group transition-all ${
+              isFullBodyMode ? 'h-[580px] sm:h-[640px]' : 'h-[380px] sm:h-[440px]'
+            }`}>
+              {isVideoOn && cameraActive ? (
                 <video
-                  ref={videoRef}
+                  ref={(el) => {
+                    videoRef.current = el;
+                    if (el && mediaStreamRef.current) {
+                      if (el.srcObject !== mediaStreamRef.current) {
+                        el.srcObject = mediaStreamRef.current;
+                      }
+                      el.muted = true;
+                      el.playsInline = true;
+                      el.play().catch(() => {});
+                    }
+                  }}
                   autoPlay
                   playsInline
                   muted
-                  className="w-full h-full object-cover"
+                  className={`w-full h-full ${
+                    cameraFacing === 'user' ? 'transform -scale-x-100' : ''
+                  } ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'}`}
                 />
+              ) : isVideoOn && !cameraActive ? (
+                <div className="flex flex-col items-center justify-center p-6 text-center max-w-sm">
+                  {cameraError ? (
+                    <div className="bg-red-950/80 border border-red-500/60 p-3 rounded-2xl mb-3">
+                      <AlertCircle className="w-7 h-7 text-red-400 mx-auto mb-1" />
+                      <p className="text-xs font-bold text-red-200 mb-2">{cameraError}</p>
+                      <button
+                        onClick={() => startCamera(cameraFacing)}
+                        className="px-3.5 py-1.5 bg-amber-500 text-slate-950 rounded-xl text-xs font-black cursor-pointer shadow-md"
+                      >
+                        እንደገና ሞክር (Retry)
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center text-amber-400 mb-3 shadow-lg">
+                        <Camera className="w-7 h-7 text-amber-400 animate-pulse" />
+                      </div>
+                      <h4 className="text-base font-black text-white mb-1">ካሜራዎ አልበራም</h4>
+                      <p className="text-xs text-slate-300 mb-3">በዚህ ቤት ፊት ለፊት በቀጥታ ለመሳተፍ ካሜራዎን ያብሩ</p>
+                      <button
+                        onClick={() => startCamera('user')}
+                        className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition transform hover:scale-105"
+                      >
+                        📹 ካሜራዬን አብራ (Start Camera)
+                      </button>
+                    </>
+                  )}
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center p-4 text-center">
                   <img
                     src={profilePhotoUrl || currentUser.avatarUrl}
                     alt={currentUser.fullName}
-                    className="w-20 h-20 rounded-full object-cover border-3 border-emerald-400 mb-2 shadow-lg"
+                    className="w-24 h-24 rounded-2xl object-cover border-2 border-amber-400 mb-2 shadow-lg"
                   />
-                  <span className="text-xs font-bold text-white">{currentUser.fullName}</span>
-                  <span className="text-[10px] text-slate-400">{membership.roleInHouse}</span>
+                  <span className="text-base font-black text-white">{currentUser.fullName}</span>
+                  <span className="text-xs text-amber-300 font-bold">{membership.roleInHouse}</span>
                 </div>
               )}
 
-              {/* Seat Tag */}
-              <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs text-white font-mono">
-                <span>#{userSeat} ({t.stageMedia.yourSeat})</span>
+              {/* Seat Tag & Flip */}
+              <div className="absolute top-3 left-3 flex items-center gap-2">
+                <div className="flex items-center gap-1 bg-black/85 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs sm:text-sm text-amber-400 font-mono font-black border border-amber-500/40 shadow-md">
+                  <span>#{userSeat} ({t.stageMedia.yourSeat})</span>
+                </div>
+                {cameraActive && (
+                  <button
+                    onClick={handleFlipCamera}
+                    className="bg-black/85 hover:bg-black text-white text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1 cursor-pointer shadow-md"
+                    title="የፊት/የኋላ ካሜራ ቀይር"
+                  >
+                    <RefreshCw className="w-3 h-3 text-amber-400" />
+                    <span>ቀይር</span>
+                  </button>
+                )}
               </div>
 
               {/* Name & Title Overlay */}
-              <div className="absolute bottom-3 left-3 flex flex-col bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs font-bold text-white max-w-[85%]">
-                <span className="truncate">{currentUser.fullName}</span>
-                <span className="text-[10px] text-emerald-400 font-semibold">{membership.roleInHouse}</span>
+              <div className="absolute bottom-3 left-3 flex flex-col bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-white max-w-[85%] border border-slate-800 shadow-md">
+                <span className="truncate text-sm sm:text-base font-black">{currentUser.fullName}</span>
+                <span className="text-xs text-amber-300 font-bold">{membership.roleInHouse}</span>
               </div>
 
               {/* Mic Icon */}
-              <div className="absolute bottom-3 right-3 p-2 rounded-xl bg-black/70 backdrop-blur-md">
+              <div className="absolute bottom-3 right-3 p-3 rounded-2xl bg-black/85 backdrop-blur-md border border-slate-800 shadow-md">
                 {isMicOn ? (
-                  <Mic className="w-4 h-4 text-emerald-400 animate-pulse" />
+                  <Mic className="w-4 h-4 text-amber-400 animate-pulse" />
                 ) : (
                   <MicOff className="w-4 h-4 text-rose-400" />
                 )}
@@ -632,34 +798,34 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
           {participants.map((p) => (
             <div
               key={p.seatNumber}
-              className={`relative rounded-3xl bg-slate-950 border overflow-hidden min-h-[220px] aspect-video flex items-center justify-center shadow-xl transition ${
-                p.isSpeaking ? 'border-emerald-500 ring-2 ring-emerald-500/40' : 'border-slate-800'
-              }`}
+              className={`relative rounded-3xl bg-slate-950 border-2 overflow-hidden flex items-center justify-center shadow-2xl transition-all group ${
+                p.isSpeaking ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-slate-800'
+              } ${isFullBodyMode ? 'h-[580px] sm:h-[640px]' : 'h-[380px] sm:h-[440px]'}`}
             >
               <img
                 src={p.avatar}
                 alt={p.name}
-                className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition duration-500"
+                className={`w-full h-full transition duration-500 ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'} group-hover:scale-105`}
               />
 
               {/* Top Seat Tag */}
-              <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-lg text-xs text-slate-300 font-mono">
+              <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-xs text-amber-400 font-mono font-bold border border-amber-500/40">
                 <span>#{p.seatNumber}</span>
               </div>
 
               {/* Name & Role */}
-              <div className="absolute bottom-3 left-3 flex flex-col bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs font-semibold text-white max-w-[85%] leading-tight">
-                <div className="flex items-center gap-1 font-bold">
+              <div className="absolute bottom-3 left-3 flex flex-col bg-black/85 backdrop-blur-md px-3.5 py-2 rounded-2xl text-xs font-semibold text-white max-w-[85%] leading-tight border border-slate-800">
+                <div className="flex items-center gap-1 font-black text-sm">
                   <span className="truncate">{p.name}</span>
                   <span>{p.countryFlag}</span>
                 </div>
-                <span className="text-[10px] text-amber-300 font-medium">{p.role}</span>
+                <span className="text-[11px] text-amber-300 font-bold">{p.role}</span>
               </div>
 
               {/* Mic */}
-              <div className="absolute bottom-3 right-3 p-2 rounded-xl bg-black/70 backdrop-blur-md">
+              <div className="absolute bottom-3 right-3 p-2.5 rounded-2xl bg-black/80 backdrop-blur-md border border-slate-800">
                 {p.isMicOn ? (
-                  <Mic className="w-4 h-4 text-emerald-400" />
+                  <Mic className="w-4 h-4 text-amber-400 animate-pulse" />
                 ) : (
                   <MicOff className="w-4 h-4 text-slate-500" />
                 )}

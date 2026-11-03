@@ -26,7 +26,7 @@ export const HouseFamilyKinship: React.FC = () => {
     },
     {
       id: 'fam-2',
-      name: 'አቶ ዘበነ አስፍዬ (Zebene Asfaye)',
+      name: 'አቶ ዘበነ አስፍዬ (Zebene Asfye)',
       generation: '2ኛ ትውልድ (አባት / መሪ)',
       relation: 'የቤተሰብ አስተባባሪና ገንቢ',
       origin: 'አዲስ አበባ',

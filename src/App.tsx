@@ -17,7 +17,8 @@ import { MasterDrawer, HouseId } from './components/MasterDrawer';
 import { BuilderVaultModal } from './components/BuilderVaultModal';
 import { AuthModal, UserProfile } from './components/AuthModal';
 import { FoundingCharterModal } from './components/FoundingCharterModal';
-import { InstallAppBanner } from './components/InstallAppBanner';
+import { HouseSelectorModal } from './components/HouseSelectorModal';
+import { RevenueFormulaModal } from './components/RevenueFormulaModal';
 import { HouseStageMedia, HouseMemberRecord } from './components/HouseStageMedia';
 import { announceLanguageSwitch } from './services/speechService';
 
@@ -81,6 +82,8 @@ export default function App() {
   const [isBuilderVaultOpen, setIsBuilderVaultOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isCharterOpen, setIsCharterOpen] = useState(false);
+  const [isHouseHubOpen, setIsHouseHubOpen] = useState(false);
+  const [isRevenueFormulaOpen, setIsRevenueFormulaOpen] = useState(false);
 
   // PWA Install State
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
@@ -99,7 +102,7 @@ export default function App() {
       h1: {
         houseId: 'h1',
         memberId: 'OW-H1-0001',
-        fullName: 'ዘበነ አስፍዬ (Zebene Asfaye)',
+        fullName: 'ዘበነ አስፍዬ (Zebene Asfye)',
         avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
         roleInHouse: 'የመድረኩ መስራችና የጋራ ቤት መሪ',
         registeredDate: '2026-10-26',
@@ -156,7 +159,7 @@ export default function App() {
   // User Profile
   const [currentUser, setCurrentUser] = useState<UserProfile>({
     phoneNumber: '0911234567',
-    fullName: 'ዘበነ አስፍዬ (Zebene Asfaye)',
+    fullName: 'ዘበነ አስፍዬ (Zebene Asfye)',
     gender: 'ወንድ (Male)',
     age: 32,
     nationality: 'ኢትዮጵያዊ (Ethiopian)',
@@ -387,6 +390,25 @@ export default function App() {
         activeTarget={activeTarget}
         onSelectTarget={setActiveTarget}
         currentLang={currentLang}
+        onOpenHouseHub={() => setIsHouseHubOpen(true)}
+        onOpenCharter={() => setIsCharterOpen(true)}
+        onOpenRevenueFormula={() => setIsRevenueFormulaOpen(true)}
+      />
+
+      {/* 16 Houses Hub Modal (Collapsed selector for all 16 houses) */}
+      <HouseSelectorModal
+        isOpen={isHouseHubOpen}
+        onClose={() => setIsHouseHubOpen(false)}
+        activeHouse={activeTarget.startsWith('h') ? (activeTarget as HouseId) : 'h1'}
+        onSelectHouse={(hId) => setActiveTarget(hId)}
+        currentLang={currentLang}
+      />
+
+      {/* Revenue Formula Modal (60% Member · 10% Bank · 10% Founder Zebene Asfye · 20% Community) */}
+      <RevenueFormulaModal
+        isOpen={isRevenueFormulaOpen}
+        onClose={() => setIsRevenueFormulaOpen(false)}
+        currentLang={currentLang}
       />
 
       {/* Master Left-Side 3-Bar Drawer */}
@@ -405,7 +427,7 @@ export default function App() {
         isInstallable={isInstallable}
       />
 
-      {/* Builder Sovereign Vault Modal (PIN 2026, CBE: 1000167413618, Founder: ዘበነ አስፍዬ) */}
+      {/* Builder Sovereign Vault Modal (Direct Access, CBE: 1000167413618, Founder: ዘበነ አስፍዬ - Zebene Asfye) */}
       <BuilderVaultModal
         isOpen={isBuilderVaultOpen}
         onClose={() => setIsBuilderVaultOpen(false)}
@@ -432,15 +454,7 @@ export default function App() {
       />
 
       {/* Main Content Dashboard */}
-      <main className="flex-1 pb-16">
-        <div className="max-w-7xl mx-auto px-4 lg:px-8 pt-4">
-          {/* Prominent Install App Banner at top of Dashboard */}
-          <InstallAppBanner
-            onInstall={handleInstallPwa}
-            isInstallable={isInstallable}
-            currentLang={currentLang}
-          />
-        </div>
+      <main className="flex-1 pb-16 pt-2">
 
         {/* House 1: የሁሉም የጋራ ቤት */}
         {activeTarget === 'h1' && (
@@ -770,11 +784,11 @@ export default function App() {
       <footer className="bg-[#090c13] border-t border-slate-800/80 py-8 px-4 text-center text-xs text-slate-500">
         <div className="max-w-5xl mx-auto space-y-3">
           <div className="flex flex-wrap items-center justify-center gap-6 text-slate-400 font-medium">
-            <span>Oneworld · መስራች፡ ዘበነ አስፍዬ (Zebene Asfaye)</span>
+            <span>Oneworld · መስራች፡ ዘበነ አስፍዬ (Zebene Asfye)</span>
             <span>·</span>
             <span>16ቱ ዋና ዋና ቤቶች (16 Sovereign Houses)</span>
             <span>·</span>
-            <span>የ2026 ሚስጥራዊ ካዝና እና አለም አቀፍ የክፍያ ጥበቃ</span>
+            <span>ሉዓላዊ ካዝና እና አለም አቀፍ የክፍያ ጥበቃ</span>
           </div>
           <p className="text-[11px] text-slate-600">
             የአለማችን ህዝቦች በሁለንተናዊ መልካም አስተሳሰብ፣ በቴክኖሎጂ እውቀት፣ በስጋ ዝምድና፣ በሰርግ ውል፣ በፍትህና በጋራ ልማት ተሳስረው የሚኖሩበት አለም አቀፍ ሉዓላዊ አጎራ።

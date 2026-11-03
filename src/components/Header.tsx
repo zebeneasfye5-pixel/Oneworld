@@ -55,57 +55,57 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Live Global Presence */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-900/80 border border-slate-800 rounded-lg text-xs text-slate-400">
-            <span className="relative flex h-2 w-2">
+          {/* Live Global Presence */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs sm:text-sm text-slate-300">
+            <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <Users className="w-3.5 h-3.5 text-slate-400" />
-            <span className="font-medium text-slate-200">184,920</span>
-            <span className="text-[10px] text-emerald-400 font-bold">{t.header.live}</span>
+            <Users className="w-4 h-4 text-slate-300" />
+            <span className="font-extrabold text-white">184,920</span>
+            <span className="text-xs text-emerald-400 font-black">{t.header.live}</span>
           </div>
         </div>
 
         {/* Global Financial Reserve Split Notice */}
-        <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 bg-amber-950/20 border border-amber-800/30 rounded-lg text-[11px] text-amber-300">
-          <ShieldCheck className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+        <div className="hidden xl:flex items-center gap-2 px-3.5 py-2 bg-amber-950/30 border border-amber-800/40 rounded-xl text-xs font-bold text-amber-300">
+          <ShieldCheck className="w-4 h-4 text-amber-400 flex-shrink-0" />
           <span>{t.reserveRule}</span>
         </div>
 
-        {/* Right side controls: PWA, 8-Languages, Vault, Profile, Wallet */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          {/* PWA Install Button if available */}
-          {isInstallable && (
-            <button
-              onClick={onInstallPwa}
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-950/40 rounded-lg text-xs font-bold transition-all cursor-pointer"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{t.header.installApp}</span>
-            </button>
-          )}
+        {/* Right side controls: PWA Install, 8-Languages, Vault, Profile, Wallet */}
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap sm:flex-nowrap">
+          {/* PWA Install Button placed prominently and elegantly on top right */}
+          <button
+            onClick={onInstallPwa}
+            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-amber-500/25 to-amber-600/25 hover:from-amber-500/35 hover:to-amber-600/35 border border-amber-500/60 text-amber-300 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer shadow-sm group"
+            title="Oneworld አፕሊኬሽን ወደ ስልክዎ ስክሪን ይጫኑ"
+          >
+            <Smartphone className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
+            <span>{t.header.installApp}</span>
+          </button>
 
-          {/* Builder Sovereign Vault Trigger (PIN 2026) */}
+          {/* Builder Sovereign Vault Trigger */}
           <button
             onClick={onOpenBuilderVault}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-950/40 hover:bg-amber-950/80 border border-amber-600/50 rounded-lg text-xs text-amber-300 font-bold transition-all cursor-pointer"
-            title={`${t.builderVaultTitle} (2026)`}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-amber-500/50 rounded-xl text-xs sm:text-sm text-amber-300 font-black transition-all cursor-pointer"
+            title={t.builderVaultTitle}
           >
-            <Lock className="w-3.5 h-3.5 text-amber-400" />
+            <ShieldCheck className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">{t.header.vault}</span>
           </button>
 
           {/* 8-Language Selector */}
-          <div className="relative flex items-center bg-slate-900/90 border border-slate-700/70 rounded-lg px-2 py-1.5 text-xs">
-            <Globe className="w-3.5 h-3.5 text-amber-400 mr-1.5" />
+          <div className="relative flex items-center bg-slate-900/95 border border-slate-700 rounded-xl px-2.5 py-2 text-xs sm:text-sm">
+            <Globe className="w-4 h-4 text-amber-400 mr-1.5" />
             <select
               aria-label={t.header.selectLanguage}
               value={currentLang}
               onChange={(e) => onLanguageChange(e.target.value as AppLanguage)}
-              className="bg-transparent text-slate-200 focus:outline-none cursor-pointer pr-1 font-medium text-xs"
+              className="bg-transparent text-white focus:outline-none cursor-pointer pr-1 font-bold text-xs sm:text-sm"
             >
               {APP_LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code} className="bg-slate-900 text-white">
+                <option key={lang.code} value={lang.code} className="bg-slate-900 text-white font-bold">
                   {lang.flag} {lang.nativeName}
                 </option>
               ))}
@@ -115,25 +115,25 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Profile / Auth Button */}
           <button
             onClick={onOpenAuth}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs sm:text-sm font-extrabold text-slate-200 transition-colors cursor-pointer"
             title={t.header.profile}
           >
-            <User className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline max-w-[80px] truncate">{user?.fullName.split(' ')[0] || t.header.profile}</span>
+            <User className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline max-w-[90px] truncate">{user?.fullName.split(' ')[0] || t.header.profile}</span>
           </button>
 
           {/* Wallet & Royalty Activity Button */}
           <button
             onClick={onOpenWallet}
-            className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-lg font-medium text-xs shadow-md shadow-emerald-950 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 rounded-xl font-black text-xs sm:text-sm shadow-md shadow-amber-950/30 transition-all cursor-pointer"
           >
-            <Wallet className="w-3.5 h-3.5" />
+            <Wallet className="w-4 h-4 text-slate-950" />
             <div className="flex flex-col text-left">
-              <span className="text-[9px] text-emerald-200 leading-none">{t.balance}</span>
-              <span className="font-bold text-xs">{balanceETB.toLocaleString()} ብር</span>
+              <span className="text-[10px] text-slate-950 font-extrabold leading-none">{t.balance}</span>
+              <span className="font-black text-xs sm:text-sm">{balanceETB.toLocaleString()} ብር</span>
             </div>
-            <div className="hidden sm:flex items-center gap-1 pl-1.5 border-l border-emerald-400/30 text-[10px] text-amber-300 font-semibold">
-              <Sparkles className="w-3 h-3 text-amber-300" />
+            <div className="hidden sm:flex items-center gap-1 pl-1.5 border-l border-slate-900/40 text-xs text-slate-950 font-black">
+              <Sparkles className="w-3.5 h-3.5" />
               <span>+{royaltyPoints}</span>
             </div>
           </button>

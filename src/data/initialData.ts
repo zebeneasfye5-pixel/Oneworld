@@ -33,7 +33,7 @@ export const INITIAL_ROOMS: Room[] = [
     categoryLabelAm: 'ሁለንተናዊ መልካም አስተሳሰብ',
     descriptionAm: 'የአለማችንን ህዝቦች በፍቅር፣ በጋራ መከባበርና በመልካም ስነምግባር የሚያስተሳስሩ እሴቶችን መገንባት።',
     descriptionEn: 'Fostering love, mutual respect, and ethical human values across all nations.',
-    hostName: 'ዶ/ር ዘበነ አስፋው (Dr. Zebene)',
+    hostName: 'ዶ/ር ዘበነ አስፍዬ (Dr. Zebene Asfye)',
     hostAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
     activeSpeakers: 8,
     totalAudience: 1420,
@@ -108,7 +108,7 @@ export const INITIAL_ROOMS: Room[] = [
     categoryLabelAm: 'የአባላት የጋራ ቤት',
     descriptionAm: 'በአባላት ሀላፊነት ስር የሚመዘገቡ ተሳታፊዎችን የማወያየት፣ የማሰልጠን እና እውቀት የማጋራት ማዕከል።',
     descriptionEn: 'Member-led localized seminar, team coaching, and real-time cross-border dialogue.',
-    hostName: 'ዘበነ አስፋው (Zebene Asfaw - Host)',
+    hostName: 'ዘበነ አስፍዬ (Zebene Asfye - Host)',
     hostAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
     activeSpeakers: 4,
     totalAudience: 420,
@@ -136,7 +136,7 @@ export const INITIAL_OCCUPANTS: RoomOccupant[] = [
   },
   {
     id: 'occ-2',
-    name: 'ዶ/ር ዘበነ አስፋው (Host)',
+    name: 'ዶ/ር ዘበነ አስፍዬ (Dr. Zebene Asfye - Host)',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=160&q=80',
     country: 'ኢትዮጵያ',
     countryFlag: '🇪🇹',
@@ -533,7 +533,7 @@ export const INITIAL_BANK_ACCOUNTS: BankAccount[] = [
     bankName: 'የኢትዮጵያ ንግድ ባንክ (Commercial Bank of Ethiopia - CBE)',
     bankCode: 'CBE',
     accountNumber: '1000192837465',
-    holderName: 'ዘበነ አስፋው (Zebene Asfaw)',
+    holderName: 'ዘበነ አስፍዬ (Zebene Asfye)',
     isPrimary: true,
     verified: true
   },
@@ -542,7 +542,7 @@ export const INITIAL_BANK_ACCOUNTS: BankAccount[] = [
     bankName: 'ቴሌብር (Telebirr SuperApp)',
     bankCode: 'TELEBIRR',
     accountNumber: '0911234567',
-    holderName: 'ዘበነ አስፋው',
+    holderName: 'ዘበነ አስፍዬ',
     isPrimary: false,
     verified: true
   },
@@ -551,7 +551,7 @@ export const INITIAL_BANK_ACCOUNTS: BankAccount[] = [
     bankName: 'አዋሽ ባንክ (Awash Bank)',
     bankCode: 'AWASH',
     accountNumber: '01320495837200',
-    holderName: 'Zebene Asfaw',
+    holderName: 'Zebene Asfye',
     isPrimary: false,
     verified: true
   },
@@ -560,7 +560,7 @@ export const INITIAL_BANK_ACCOUNTS: BankAccount[] = [
     bankName: 'ዳሽን ባንክ (Dashen Bank / Amole)',
     bankCode: 'DASHEN',
     accountNumber: '502938471625',
-    holderName: 'Zebene Asfaw',
+    holderName: 'Zebene Asfye',
     isPrimary: false,
     verified: true
   }
