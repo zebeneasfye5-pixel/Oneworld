@@ -93,12 +93,22 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   const [activeTabCategory, setActiveTabCategory] = useState<string>('all');
   const [handRaised, setHandRaised] = useState(false);
 
-  // Zoom & Full-Body View Controls
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isFullBodyMode, setIsFullBodyMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [audioVolumeLevel, setAudioVolumeLevel] = useState<number>(0);
   const [showStageDetails, setShowStageDetails] = useState(false);
+  const [isSubRoomsOpen, setIsSubRoomsOpen] = useState(false);
+  const [floatingReactions, setFloatingReactions] = useState<Array<{ id: number; emoji: string; left: number }>>([]);
+
+  const triggerReaction = (emoji: string) => {
+    const id = Date.now() + Math.random();
+    const left = Math.floor(15 + Math.random() * 70);
+    setFloatingReactions((prev) => [...prev, { id, emoji, left }]);
+    setTimeout(() => {
+      setFloatingReactions((prev) => prev.filter((r) => r.id !== id));
+    }, 2400);
+  };
 
   const toggleFullscreen = () => {
     setIsFullscreen((prev) => !prev);
@@ -489,130 +499,8 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   const handleResetZoom = () => setZoomScale(1);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 space-y-6">
-      {/* Top Hall Selector Bar */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-[#0f1422] border-2 border-slate-800 p-4 rounded-2xl shadow-xl">
-        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 no-scrollbar">
-          <button
-            onClick={() => setActiveTabCategory('all')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-colors cursor-pointer shadow-md ${
-              activeTabCategory === 'all'
-                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400'
-                : 'text-white hover:text-amber-300 bg-slate-900 border border-slate-700'
-            }`}
-          >
-            {t.roomStage.allHalls}
-          </button>
-          <button
-            onClick={() => setActiveTabCategory('philosophy')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-colors cursor-pointer shadow-md ${
-              activeTabCategory === 'philosophy'
-                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400'
-                : 'text-white hover:text-amber-300 bg-slate-900 border border-slate-700'
-            }`}
-          >
-            {t.roomStage.philosophy}
-          </button>
-          <button
-            onClick={() => setActiveTabCategory('tech')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-colors cursor-pointer shadow-md ${
-              activeTabCategory === 'tech'
-                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400'
-                : 'text-white hover:text-amber-300 bg-slate-900 border border-slate-700'
-            }`}
-          >
-            {t.roomStage.tech}
-          </button>
-          <button
-            onClick={() => setActiveTabCategory('politics')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-colors cursor-pointer shadow-md ${
-              activeTabCategory === 'politics'
-                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400'
-                : 'text-white hover:text-amber-300 bg-slate-900 border border-slate-700'
-            }`}
-          >
-            {t.roomStage.politics}
-          </button>
-          <button
-            onClick={() => setActiveTabCategory('charity')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-colors cursor-pointer shadow-md ${
-              activeTabCategory === 'charity'
-                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400'
-                : 'text-white hover:text-amber-300 bg-slate-900 border border-slate-700'
-            }`}
-          >
-            {t.roomStage.charity}
-          </button>
-          <button
-            onClick={() => setActiveTabCategory('community')}
-            className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black whitespace-nowrap transition-colors cursor-pointer shadow-md ${
-              activeTabCategory === 'community'
-                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400'
-                : 'text-white hover:text-amber-300 bg-slate-900 border border-slate-700'
-            }`}
-          >
-            {t.roomStage.community}
-          </button>
-        </div>
-
-        {/* Create Member Hall Button */}
-        <button
-          onClick={() => setIsCreateRoomModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs sm:text-sm font-black transition-all shadow-md shadow-amber-950 cursor-pointer whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{t.roomStage.openSubHall}</span>
-        </button>
-      </div>
-
-      {/* Room Tabs Horizontal List */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        {filteredRooms.map((room) => {
-          const isSelected = room.id === currentRoom.id;
-          return (
-            <div
-              key={room.id}
-              onClick={() => onSelectRoom(room)}
-              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
-                isSelected
-                  ? 'bg-gradient-to-br from-amber-950/50 to-slate-900 border-amber-500 shadow-xl shadow-amber-950/30 ring-2 ring-amber-400/50'
-                  : 'bg-slate-900/80 border-slate-800 hover:border-amber-500/60 hover:bg-slate-900'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-xs font-black text-amber-400 uppercase tracking-wider">
-                  {room.categoryLabelAm}
-                </span>
-                {room.isLive && (
-                  <span className="flex items-center gap-1.5 text-xs text-amber-300 font-black bg-amber-950/80 border border-amber-700/60 px-2.5 py-1 rounded-full">
-                    <Radio className="w-3 h-3 animate-pulse text-amber-400" />
-                    {t.chairs.liveBadge}
-                  </span>
-                )}
-              </div>
-              <h4 className="text-sm sm:text-base font-black text-white line-clamp-1 mb-1.5">
-                {getRoomTitle(room)}
-              </h4>
-              <p className="text-xs sm:text-sm text-slate-200 font-medium line-clamp-2 mb-2.5 leading-relaxed">
-                {getRoomDesc(room)}
-              </p>
-              <div className="flex items-center justify-between text-xs sm:text-sm font-extrabold text-slate-300 pt-2.5 border-t border-slate-800">
-                <div className="flex items-center gap-2">
-                  <img
-                    src={room.hostAvatar}
-                    alt={room.hostName}
-                    className="w-5 h-5 rounded-full object-cover border border-amber-500/50"
-                  />
-                  <span className="truncate max-w-[130px] text-white font-black">{room.hostName}</span>
-                </div>
-                <span className="text-amber-400 font-black">{room.totalAudience.toLocaleString()} {t.chairs.audienceCount}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Main Virtual Hall Stage & Live Screen */}
+    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 sm:py-6 space-y-6">
+      {/* 1. Main Virtual Hall Stage & Live Screen - IMMEDIATELY AT THE VERY TOP */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Main Video Stage + Numbered Chairs */}
         <div className="lg:col-span-2 space-y-6">
@@ -883,6 +771,46 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       )}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Floating Real-Time Live Reaction Emojis Animation Layer */}
+              <div className="relative w-full h-0 pointer-events-none overflow-visible">
+                {floatingReactions.map((r) => (
+                  <span
+                    key={r.id}
+                    className="absolute bottom-2 text-3xl sm:text-4xl animate-bounce filter drop-shadow-lg pointer-events-none transition-all duration-1000 select-none z-30"
+                    style={{ left: `${r.left}%`, animation: 'floatUp 2.2s cubic-bezier(0.25, 1, 0.5, 1) forwards' }}
+                  >
+                    {r.emoji}
+                  </span>
+                ))}
+              </div>
+
+              {/* Live Interactive Reaction Bar (World-Class Social Media Innovation) */}
+              <div className="mt-3 py-2 px-3 bg-[#0a0d14]/90 border border-amber-500/30 rounded-2xl flex items-center justify-between gap-2 overflow-x-auto no-scrollbar shadow-lg">
+                <span className="text-[11px] sm:text-xs font-black text-amber-400 whitespace-nowrap pl-1">
+                  ⚡ የቀጥታ ስሜት መግለጫ (Live Reactions)፦
+                </span>
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  {[
+                    { emoji: '❤️', label: 'ፍቅር' },
+                    { emoji: '🔥', label: 'እሳት' },
+                    { emoji: '👏', label: 'ጭብጨባ' },
+                    { emoji: '👑', label: 'ክብር' },
+                    { emoji: '💎', label: 'አልማዝ' },
+                    { emoji: '🕊️', label: 'ሰላም' },
+                    { emoji: '🇪🇹', label: 'አንድነት' }
+                  ].map((btn) => (
+                    <button
+                      key={btn.emoji}
+                      onClick={() => triggerReaction(btn.emoji)}
+                      className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 active:scale-125 border border-slate-700 hover:border-amber-400 rounded-xl text-base sm:text-lg transition-transform cursor-pointer shadow-sm flex items-center gap-1"
+                      title={btn.label}
+                    >
+                      <span>{btn.emoji}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1308,6 +1236,119 @@ export const RoomStage: React.FC<RoomStageProps> = ({
             </form>
           </div>
         </div>
+      </div>
+
+      {/* 2. Sub-Halls Collapsible Section (Placed cleanly beneath stage to protect viewport) */}
+      <div className="bg-[#0f1422] border-2 border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-xl">
+              🏛️
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-amber-400">
+                ተጓዳኝ ንዑስ አዳራሾች ({filteredRooms.length})
+              </h3>
+              <p className="text-xs text-slate-300 font-medium">
+                የተለያዩ ርዕሰ-ጉዳይ ያላቸው የቀጥታ ውይይት ክፍሎች
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsCreateRoomModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black shadow cursor-pointer transition"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t.roomStage.openSubHall}</span>
+            </button>
+            <button
+              onClick={() => setIsSubRoomsOpen(!isSubRoomsOpen)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 rounded-xl text-xs font-bold cursor-pointer transition"
+            >
+              <span>{isSubRoomsOpen ? 'አዳራሾችን ደብቅ' : 'አዳራሾችን አሳይ'}</span>
+              {isSubRoomsOpen ? <ChevronUp className="w-4 h-4 text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-400" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Collapsible Sub-Rooms Drawer */}
+        {isSubRoomsOpen && (
+          <div className="mt-4 pt-4 border-t border-slate-800 space-y-4 animate-fadeIn">
+            {/* Category Filter */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+              {(['all', 'philosophy', 'tech', 'politics', 'charity', 'community'] as const).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveTabCategory(cat)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition-colors cursor-pointer ${
+                    activeTabCategory === cat
+                      ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400'
+                      : 'text-white hover:text-amber-300 bg-slate-900 border border-slate-700'
+                  }`}
+                >
+                  {cat === 'all' && t.roomStage.allHalls}
+                  {cat === 'philosophy' && t.roomStage.philosophy}
+                  {cat === 'tech' && t.roomStage.tech}
+                  {cat === 'politics' && t.roomStage.politics}
+                  {cat === 'charity' && t.roomStage.charity}
+                  {cat === 'community' && t.roomStage.community}
+                </button>
+              ))}
+            </div>
+
+            {/* Room Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {filteredRooms.map((room) => {
+                const isSelected = room.id === currentRoom.id;
+                return (
+                  <div
+                    key={room.id}
+                    onClick={() => {
+                      onSelectRoom(room);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-gradient-to-br from-amber-950/50 to-slate-900 border-amber-500 shadow-xl ring-2 ring-amber-400/50'
+                        : 'bg-slate-900/80 border-slate-800 hover:border-amber-500/60 hover:bg-slate-900'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider">
+                        {room.categoryLabelAm}
+                      </span>
+                      {room.isLive && (
+                        <span className="flex items-center gap-1 text-[10px] text-amber-300 font-black bg-amber-950/80 border border-amber-700/60 px-2 py-0.5 rounded-full">
+                          <Radio className="w-2.5 h-2.5 animate-pulse text-amber-400" />
+                          {t.chairs.liveBadge}
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-sm font-black text-white line-clamp-1 mb-1">
+                      {getRoomTitle(room)}
+                    </h4>
+                    <p className="text-xs text-slate-300 line-clamp-1 mb-2">
+                      {getRoomDesc(room)}
+                    </p>
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-300 pt-2 border-t border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <img
+                          src={room.hostAvatar}
+                          alt={room.hostName}
+                          className="w-4 h-4 rounded-full object-cover border border-amber-500/50"
+                        />
+                        <span className="truncate max-w-[110px] text-white font-bold">{room.hostName}</span>
+                      </div>
+                      <span className="text-amber-400 font-mono font-black">{room.totalAudience.toLocaleString()} {t.chairs.audienceCount}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Gift Modal */}

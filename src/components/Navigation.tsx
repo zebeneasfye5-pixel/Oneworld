@@ -74,14 +74,14 @@ export const Navigation: React.FC<NavigationProps> = ({
             <span>መመሪያና ህግ (Rules)</span>
           </button>
 
-          {/* Revenue Formula 60/10/10/20 Modal Trigger */}
+          {/* Revenue Formula 80/10/10 Modal Trigger */}
           <button
             onClick={onOpenRevenueFormula}
             className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900/90 hover:bg-slate-800 text-slate-100 hover:text-white border border-slate-700/80 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap shadow-sm"
-            title="የገቢ ክፍፍል ቀመር (60% አባል · 10% ባንክ · 10% ገንቢ · 20% ማህበረሰብ)"
+            title="የገቢ ክፍፍል ቀመር (80% አባል · 10% ባንክ · 10% ገንቢ ዘበነ አስፍዬ)"
           >
             <Scale className="w-4 h-4 text-amber-400" />
-            <span>የገቢ ቀመር (60/10/10/20)</span>
+            <span>የገቢ ቀመር (80/10/10)</span>
           </button>
 
           {/* Grand Games & Contests */}

@@ -260,7 +260,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
     photo: 'የፊት ፎቶ',
     balance: 'የሂሳብ ቀሪ',
     royaltyPoints: 'የእንቅስቃሴ ሮያሊቲ',
-    reserveRule: '60% ለአባላት · 10% ለባንክ · 10% ለገንቢው (ዘበነ አስፍዬ) · 20% ለማህበረሰብ',
+    reserveRule: '80% ለአባላት · 10% ለባንክ · 10% ለገንቢው (ዘበነ አስፍዬ)',
     builderVaultTitle: 'የገንቢው ሉዓላዊ ካዝና (Builder Sovereign Vault)',
     builderVaultDesc: 'የባለቤቱ ዘበነ አስፍዬ 10% ቋሚ ገቢና አለም አቀፍ የክፍያ መዝገብ',
     enterPin: 'የገንቢው ሉዓላዊ ካዝና',

@@ -74,7 +74,17 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   onShowToast
 }) => {
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.am;
-  const membership = houseMemberships[houseId];
+  const activeMembership: HouseMemberRecord = houseMemberships[houseId] || {
+    houseId,
+    memberId: `OW-${houseId.toUpperCase()}-001`,
+    fullName: currentUser.fullName || 'ዘበነ አስፍዬ (Zebene Asfye)',
+    avatarUrl: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
+    roleInHouse: houseRoleOptions[0] || 'Member',
+    profession: 'የመድረክ መሪና የክብር አባል',
+    registeredDate: '2026-10-26',
+    seatNumber: 1
+  };
+  const membership = activeMembership;
 
   // Registration Form State
   const [selectedRole, setSelectedRole] = useState(houseRoleOptions[0] || 'Member');

@@ -330,18 +330,18 @@ export default function App() {
   };
 
   const handleCreditBalance = (amount: number, reason: string) => {
-    const memberShare = Math.round(amount * 0.60); // 60% to member
-    const devCut = Math.round(amount * 0.10);      // 10% to builder
+    const memberShare = Math.round(amount * 0.80); // 80% to member
+    const devCut = Math.round(amount * 0.10);      // 10% to builder ዘበነ አስፍዬ
     setBalanceETB((prev) => prev + memberShare);
     setBuilderReserveETB((prev) => prev + devCut);
-    showToast(`+${memberShare.toLocaleString()} ብር ገቢ ተደርጓል (የ60% አባል ድርሻ - ${reason})`);
+    showToast(`+${memberShare.toLocaleString()} ብር ገቢ ተደርጓል (የ80% አባል ድርሻ - ${reason})`);
   };
 
   const handleAddRoyalty = (points: number, reason: string) => {
     setRoyaltyPoints((prev) => prev + points);
-    const bonusETB = Math.round(points * 0.60); // 60%
+    const bonusETB = Math.round(points * 0.80); // 80% to member
     setBalanceETB((prev) => prev + bonusETB);
-    const devCut = Math.round(bonusETB * 0.10);
+    const devCut = Math.round(bonusETB * 0.10); // 10% to builder ዘበነ አስፍዬ
     setBuilderReserveETB((prev) => prev + devCut);
     showToast(`+${points} የእንቅስቃሴ ነጥብና +${bonusETB} ብር ሮያሊቲ አግኝተዋል! (${reason})`);
   };

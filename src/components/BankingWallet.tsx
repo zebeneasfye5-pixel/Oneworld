@@ -126,9 +126,9 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
     const success = onWithdraw(amountInput, bank.bankName);
     if (!success) return;
 
-    const bankCut = Math.round(amountInput * 0.10);
-    const builderCut = Math.round(amountInput * 0.05);
-    const netPayout = amountInput - bankCut - builderCut;
+    const bankCut = Math.round(amountInput * 0.10); // 10% ለባንክ ዋስትና
+    const builderCut = Math.round(amountInput * 0.10); // 10% ለገንቢው (ዘበነ አስፍዬ)
+    const netPayout = amountInput - bankCut - builderCut; // 80% የተጣራ ለአባሉ
 
     const newTx: TransactionRecord = {
       id: `tx-${Date.now()}`,
@@ -147,7 +147,7 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
     setIsWithdrawModalOpen(false);
     confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
     alert(
-      `የወጪ ጥያቄዎ ፀድቋል!\nየተጣራ የተላከ፡ ${netPayout.toLocaleString()} ብር\nለባንክ ዋስትና (10%): ${bankCut} ብር\nለገንቢው ተቆጣቢ (5%): ${builderCut} ብር\n\nበቴሌብር / በCBE የኤስኤምኤስ ማረጋገጫ ተልኳል።`
+      `የወጪ ጥያቄዎ ፀድቋል!\nየተጣራ የተላከ (80%): ${netPayout.toLocaleString()} ብር\nለባንክ ዋስትና (10%): ${bankCut} ብር\nለገንቢው ዘበነ አስፍዬ (10%): ${builderCut} ብር\n\nበቴሌብር / በCBE የኤስኤምኤስ ማረጋገጫ ተልኳል።`
     );
   };
 

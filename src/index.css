@@ -93,3 +93,22 @@
 .animate-soundwave-2 { animation: soundwave 0.8s ease-in-out infinite 0.25s; }
 .animate-soundwave-3 { animation: soundwave 0.8s ease-in-out infinite 0.4s; }
 .animate-soundwave-4 { animation: soundwave 0.8s ease-in-out infinite 0.15s; }
+
+@keyframes floatUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-40px) scale(1.2);
+  }
+  75% {
+    opacity: 0.95;
+    transform: translateY(-160px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-240px) scale(0.7);
+  }
+}
