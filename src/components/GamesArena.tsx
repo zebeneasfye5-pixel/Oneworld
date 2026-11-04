@@ -5,6 +5,9 @@ import { SpeedMathChallenge } from './games/SpeedMathChallenge';
 import { MysteryChestsGame } from './games/MysteryChestsGame';
 import { GlobalUniversalTrivia } from './GlobalUniversalTrivia';
 import { SenterejChessGame } from './games/SenterejChessGame';
+import { QirshCoinGame } from './games/QirshCoinGame';
+import { LuckyCoinFlipGame } from './games/LuckyCoinFlipGame';
+import { LuckyNumberLotteryGame } from './games/LuckyNumberLotteryGame';
 import confetti from 'canvas-confetti';
 import { 
   Gamepad2, 
@@ -24,7 +27,7 @@ interface GamesArenaProps {
   currentLang?: AppLanguage;
 }
 
-export type GameTabType = 'trivia' | 'senterej' | 'gebeta' | 'dama' | 'speedmath' | 'chests' | 'wheel';
+export type GameTabType = 'trivia' | 'qirsh' | 'coinflip' | 'lottery' | 'senterej' | 'gebeta' | 'dama' | 'speedmath' | 'chests' | 'wheel';
 
 export const GamesArena: React.FC<GamesArenaProps> = ({ onEarnPrize, currentLang = 'am' }) => {
   const [activeGameTab, setActiveGameTab] = useState<GameTabType>('trivia');
@@ -87,6 +90,9 @@ export const GamesArena: React.FC<GamesArenaProps> = ({ onEarnPrize, currentLang
 
   const tabs: { id: GameTabType; label: string; icon: string; badge?: string }[] = [
     { id: 'trivia', label: 'ገደብ የለሽ እውቀት (Q&A)', icon: '🧠', badge: 'ኦሊምፒያድ' },
+    { id: 'qirsh', label: 'ባህላዊ ቅርሽ (Qirsh)', icon: '🪙', badge: 'ባህላዊ' },
+    { id: 'coinflip', label: 'የዕድል ሳንቲም (Coin Flip)', icon: '🦁', badge: 'እድል' },
+    { id: 'lottery', label: 'የዕድል ቁጥር ሎተሪ (Lottery)', icon: '🎟️', badge: 'ጃክፖት' },
     { id: 'senterej', label: 'ሰንጠረዥና ቼስ (Senterej)', icon: '♟️', badge: 'ታክቲክ' },
     { id: 'gebeta', label: 'ባህላዊ ገበጣ (Gebeta)', icon: '🏺', badge: 'ባህላዊ' },
     { id: 'dama', label: 'የታክቲክ ዳማ (Dama)', icon: '🎯' },
@@ -155,6 +161,21 @@ export const GamesArena: React.FC<GamesArenaProps> = ({ onEarnPrize, currentLang
       {/* Tab 1: Boundless Universal Q&A */}
       {activeGameTab === 'trivia' && (
         <GlobalUniversalTrivia onEarnPrize={onEarnPrize} userLang={currentLang} />
+      )}
+
+      {/* Tab: Traditional Qirsh Precision Toss */}
+      {activeGameTab === 'qirsh' && (
+        <QirshCoinGame onEarnPrize={onEarnPrize} />
+      )}
+
+      {/* Tab: Lucky Coin Flip (Heads or Tails) */}
+      {activeGameTab === 'coinflip' && (
+        <LuckyCoinFlipGame onEarnPrize={onEarnPrize} />
+      )}
+
+      {/* Tab: Lucky 3-Digit Lottery Draw */}
+      {activeGameTab === 'lottery' && (
+        <LuckyNumberLotteryGame onEarnPrize={onEarnPrize} />
       )}
 
       {/* Tab 2: Ethiopian Senterej & Grandmaster Chess */}

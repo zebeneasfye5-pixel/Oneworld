@@ -1,5 +1,5 @@
 import React from 'react';
-import { Scale, Users, Building2, ShieldCheck, HeartHandshake, X } from 'lucide-react';
+import { Scale, Users, Building2, ShieldCheck, X } from 'lucide-react';
 import { AppLanguage, TRANSLATIONS } from '../i18n/translations';
 
 interface RevenueFormulaModalProps {
@@ -22,7 +22,7 @@ export const RevenueFormulaModal: React.FC<RevenueFormulaModalProps> = ({
       <div className="bg-[#0f1422] border-2 border-amber-500/50 rounded-3xl w-full max-w-xl p-6 md:p-8 shadow-2xl relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg bg-slate-900 cursor-pointer transition-colors"
+          className="absolute top-4 right-4 text-slate-300 hover:text-white p-1 rounded-lg bg-slate-900 cursor-pointer transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -33,89 +33,76 @@ export const RevenueFormulaModal: React.FC<RevenueFormulaModalProps> = ({
             <Scale className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-base font-black text-white">
+            <h3 className="text-xl font-black text-amber-400">
               የOneworld ሉዓላዊ የገቢ ክፍፍል ቀመር
             </h3>
-            <p className="text-xs text-amber-400 font-bold mt-0.5">
-              60% አባል · 10% ባንክ · 10% ገንቢ (ዘበነ አስፍዬ) · 20% ማህበረሰብ
+            <p className="text-sm text-white font-bold mt-1">
+              80% ለባለቤቱ/ለአባሉ · 10% ለባንኩ · 10% ለገንቢው (ዘበነ አስፍዬ)
             </p>
           </div>
         </div>
 
-        {/* 4 Pillars of Revenue Distribution */}
-        <div className="space-y-3.5 text-xs text-slate-300">
-          {/* 60% Members */}
-          <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/30 flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 flex-shrink-0 font-black text-sm">
-              60%
+        {/* 3 Strict Pillars of Revenue Distribution (80 / 10 / 10) */}
+        <div className="space-y-4 text-xs text-white">
+          {/* 80% Owner / Member */}
+          <div className="p-4 rounded-2xl bg-slate-950 border-2 border-emerald-500/60 flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-300 flex-shrink-0 font-black text-lg">
+              80%
             </div>
             <div>
-              <h4 className="font-black text-white text-sm flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-amber-400" />
-                ቀጥታ ለአባላትና ለተሳታፊዎች (Direct to Members)
+              <h4 className="font-black text-emerald-400 text-base flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-emerald-400" />
+                ቀጥታ ለባለቤቱና ለአባሉ (Direct to Owner / Member)
               </h4>
-              <p className="mt-1 text-slate-300 leading-relaxed text-[11px]">
-                አባላት በ16ቱ ቤቶች በሚያደርጉት ንቁ ተሳትፎ፣ በውይይት፣ አዳዲስ አባላትን በመመዝገብ፣ በገበያ ሽያጭና በታለንት ውድድሮች ለሚያገኙት ገቢ 60% ያለምንም መሸራረፍ ቀጥታ ለራሳቸው ይከፈላቸዋል።
+              <p className="mt-1.5 text-white leading-relaxed text-xs">
+                ማንኛውም አባል ወይም ይዘት ፈጣሪ በ16ቱ ቤቶች፣ በንግድ፣ በስልጠና፣ በእቁብና በታለንት ውድድሮች ለሚያገኘው ገቢ ሰማንያ በመቶው (80%) ሙሉ በሙሉ ቀጥታ ወደ ግል ዋሌቱ ይገባል።
               </p>
             </div>
           </div>
 
-          {/* 10% Bank Reserve */}
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-200 flex-shrink-0 font-black text-sm">
+          {/* 10% Banking & Payment Processing */}
+          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-700 flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-white flex-shrink-0 font-black text-lg">
               10%
             </div>
             <div>
-              <h4 className="font-black text-white text-sm flex items-center gap-1.5">
+              <h4 className="font-black text-white text-base flex items-center gap-1.5">
                 <Building2 className="w-4 h-4 text-amber-400" />
-                የባንኮች ፈሳሽነትና ግብይት ዋስትና (Banking Reserve)
+                የባንኮች ፈሳሽነትና ግብይት ዋስትና (Banking & Settlement)
               </h4>
-              <p className="mt-1 text-slate-300 leading-relaxed text-[11px]">
-                በኢትዮጵያ ንግድ ባንክና በብሄራዊ ባንክ መመሪያ መሰረት የፈሳሽነትና የግብይት ዋስትና እንዲሆን 10% በመጠባበቂያነት ይቀመጣል።
+              <p className="mt-1.5 text-white leading-relaxed text-xs">
+                በአለምአቀፍና በሀገር ውስጥ የክፍያ ስርአቶች (Chapa, PayPal, Stripe እና የባንክ ኔትወርክ) ደህንነቱ የተጠበቀ ፈሳሽነት ዋስትና ሆኖ 10% ይያዛል።
               </p>
             </div>
           </div>
 
-          {/* 10% Developer / Founder */}
-          <div className="p-4 rounded-2xl bg-slate-950 border border-amber-500/40 flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 flex-shrink-0 font-black text-sm">
+          {/* 10% Developer / Platform Architect: Zebene Asfye */}
+          <div className="p-4 rounded-2xl bg-slate-950 border-2 border-amber-500/50 flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-400 flex-shrink-0 font-black text-lg">
               10%
             </div>
             <div>
-              <h4 className="font-black text-white text-sm flex items-center gap-1.5">
+              <h4 className="font-black text-amber-400 text-base flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-amber-400" />
-                ለገንቢውና ለመድረኩ መስራች (ዘበነ አስፍዬ - Zebene Asfye)
+                ለድህረ ገፁ ገንቢ (ዘበነ አስፍዬ - Zebene Asfye)
               </h4>
-              <p className="mt-1 text-slate-300 leading-relaxed text-[11px]">
-                የመድረኩ ፈጣሪና ገንቢ ዘበነ አስፍዬ (Zebene Asfye) የፈጠራ መብትና ቀጣይነት ያለው የስርዓት ጥገና ዋስትና እንዲሆን 10% ቋሚ ገቢ በቀጥታ ወደ CBE ሂሳብ 1000167413618 ይተላለፋል።
-              </p>
-            </div>
-          </div>
-
-          {/* 20% Community */}
-          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-200 flex-shrink-0 font-black text-sm">
-              20%
-            </div>
-            <div>
-              <h4 className="font-black text-white text-sm flex items-center gap-1.5">
-                <HeartHandshake className="w-4 h-4 text-amber-400" />
-                ለማህበረሰብ እቁብ፣ ሎተሪና በጎ አድራጎት (Community Solidarity)
-              </h4>
-              <p className="mt-1 text-slate-300 leading-relaxed text-[11px]">
-                ለማህበረሰብ የጋራ ፈንድ፣ ለድሃ ድሆች፣ ለወላጅ አልባ ህፃናት እና ለዲጂታል እቁብና ሎተሪ ማጠናከሪያ 20% ሙሉ በሙሉ ይውላል።
+              <p className="mt-1.5 text-white leading-relaxed text-xs">
+                የመድረኩ መስራችና መሀንዲስ ዘበነ አስፍዬ (Zebene Asfye) ሉዓላዊ የቴክኖሎጂ ፈጠራ፣ የአገልጋይ ደመና እና ቀጣይነት ያለው ሲስተም ጥገና 10% በራስ-ሰር ይደለደላል።
               </p>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="mt-6 pt-4 border-t border-slate-800 flex justify-end">
+        {/* Footer info */}
+        <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between text-xs">
+          <span className="text-white font-bold">
+            የስሌት ቀመር፡ 80% ባለቤት + 10% ባንክ + 10% ገንቢ = 100%
+          </span>
           <button
             onClick={onClose}
-            className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-xl text-xs transition cursor-pointer shadow-md shadow-amber-950/40"
+            className="px-5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-xl cursor-pointer"
           >
-            ተረድቻለሁ (Understood)
+            ተረድቻለሁ
           </button>
         </div>
       </div>

@@ -300,10 +300,15 @@ export const GlobalUniversalTrivia: React.FC<GlobalUniversalTriviaProps> = ({
   const handleNextQuestion = () => {
     setSelectedOption(null);
     setIsAnswered(false);
-    setCurrentIndex((prev) => (prev + 1) % filteredQuestions.length);
+    if (currentIndex + 1 >= filteredQuestions.length) {
+      // Reached end of current pool -> Auto-generate next question seamlessly!
+      handleGenerateInfiniteQuestion();
+    } else {
+      setCurrentIndex((prev) => prev + 1);
+    }
   };
 
-  // Generate boundless infinite new questions
+  // Generate boundless infinite new questions across all fields of human knowledge
   const handleGenerateInfiniteQuestion = () => {
     setIsGenerating(true);
     setTimeout(() => {
@@ -331,12 +336,52 @@ export const GlobalUniversalTrivia: React.FC<GlobalUniversalTriviaProps> = ({
           opts: ['የጠዋት የፀሐይ ብርሃን በቆዳችን ላይ ሲያርፍ በሰውነት የሚመረት', 'ነጭ ስኳር በብዛት መመገብ', 'ጨለማ ክፍል ውስጥ ብቻ መቆየት', 'ውሃ በበረዶ መጠጣት'],
           cIdx: 0,
           exp: 'የፀሐይ አልትራቫዮሌት ጨረሮች በቆዳችን ውስጥ ያለውን ኮሌስትሮል ወደ ቫይታሚን ዲ በመቀየር የአጥንት ጥንካሬንና የበሽታ መከላከያ ህዋሳትን ያነቃቃሉ።'
+        },
+        {
+          cat: 'የኢትዮጵያ ታሪክና ባህል',
+          icon: '🇪🇹',
+          q: 'በ12ኛው መቶ ክፍለ ዘመን ከአንድ ወጥ አለት ተፈልፍለው የተሰሩት አስደናቂዎቹ የላሊበላ አብያተ ክርስቲያናት ብዛት ስንት ነው?',
+          opts: ['11 ውቅር አብያተ ክርስቲያናት', '7 አብያተ ክርስቲያናት', '15 አብያተ ክርስቲያናት', '9 አብያተ ክርስቲያናት'],
+          cIdx: 0,
+          exp: 'ቅዱስ ላሊበላ በ12ኛው መቶ ክፍለ ዘመን 11ዱን ውቅር አብያተ ክርስቲያናት ከአንድ ወጥ አለት በመፈልፈል የሰው ልጅ የምህንድስና ድንቅ አሻራ አኑሯል።'
+        },
+        {
+          cat: 'የአለም ጂኦግራፊና ህዝቦች',
+          icon: '🌍',
+          q: 'በአለም ላይ በርዝመቱ አንደኛ የሆነውና በ11 የአፍሪካ ሀገራት ውስጥ የሚፈሰው ታላቁ ወንዝ የትኛው ነው?',
+          opts: ['የአባይ (ናይል) ወንዝ', 'የአማዞን ወንዝ', 'የሚሲሲፒ ወንዝ', 'የዳኑብ ወንዝ'],
+          cIdx: 0,
+          exp: 'የአባይ (ናይል) ወንዝ 6,650 ኪሎ ሜትር ርዝመት ያለው ሲሆን 85 በመቶ ውሀው የሚመነጨው ከኢትዮጵያ ከፍተኛ ተራሮች ነው።'
+        },
+        {
+          cat: 'ጠፈርና አስትሮኖሚ',
+          icon: '🌌',
+          q: 'በስርአተ-ፀሐይ (Solar System) ውስጥ ትልቁ ፕላኔት የትኛው ነው?',
+          opts: ['ጁፒተር (Jupiter)', 'ሳተርን (Saturn)', 'ማርስ (Mars)', 'ኔፕቱን (Neptune)'],
+          cIdx: 0,
+          exp: 'ጁፒተር ከሁሉም ፕላኔቶች በጥቅል መጠኑ እጅግ ግዙፉ ጋዛማ ፕላኔት ነው።'
+        },
+        {
+          cat: 'ስፖርትና አለም አቀፍ ድሎች',
+          icon: '🏃',
+          q: 'በ1960 የሮማ ኦሊምፒክ በማራቶን በባዶ እግሩ ሮጦ የወርቅ ሜዳሊያ በማሸነፍ ለአፍሪካ አህጉር የመጀመሪያውን የኦሊምፒክ ድል ያመጣው አትሌት ማን ነው?',
+          opts: ['ሻምበል አበበ ቢቂላ', 'ማሞ ወልዴ', 'ኃይሌ ገብረስላሴ', 'ቀነኒሳ በቀለ'],
+          cIdx: 0,
+          exp: 'ሻምበል አበበ ቢቂላ በሮማ ጎዳናዎች በባዶ እግሩ በመሮጥ አለምን ያስደነቀና የአፍሪካ የኦሊምፒክ ታሪክ ፈር ቀዳጅ ነው።'
+        },
+        {
+          cat: 'የአለም ስነ-ጽሁፍና ፍልስፍና',
+          icon: '📜',
+          q: 'በ17ኛው ክፍለ ዘመን "ሀተታ ዘዘርአ ያዕቆብ" በሚባለው ድንቅ የፍልስፍና ድርሳኑ የሰው ልጆችን እኩልነትና የአእምሮ አመክንዮን (Rationalism) ያስተማረው ኢትዮጵያዊ ፈላስፋ ማን ነው?',
+          opts: ['ዘርአ ያዕቆብ', 'ወልደ ህይወት', 'አባ ባሕርይ', 'እጨጌ ዮሐንስ'],
+          cIdx: 0,
+          exp: 'ፈላስፋው ዘርአ ያዕቆብ ከአውሮፓውያኑ ዴካርትና ሎክ ቀድሞ የሰው ልጆችን ነጻ አስተሳሰብና የህሊና አመክንዮን አጉልቶ አስተምሯል።'
         }
       ];
 
       const picked = dynamicThemes[Math.floor(Math.random() * dynamicThemes.length)];
       const newQuestion: TriviaItem = {
-        id: `dyn-q-${Date.now()}`,
+        id: `dyn-q-${Date.now()}-${Math.random().toString(36).substring(7)}`,
         category: picked.cat,
         categoryIcon: picked.icon,
         difficulty: 'የሊቃውንት ደረጃ (Mastery)',
@@ -353,7 +398,7 @@ export const GlobalUniversalTrivia: React.FC<GlobalUniversalTriviaProps> = ({
       setSelectedOption(null);
       setIsAnswered(false);
       setIsGenerating(false);
-    }, 800);
+    }, 400);
   };
 
   const handleReadQuestion = () => {

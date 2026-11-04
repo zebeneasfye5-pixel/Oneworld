@@ -694,141 +694,138 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             ? 'grid-cols-1 sm:grid-cols-2 max-w-4xl mx-auto' 
             : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-2'
         }`}>
-          {/* User's Own Video Tile */}
+          {/* User's Own Video Tile - All Text Strictly OUTSIDE Video Frame */}
           {userSeat !== null && (
-            <div className={`relative rounded-3xl bg-slate-950 border-2 border-amber-500 overflow-hidden flex items-center justify-center shadow-2xl group transition-all ${
-              isFullBodyMode ? 'h-[580px] sm:h-[640px]' : 'h-[380px] sm:h-[440px]'
-            }`}>
-              {isVideoOn && cameraActive ? (
-                <video
-                  ref={(el) => {
-                    videoRef.current = el;
-                    if (el && mediaStreamRef.current) {
-                      if (el.srcObject !== mediaStreamRef.current) {
-                        el.srcObject = mediaStreamRef.current;
-                      }
-                      el.muted = true;
-                      el.playsInline = true;
-                      el.play().catch(() => {});
-                    }
-                  }}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={`w-full h-full ${
-                    cameraFacing === 'user' ? 'transform -scale-x-100' : ''
-                  } ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'}`}
-                />
-              ) : isVideoOn && !cameraActive ? (
-                <div className="flex flex-col items-center justify-center p-6 text-center max-w-sm">
-                  {cameraError ? (
-                    <div className="bg-red-950/80 border border-red-500/60 p-3 rounded-2xl mb-3">
-                      <AlertCircle className="w-7 h-7 text-red-400 mx-auto mb-1" />
-                      <p className="text-xs font-bold text-red-200 mb-2">{cameraError}</p>
-                      <button
-                        onClick={() => startCamera(cameraFacing)}
-                        className="px-3.5 py-1.5 bg-amber-500 text-slate-950 rounded-xl text-xs font-black cursor-pointer shadow-md"
-                      >
-                        እንደገና ሞክር (Retry)
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="w-14 h-14 rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center text-amber-400 mb-3 shadow-lg">
-                        <Camera className="w-7 h-7 text-amber-400 animate-pulse" />
-                      </div>
-                      <h4 className="text-base font-black text-white mb-1">ካሜራዎ አልበራም</h4>
-                      <p className="text-xs text-slate-300 mb-3">በዚህ ቤት ፊት ለፊት በቀጥታ ለመሳተፍ ካሜራዎን ያብሩ</p>
-                      <button
-                        onClick={() => startCamera('user')}
-                        className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition transform hover:scale-105"
-                      >
-                        📹 ካሜራዬን አብራ (Start Camera)
-                      </button>
-                    </>
+            <div className="bg-slate-950/80 border-2 border-amber-500 rounded-3xl p-3.5 flex flex-col justify-between shadow-2xl">
+              {/* Top Bar OUTSIDE Video Frame */}
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+                <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md">
+                  #{userSeat} ({t.stageMedia.yourSeat})
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {cameraActive && (
+                    <button
+                      onClick={handleFlipCamera}
+                      className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-2.5 py-1 rounded-xl border border-slate-700 flex items-center gap-1 cursor-pointer transition shadow-md"
+                      title="የፊት/የኋላ ካሜራ ቀይር"
+                    >
+                      <RefreshCw className="w-3 h-3 text-amber-400" />
+                      <span>{cameraFacing === 'user' ? 'የፊት' : 'የኋላ'}</span>
+                    </button>
                   )}
                 </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center p-4 text-center">
-                  <img
-                    src={profilePhotoUrl || currentUser.avatarUrl}
-                    alt={currentUser.fullName}
-                    className="w-24 h-24 rounded-2xl object-cover border-2 border-amber-400 mb-2 shadow-lg"
+              </div>
+
+              {/* PURE VIDEO / CAMERA BOX - ZERO TEXT OVERLAY INSIDE */}
+              <div className={`relative rounded-2xl overflow-hidden bg-black border border-slate-700 w-full ${
+                isFullBodyMode ? 'h-[440px] sm:h-[500px]' : 'h-[300px] sm:h-[350px]'
+              }`}>
+                {isVideoOn && cameraActive ? (
+                  <video
+                    ref={(el) => {
+                      videoRef.current = el;
+                      if (el && mediaStreamRef.current) {
+                        if (el.srcObject !== mediaStreamRef.current) {
+                          el.srcObject = mediaStreamRef.current;
+                        }
+                        el.muted = true;
+                        el.playsInline = true;
+                        el.play().catch(() => {});
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full ${
+                      cameraFacing === 'user' ? 'transform -scale-x-100' : ''
+                    } ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'}`}
                   />
-                  <span className="text-base font-black text-white">{currentUser.fullName}</span>
-                  <span className="text-xs text-amber-300 font-bold">{membership.roleInHouse}</span>
-                </div>
-              )}
-
-              {/* Seat Tag & Flip */}
-              <div className="absolute top-3 left-3 flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-black/85 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs sm:text-sm text-amber-400 font-mono font-black border border-amber-500/40 shadow-md">
-                  <span>#{userSeat} ({t.stageMedia.yourSeat})</span>
-                </div>
-                {cameraActive && (
-                  <button
-                    onClick={handleFlipCamera}
-                    className="bg-black/85 hover:bg-black text-white text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1 cursor-pointer shadow-md"
-                    title="የፊት/የኋላ ካሜራ ቀይር"
-                  >
-                    <RefreshCw className="w-3 h-3 text-amber-400" />
-                    <span>ቀይር</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Name & Title Overlay */}
-              <div className="absolute bottom-3 left-3 flex flex-col bg-black/85 backdrop-blur-md px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-white max-w-[85%] border border-slate-800 shadow-md">
-                <span className="truncate text-sm sm:text-base font-black">{currentUser.fullName}</span>
-                <span className="text-xs text-amber-300 font-bold">{membership.roleInHouse}</span>
-              </div>
-
-              {/* Mic Icon */}
-              <div className="absolute bottom-3 right-3 p-3 rounded-2xl bg-black/85 backdrop-blur-md border border-slate-800 shadow-md">
-                {isMicOn ? (
-                  <Mic className="w-4 h-4 text-amber-400 animate-pulse" />
+                ) : isVideoOn && !cameraActive ? (
+                  <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4">
+                    <button
+                      onClick={() => startCamera('user')}
+                      className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
+                    >
+                      📹 ካሜራዬን አብራ (Start Camera)
+                    </button>
+                  </div>
                 ) : (
-                  <MicOff className="w-4 h-4 text-rose-400" />
+                  <div className="w-full h-full flex items-center justify-center bg-slate-900">
+                    <img
+                      src={profilePhotoUrl || currentUser.avatarUrl}
+                      alt={currentUser.fullName}
+                      className="w-28 h-28 rounded-2xl object-cover border-2 border-amber-400 shadow-lg"
+                    />
+                  </div>
                 )}
+              </div>
+
+              {/* Bottom Info Card OUTSIDE Video Frame */}
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
+                <div>
+                  <h4 className="text-white font-black text-sm sm:text-base">{currentUser.fullName}</h4>
+                  <p className="text-xs text-white font-medium">{membership.roleInHouse}</p>
+                </div>
+                <div>
+                  {isMicOn ? (
+                    <span className="flex items-center gap-1.5 bg-amber-950/90 border border-amber-500/70 text-white text-xs px-2.5 py-1 rounded-xl font-black">
+                      <Mic className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                      <span>ድምፅ በርቷል</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 bg-red-950/90 border border-red-500/60 text-white text-xs px-2.5 py-1 rounded-xl font-bold">
+                      <MicOff className="w-3.5 h-3.5 text-red-400" />
+                      <span>ድምፅ ጠፍቷል</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
-          {/* Other Seated Participants */}
+          {/* Other Seated Participants - All Text Strictly OUTSIDE Video Frame */}
           {participants.map((p) => (
             <div
               key={p.seatNumber}
-              className={`relative rounded-3xl bg-slate-950 border-2 overflow-hidden flex items-center justify-center shadow-2xl transition-all group ${
-                p.isSpeaking ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-slate-800'
-              } ${isFullBodyMode ? 'h-[580px] sm:h-[640px]' : 'h-[380px] sm:h-[440px]'}`}
+              className="bg-slate-950/80 border-2 border-slate-800 rounded-3xl p-3.5 flex flex-col justify-between shadow-2xl"
             >
-              <img
-                src={p.avatar}
-                alt={p.name}
-                className={`w-full h-full transition duration-500 ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'} group-hover:scale-105`}
-              />
-
-              {/* Top Seat Tag */}
-              <div className="absolute top-3 left-3 flex items-center gap-1 bg-black/80 backdrop-blur-md px-3 py-1 rounded-xl text-xs text-amber-400 font-mono font-bold border border-amber-500/40">
-                <span>#{p.seatNumber}</span>
+              {/* Top Bar OUTSIDE Video Frame */}
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+                <span className="text-xs text-white font-mono font-bold bg-slate-900 px-2.5 py-1 rounded-lg">
+                  #{p.seatNumber}
+                </span>
+                <span className="text-sm">{p.countryFlag}</span>
               </div>
 
-              {/* Name & Role */}
-              <div className="absolute bottom-3 left-3 flex flex-col bg-black/85 backdrop-blur-md px-3.5 py-2 rounded-2xl text-xs font-semibold text-white max-w-[85%] leading-tight border border-slate-800">
-                <div className="flex items-center gap-1 font-black text-sm">
-                  <span className="truncate">{p.name}</span>
-                  <span>{p.countryFlag}</span>
+              {/* PURE VIDEO FRAME - ZERO TEXT OVERLAY INSIDE */}
+              <div className={`relative rounded-2xl overflow-hidden bg-black border border-slate-700 w-full ${
+                isFullBodyMode ? 'h-[440px] sm:h-[500px]' : 'h-[300px] sm:h-[350px]'
+              }`}>
+                <img
+                  src={p.avatar}
+                  alt={p.name}
+                  className={`w-full h-full transition duration-500 ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'}`}
+                />
+              </div>
+
+              {/* Bottom Info Card OUTSIDE Video Frame */}
+              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
+                <div>
+                  <h4 className="text-white font-black text-sm sm:text-base">{p.name}</h4>
+                  <p className="text-xs text-white font-medium">{p.role}</p>
                 </div>
-                <span className="text-[11px] text-amber-300 font-bold">{p.role}</span>
-              </div>
-
-              {/* Mic */}
-              <div className="absolute bottom-3 right-3 p-2.5 rounded-2xl bg-black/80 backdrop-blur-md border border-slate-800">
-                {p.isMicOn ? (
-                  <Mic className="w-4 h-4 text-amber-400 animate-pulse" />
-                ) : (
-                  <MicOff className="w-4 h-4 text-slate-500" />
-                )}
+                <div>
+                  {p.isMicOn ? (
+                    <span className="flex items-center gap-1.5 bg-amber-950/90 border border-amber-500/70 text-white text-xs px-2.5 py-1 rounded-xl font-black">
+                      <Mic className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                      <span>ድምፅ</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 bg-slate-900 text-white text-xs px-2.5 py-1 rounded-xl">
+                      <MicOff className="w-3.5 h-3.5 text-slate-500" />
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
