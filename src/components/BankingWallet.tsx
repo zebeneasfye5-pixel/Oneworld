@@ -24,6 +24,7 @@ import {
   Percent,
   History
 } from 'lucide-react';
+import { ENV_CONFIG } from '../config/env';
 
 interface BankingWalletProps {
   balanceETB: number;
@@ -307,10 +308,10 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
               {builderReserveTotal.toLocaleString()} <span className="text-sm font-semibold text-slate-400">ብር</span>
             </div>
             <p className="text-[10px] text-slate-400 mt-0.5">
-              CBE 1000167413618 (በPIN 2026 የተጠበቀ)
+              CBE {ENV_CONFIG.CBE_ACCOUNT_NUMBER} (በPIN የተጠበቀ)
             </p>
           </div>
-          <span className="text-[10px] text-indigo-400 font-semibold">60% አባል · 10% ባንክ · 10% ገንቢ · 20% ማህበረሰብ</span>
+          <span className="text-[10px] text-indigo-400 font-semibold">80% አባል · 10% ባንክ · 10% ገንቢ (ዘበነ አስፍዬ)</span>
         </div>
       </div>
 

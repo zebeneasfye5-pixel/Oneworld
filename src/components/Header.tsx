@@ -73,69 +73,36 @@ export const Header: React.FC<HeaderProps> = ({
           <span>{t.reserveRule}</span>
         </div>
 
-        {/* Right side controls: PWA Install, 8-Languages, Vault, Profile, Wallet */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap sm:flex-nowrap">
-          {/* PWA Install Button placed prominently and elegantly on top right */}
+        {/* Right side controls: PWA Install, Quick Profile & Left Drawer Trigger */}
+        <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
+          {/* PWA Install Button placed prominently on top right */}
           <button
             onClick={onInstallPwa}
-            className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-amber-500/25 to-amber-600/25 hover:from-amber-500/35 hover:to-amber-600/35 border border-amber-500/60 text-amber-300 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer shadow-sm group"
+            className="flex items-center gap-2 px-3.5 py-2.5 bg-gradient-to-r from-amber-500/20 to-amber-600/20 hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-500/60 text-amber-300 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer shadow-sm group"
             title="Oneworld አፕሊኬሽን ወደ ስልክዎ ስክሪን ይጫኑ"
           >
             <Smartphone className="w-4 h-4 text-amber-400 group-hover:scale-110 transition-transform" />
             <span>{t.header.installApp}</span>
           </button>
 
-          {/* Builder Sovereign Vault Trigger */}
-          <button
-            onClick={onOpenBuilderVault}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-amber-500/50 rounded-xl text-xs sm:text-sm text-amber-300 font-black transition-all cursor-pointer"
-            title={t.builderVaultTitle}
-          >
-            <ShieldCheck className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">{t.header.vault}</span>
-          </button>
-
-          {/* 8-Language Selector */}
-          <div className="relative flex items-center bg-slate-900/95 border border-slate-700 rounded-xl px-2.5 py-2 text-xs sm:text-sm">
-            <Globe className="w-4 h-4 text-amber-400 mr-1.5" />
-            <select
-              aria-label={t.header.selectLanguage}
-              value={currentLang}
-              onChange={(e) => onLanguageChange(e.target.value as AppLanguage)}
-              className="bg-transparent text-white focus:outline-none cursor-pointer pr-1 font-bold text-xs sm:text-sm"
-            >
-              {APP_LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code} className="bg-slate-900 text-white font-bold">
-                  {lang.flag} {lang.nativeName}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Profile / Auth Button */}
+          {/* Quick Profile / Auth */}
           <button
             onClick={onOpenAuth}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs sm:text-sm font-extrabold text-slate-200 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs sm:text-sm font-extrabold text-slate-200 transition-colors cursor-pointer"
             title={t.header.profile}
           >
             <User className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline max-w-[90px] truncate">{user?.fullName.split(' ')[0] || t.header.profile}</span>
           </button>
 
-          {/* Wallet & Royalty Activity Button */}
+          {/* Wallet Trigger with clean balance pill */}
           <button
             onClick={onOpenWallet}
             className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 rounded-xl font-black text-xs sm:text-sm shadow-md shadow-amber-950/30 transition-all cursor-pointer"
+            title="የኪስ ቦርሳዎን ይክፈቱ (Open Wallet)"
           >
             <Wallet className="w-4 h-4 text-slate-950" />
-            <div className="flex flex-col text-left">
-              <span className="text-[10px] text-slate-950 font-extrabold leading-none">{t.balance}</span>
-              <span className="font-black text-xs sm:text-sm">{balanceETB.toLocaleString()} ብር</span>
-            </div>
-            <div className="hidden sm:flex items-center gap-1 pl-1.5 border-l border-slate-900/40 text-xs text-slate-950 font-black">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>+{royaltyPoints}</span>
-            </div>
+            <span className="font-black text-xs sm:text-sm">{balanceETB.toLocaleString()} ብር</span>
           </button>
         </div>
       </div>

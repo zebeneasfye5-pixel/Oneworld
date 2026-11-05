@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { ENV_CONFIG } from '../config/env';
 
 interface BuilderVaultModalProps {
   isOpen: boolean;
@@ -172,7 +173,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
               <div className="p-4 bg-slate-950/90 border border-slate-800 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800/80">
                   <span className="text-slate-400">የገንቢው ሙሉ ስም፡</span>
-                  <strong className="text-white text-sm font-black">ዘበነ አስፍዬ (Zebene Asfye)</strong>
+                  <strong className="text-white text-sm font-black">{ENV_CONFIG.FOUNDER_NAME_AM} ({ENV_CONFIG.FOUNDER_NAME_EN})</strong>
                 </div>
 
                 <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800/80">
@@ -186,7 +187,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">የCBE ሂሳብ ቁጥር፡</span>
                   <strong className="font-mono text-amber-300 text-sm tracking-wider font-bold">
-                    1000167413618
+                    {ENV_CONFIG.CBE_ACCOUNT_NUMBER}
                   </strong>
                 </div>
               </div>
@@ -211,7 +212,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
                     <CheckCircle2 className="w-4 h-4" />
                     ክፍያው በተሳካ ሁኔታ ተላልፏል!
                   </div>
-                  <p>ወደ CBE አካውንት 1000167413618 (ዘበነ አስፍዬ - Zebene Asfye) በቀጥታ ገቢ ተደርጓል።</p>
+                  <p>ወደ CBE አካውንት {ENV_CONFIG.CBE_ACCOUNT_NUMBER} ({ENV_CONFIG.FOUNDER_NAME_AM} - {ENV_CONFIG.FOUNDER_NAME_EN}) በቀጥታ ገቢ ተደርጓል።</p>
                 </div>
               ) : (
                 <button
@@ -219,7 +220,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
                   className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-lg shadow-amber-950/40 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <ArrowUpRight className="w-4 h-4" />
-                  <span>ገንዘቡን ወደ CBE 1000167413618 አስተላልፍ</span>
+                  <span>ገንዘቡን ወደ CBE ({ENV_CONFIG.CBE_ACCOUNT_NUMBER}) አስተላልፍ</span>
                 </button>
               )}
             </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { 
   Room, 
   RoomOccupant, 
@@ -21,31 +21,34 @@ import { HouseSelectorModal } from './components/HouseSelectorModal';
 import { RevenueFormulaModal } from './components/RevenueFormulaModal';
 import { HouseStageMedia, HouseMemberRecord } from './components/HouseStageMedia';
 import { announceLanguageSwitch } from './services/speechService';
+import { ENV_CONFIG } from './config/env';
 
-// House Views
+// Primary Foreground Live Social Agora: House 1 (Rendered eagerly)
 import { RoomStage } from './components/RoomStage';
-import { HouseFamilyKinship } from './components/houses/HouseFamilyKinship';
-import { HouseLeadership } from './components/houses/HouseLeadership';
-import { HouseConfidentialCourtship } from './components/houses/HouseConfidentialCourtship';
-import { HouseVirtualWedding } from './components/houses/HouseVirtualWedding';
-import { HouseFaith } from './components/houses/HouseFaith';
-import { HouseSecurityChamber } from './components/houses/HouseSecurityChamber';
-import { TalentShow } from './components/TalentShow';
-import { HouseMarketplaceExpo } from './components/houses/HouseMarketplaceExpo';
-import { AIAcademy } from './components/AIAcademy';
-import { HouseInstitutionalTraining } from './components/houses/HouseInstitutionalTraining';
-import { HousePsychologyCounseling } from './components/houses/HousePsychologyCounseling';
-import { HouseBrokerageMatching } from './components/houses/HouseBrokerageMatching';
-import { HouseJudicialTribunal } from './components/houses/HouseJudicialTribunal';
-import { HouseUtilityPayments } from './components/houses/HouseUtilityPayments';
-import { HouseTourismHeritage } from './components/houses/HouseTourismHeritage';
 import { useRealtimeRoom } from './services/realtimeMesh';
-
-// Auxiliary views
-import { GamesArena } from './components/GamesArena';
-import { EqubAndLottery } from './components/EqubAndLottery';
-import { BankingWallet } from './components/BankingWallet';
 import confetti from 'canvas-confetti';
+
+// Performance Architecture: React.lazy() for all 15 hidden specialized houses (h2-h16)
+const HouseFamilyKinship = lazy(() => import('./components/houses/HouseFamilyKinship').then((m) => ({ default: m.HouseFamilyKinship })));
+const HouseLeadership = lazy(() => import('./components/houses/HouseLeadership').then((m) => ({ default: m.HouseLeadership })));
+const HouseConfidentialCourtship = lazy(() => import('./components/houses/HouseConfidentialCourtship').then((m) => ({ default: m.HouseConfidentialCourtship })));
+const HouseVirtualWedding = lazy(() => import('./components/houses/HouseVirtualWedding').then((m) => ({ default: m.HouseVirtualWedding })));
+const HouseFaith = lazy(() => import('./components/houses/HouseFaith').then((m) => ({ default: m.HouseFaith })));
+const HouseSecurityChamber = lazy(() => import('./components/houses/HouseSecurityChamber').then((m) => ({ default: m.HouseSecurityChamber })));
+const TalentShow = lazy(() => import('./components/TalentShow').then((m) => ({ default: m.TalentShow })));
+const HouseMarketplaceExpo = lazy(() => import('./components/houses/HouseMarketplaceExpo').then((m) => ({ default: m.HouseMarketplaceExpo })));
+const AIAcademy = lazy(() => import('./components/AIAcademy').then((m) => ({ default: m.AIAcademy })));
+const HouseInstitutionalTraining = lazy(() => import('./components/houses/HouseInstitutionalTraining').then((m) => ({ default: m.HouseInstitutionalTraining })));
+const HousePsychologyCounseling = lazy(() => import('./components/houses/HousePsychologyCounseling').then((m) => ({ default: m.HousePsychologyCounseling })));
+const HouseBrokerageMatching = lazy(() => import('./components/houses/HouseBrokerageMatching').then((m) => ({ default: m.HouseBrokerageMatching })));
+const HouseJudicialTribunal = lazy(() => import('./components/houses/HouseJudicialTribunal').then((m) => ({ default: m.HouseJudicialTribunal })));
+const HouseUtilityPayments = lazy(() => import('./components/houses/HouseUtilityPayments').then((m) => ({ default: m.HouseUtilityPayments })));
+const HouseTourismHeritage = lazy(() => import('./components/houses/HouseTourismHeritage').then((m) => ({ default: m.HouseTourismHeritage })));
+
+// Auxiliary views lazy-loaded on demand
+const GamesArena = lazy(() => import('./components/GamesArena').then((m) => ({ default: m.GamesArena })));
+const EqubAndLottery = lazy(() => import('./components/EqubAndLottery').then((m) => ({ default: m.EqubAndLottery })));
+const BankingWallet = lazy(() => import('./components/BankingWallet').then((m) => ({ default: m.BankingWallet })));
 
 const safeConfetti = (opts?: any) => {
   try {
@@ -356,7 +359,7 @@ export default function App() {
 
   const handleDisburseToCBE = (amount: number) => {
     setBuilderReserveETB(0);
-    showToast(`የ${amount.toLocaleString()} ብር ክፍያ ወደ CBE አካውንት 1000167413618 (ዘበነ አስፍዬ) ተላልፏል!`);
+    showToast(`የ${amount.toLocaleString()} ብር ክፍያ ወደ CBE አካውንት ${ENV_CONFIG.CBE_ACCOUNT_NUMBER} (${ENV_CONFIG.FOUNDER_NAME_AM}) ተላልፏል!`);
   };
 
   return (
@@ -404,7 +407,7 @@ export default function App() {
         currentLang={currentLang}
       />
 
-      {/* Revenue Formula Modal (60% Member · 10% Bank · 10% Founder Zebene Asfye · 20% Community) */}
+      {/* Revenue Formula Modal (80% Member · 10% Bank · 10% Founder Zebene Asfye) */}
       <RevenueFormulaModal
         isOpen={isRevenueFormulaOpen}
         onClose={() => setIsRevenueFormulaOpen(false)}
@@ -420,6 +423,13 @@ export default function App() {
         currentLang={currentLang}
         onLanguageChange={handleLanguageChange}
         user={currentUser}
+        balanceETB={balanceETB}
+        balanceUSD={balanceUSD}
+        royaltyPoints={royaltyPoints}
+        onOpenWallet={() => {
+          setIsDrawerOpen(false);
+          setActiveTarget('bank');
+        }}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenBuilderVault={() => setIsBuilderVaultOpen(true)}
         onOpenCharter={() => setIsCharterOpen(true)}
@@ -427,7 +437,7 @@ export default function App() {
         isInstallable={isInstallable}
       />
 
-      {/* Builder Sovereign Vault Modal (Direct Access, CBE: 1000167413618, Founder: ዘበነ አስፍዬ - Zebene Asfye) */}
+      {/* Builder Sovereign Vault Modal (Direct Access, Founder: ዘበነ አስፍዬ - Zebene Asfye) */}
       <BuilderVaultModal
         isOpen={isBuilderVaultOpen}
         onClose={() => setIsBuilderVaultOpen(false)}
@@ -455,7 +465,12 @@ export default function App() {
 
       {/* Main Content Dashboard */}
       <main className="flex-1 pb-16 pt-2">
-
+        <Suspense fallback={
+          <div className="max-w-7xl mx-auto px-4 lg:px-8 py-16 flex flex-col items-center justify-center space-y-4">
+            <div className="w-12 h-12 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin shadow-lg" />
+            <p className="text-sm font-bold text-amber-400">የሉዓላዊ ቤቱ ይዘት በመጫን ላይ (Loading House View)...</p>
+          </div>
+        }>
         {/* House 1: የሁሉም የጋራ ቤት */}
         {activeTarget === 'h1' && (
           <RoomStage
@@ -476,7 +491,7 @@ export default function App() {
           />
         )}
 
-        {/* Houses 2 to 15: Every house has its own dedicated membership gate, Zoom stage, mic, and numbered chairs */}
+        {/* Houses 2 to 16: Lazy-Loaded with dedicated membership gate, Zoom stage, mic, and numbered chairs */}
         {activeTarget === 'h2' && (
           <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
             <HouseStageMedia
@@ -778,6 +793,7 @@ export default function App() {
             onConvertRoyalties={handleConvertRoyalties}
           />
         )}
+        </Suspense>
       </main>
 
       {/* Platform Sovereign Footer strictly branded Oneworld */}

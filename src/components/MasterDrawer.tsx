@@ -22,7 +22,9 @@ import {
   CheckCircle2, 
   Globe2,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Wallet,
+  Globe
 } from 'lucide-react';
 import { AppLanguage, TRANSLATIONS, APP_LANGUAGES } from '../i18n/translations';
 import { UserProfile } from './AuthModal';
@@ -54,6 +56,10 @@ interface MasterDrawerProps {
   currentLang: AppLanguage;
   onLanguageChange: (lang: AppLanguage) => void;
   user: UserProfile | null;
+  balanceETB?: number;
+  balanceUSD?: number;
+  royaltyPoints?: number;
+  onOpenWallet?: () => void;
   onOpenAuth: () => void;
   onOpenBuilderVault: () => void;
   onOpenCharter: () => void;
@@ -69,6 +75,10 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
   currentLang,
   onLanguageChange,
   user,
+  balanceETB = 0,
+  balanceUSD = 0,
+  royaltyPoints = 0,
+  onOpenWallet,
   onOpenAuth,
   onOpenBuilderVault,
   onOpenCharter,
@@ -153,6 +163,57 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
           >
             {t.header.profile}
           </button>
+        </div>
+
+        {/* Master Drawer De-cluttered Hub: Financial Balances & 8-Languages Selection */}
+        <div className="p-3.5 bg-slate-950/80 border-b border-slate-800 space-y-3">
+          {/* Wallet Balance & Royalty Points Card */}
+          <div 
+            onClick={() => {
+              onClose();
+              if (onOpenWallet) onOpenWallet();
+            }}
+            className="p-3 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/40 rounded-2xl flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all shadow-md group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shadow-md">
+                <Wallet className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                  {t.balance} (Wallet Balance)
+                </span>
+                <span className="text-sm font-black text-white group-hover:text-amber-300 transition-colors">
+                  {balanceETB.toLocaleString()} ብር
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded-xl text-xs text-amber-300 font-bold">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>+{royaltyPoints}</span>
+            </div>
+          </div>
+
+          {/* 8-Language Selector moved elegantly into Drawer */}
+          <div className="flex items-center justify-between p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl">
+            <div className="flex items-center gap-2">
+              <Globe className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold text-slate-300">{t.header.selectLanguage}</span>
+            </div>
+            <select
+              aria-label={t.header.selectLanguage}
+              value={currentLang}
+              onChange={(e) => onLanguageChange(e.target.value as AppLanguage)}
+              className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-bold focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              {APP_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code} className="bg-slate-900 text-white font-bold">
+                  {lang.flag} {lang.nativeName}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Search Bar for 15 Houses */}

@@ -228,8 +228,11 @@ export function useRealtimeRoom({
     let reconnectTimeout: any;
 
     function connect() {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      // Continuous wss:// protocol resolution for seamless production and dev environments
+      const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      const customWsUrl = import.meta.env.VITE_WS_URL;
+      const defaultHost = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
+      const wsUrl = customWsUrl || `${isHttps ? 'wss:' : 'ws:'}//${defaultHost}/ws`;
 
       try {
         ws = new WebSocket(wsUrl);

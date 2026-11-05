@@ -67,7 +67,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Charter, Bylaws & Rules Modal Trigger */}
           <button
             onClick={onOpenCharter}
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900/90 hover:bg-slate-800 text-slate-100 hover:text-white border border-slate-700/80 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap shadow-sm"
+            className="h-11 flex items-center gap-2 px-4 bg-slate-900/90 hover:bg-slate-800 text-slate-100 hover:text-white border border-slate-700/80 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap shadow-sm"
             title="የመድረኩ ሉዓላዊ ቻርተር፣ ህግና ደንብ መመሪያ"
           >
             <BookOpen className="w-4 h-4 text-amber-400" />
@@ -77,7 +77,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Revenue Formula 80/10/10 Modal Trigger */}
           <button
             onClick={onOpenRevenueFormula}
-            className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900/90 hover:bg-slate-800 text-slate-100 hover:text-white border border-slate-700/80 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap shadow-sm"
+            className="h-11 flex items-center gap-2 px-4 bg-slate-900/90 hover:bg-slate-800 text-slate-100 hover:text-white border border-slate-700/80 rounded-2xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer whitespace-nowrap shadow-sm"
             title="የገቢ ክፍፍል ቀመር (80% አባል · 10% ባንክ · 10% ገንቢ ዘበነ አስፍዬ)"
           >
             <Scale className="w-4 h-4 text-amber-400" />
@@ -87,10 +87,10 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Grand Games & Contests */}
           <button
             onClick={() => onSelectTarget('games')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
+            className={`h-11 flex items-center gap-2 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
               activeTarget === 'games'
                 ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400 shadow-md'
-                : 'bg-slate-900/90 text-slate-200 hover:text-white hover:bg-slate-800 border border-slate-800'
+                : 'bg-slate-900/90 text-slate-200 hover:text-white hover:bg-slate-800 border border-slate-700/80'
             }`}
           >
             <Gamepad2 className={`w-4 h-4 ${activeTarget === 'games' ? 'text-slate-950' : 'text-amber-400'}`} />
@@ -100,10 +100,10 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Digital Equb & Lottery */}
           <button
             onClick={() => onSelectTarget('equb')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
+            className={`h-11 flex items-center gap-2 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
               activeTarget === 'equb'
                 ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400 shadow-md'
-                : 'bg-slate-900/90 text-slate-200 hover:text-white hover:bg-slate-800 border border-slate-800'
+                : 'bg-slate-900/90 text-slate-200 hover:text-white hover:bg-slate-800 border border-slate-700/80'
             }`}
           >
             <Coins className={`w-4 h-4 ${activeTarget === 'equb' ? 'text-slate-950' : 'text-amber-400'}`} />
@@ -113,10 +113,10 @@ export const Navigation: React.FC<NavigationProps> = ({
           {/* Bank & Royalties */}
           <button
             onClick={() => onSelectTarget('bank')}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
+            className={`h-11 flex items-center gap-2 px-4 rounded-2xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
               activeTarget === 'bank'
                 ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400 shadow-md'
-                : 'bg-slate-900/90 text-slate-200 hover:text-white hover:bg-slate-800 border border-slate-800'
+                : 'bg-slate-900/90 text-slate-200 hover:text-white hover:bg-slate-800 border border-slate-700/80'
             }`}
           >
             <Landmark className={`w-4 h-4 ${activeTarget === 'bank' ? 'text-slate-950' : 'text-amber-400'}`} />
