@@ -228,11 +228,22 @@ export function useRealtimeRoom({
     let reconnectTimeout: any;
 
     function connect() {
-      // Continuous wss:// protocol resolution for seamless production and dev environments
+      // Continuous wss:// protocol resolution with malformed URL cleanup (e.g. wss://://onrender.com -> wss://onrender.com/ws)
       const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-      const customWsUrl = import.meta.env.VITE_WS_URL;
+      const rawCustomUrl = (import.meta.env.VITE_WS_URL || '').trim();
       const defaultHost = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
-      const wsUrl = customWsUrl || `${isHttps ? 'wss:' : 'ws:'}//${defaultHost}/ws`;
+
+      let wsUrl = '';
+      if (rawCustomUrl) {
+        // Sanitize any accidentally malformed strings (like wss://://hostname or missing path)
+        let cleaned = rawCustomUrl.replace(/^(wss?:\/\/)+/, '').replace(/^\/+/, '');
+        if (!cleaned.endsWith('/ws') && !cleaned.includes('?')) {
+          cleaned = `${cleaned}/ws`;
+        }
+        wsUrl = `wss://${cleaned}`;
+      } else {
+        wsUrl = `${isHttps ? 'wss:' : 'ws:'}//${defaultHost}/ws`;
+      }
 
       try {
         ws = new WebSocket(wsUrl);
