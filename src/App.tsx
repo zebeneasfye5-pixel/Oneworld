@@ -14,15 +14,18 @@ import { AppLanguage, TRANSLATIONS } from './i18n/translations';
 import { Header } from './components/Header';
 import { Navigation, MainNavigationTarget } from './components/Navigation';
 import { MasterDrawer, HouseId } from './components/MasterDrawer';
-import { BuilderVaultModal } from './components/BuilderVaultModal';
-import { AuthModal, UserProfile } from './components/AuthModal';
-import { FoundingCharterModal } from './components/FoundingCharterModal';
-import { HouseSelectorModal } from './components/HouseSelectorModal';
-import { RevenueFormulaModal } from './components/RevenueFormulaModal';
-import { AdminAuditDashboard } from './admin/AdminAuditDashboard';
+import type { UserProfile } from './components/AuthModal';
 import { HouseStageMedia, HouseMemberRecord } from './components/HouseStageMedia';
 import { announceLanguageSwitch } from './services/speechService';
 import { ENV_CONFIG } from './config/env';
+
+// Lazy-loaded on-demand modals for ultra-fast initial page speed
+const BuilderVaultModal = lazy(() => import('./components/BuilderVaultModal').then((m) => ({ default: m.BuilderVaultModal })));
+const AuthModal = lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
+const FoundingCharterModal = lazy(() => import('./components/FoundingCharterModal').then((m) => ({ default: m.FoundingCharterModal })));
+const HouseSelectorModal = lazy(() => import('./components/HouseSelectorModal').then((m) => ({ default: m.HouseSelectorModal })));
+const RevenueFormulaModal = lazy(() => import('./components/RevenueFormulaModal').then((m) => ({ default: m.RevenueFormulaModal })));
+const AdminAuditDashboard = lazy(() => import('./admin/AdminAuditDashboard').then((m) => ({ default: m.AdminAuditDashboard })));
 
 // Primary Foreground Live Social Agora: House 1 (Rendered eagerly)
 import { RoomStage } from './components/RoomStage';
@@ -142,9 +145,30 @@ export default function App() {
     };
   }, []);
 
+  // 100% Offline Autonomy & Network State Synchronization
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      showToast('🟢 ኢንተርኔት ተመልሷል - መስመር ላይ ነዎት (Online)');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showToast('⚡ ኢንተርኔት የለም - ሙሉ በሙሉ ከመስመር ውጭ (100% Offline Mode) በመስራት ላይ ነዎት');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const handleInstallPwa = async () => {
     if (!deferredInstallPrompt) {
-      alert('መተግበሪያውን በቀላሉ ወደ ስልክዎ ስክሪን ለመጫን በብራውዘርዎ የ"Add to Home Screen" አማራጭ ይጠቀሙ።');
+      showToast('መተግበሪያውን ወደ ስልክዎ ለመጫን በብራውዘርዎ የ"Add to Home Screen" አማራጭ ይጠቀሙ።');
       return;
     }
     try {
@@ -175,18 +199,73 @@ export default function App() {
     verifiedAt: '2026-10-26'
   });
 
-  // Financial Balances (Revenue Sharing Formula: 60% Member, 10% Bank, 10% Founder/Developer ዘበነ አስፍዬ, 20% Community)
-  const [balanceETB, setBalanceETB] = useState<number>(34850);
-  const [balanceUSD, setBalanceUSD] = useState<number>(290);
-  const [royaltyPoints, setRoyaltyPoints] = useState<number>(620);
-  const [builderReserveETB, setBuilderReserveETB] = useState<number>(18420); // 10% developer sovereign treasury (ዘበነ አስፍዬ)
+  // Financial Balances with 100% Offline LocalStorage Persistence
+  const [balanceETB, setBalanceETB] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('oneworld_balance_etb');
+      return saved ? Number(saved) : 34850;
+    } catch {
+      return 34850;
+    }
+  });
+  const [balanceUSD, setBalanceUSD] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('oneworld_balance_usd');
+      return saved ? Number(saved) : 290;
+    } catch {
+      return 290;
+    }
+  });
+  const [royaltyPoints, setRoyaltyPoints] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('oneworld_royalty_points');
+      return saved ? Number(saved) : 620;
+    } catch {
+      return 620;
+    }
+  });
+  const [builderReserveETB, setBuilderReserveETB] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('oneworld_builder_reserve');
+      return saved ? Number(saved) : 18420;
+    } catch {
+      return 18420;
+    }
+  });
+
+  // Save balances automatically to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('oneworld_balance_etb', balanceETB.toString());
+      localStorage.setItem('oneworld_balance_usd', balanceUSD.toString());
+      localStorage.setItem('oneworld_royalty_points', royaltyPoints.toString());
+      localStorage.setItem('oneworld_builder_reserve', builderReserveETB.toString());
+    } catch {}
+  }, [balanceETB, balanceUSD, royaltyPoints, builderReserveETB]);
 
   // Virtual Rooms State (House 1)
   const [rooms, setRooms] = useState<Room[]>(INITIAL_ROOMS);
   const [currentRoom, setCurrentRoom] = useState<Room>(INITIAL_ROOMS[0]);
   const [occupants, setOccupants] = useState<RoomOccupant[]>(INITIAL_OCCUPANTS);
   const [messages, setMessages] = useState<LiveSpeechMessage[]>(INITIAL_SPEECH_MESSAGES);
-  const [userSeatedNumber, setUserSeatedNumber] = useState<number | null>(1);
+  const [userSeatedNumber, setUserSeatedNumber] = useState<number | null>(() => {
+    try {
+      const saved = localStorage.getItem('oneworld_user_seat');
+      return saved ? Number(saved) : 1;
+    } catch {
+      return 1;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (userSeatedNumber !== null) {
+        localStorage.setItem('oneworld_user_seat', userSeatedNumber.toString());
+      } else {
+        localStorage.removeItem('oneworld_user_seat');
+      }
+    } catch {}
+  }, [userSeatedNumber]);
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -374,6 +453,14 @@ export default function App() {
         </div>
       )}
 
+      {/* Offline Mode Active Banner */}
+      {!isOnline && (
+        <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 font-black text-xs py-2 px-4 text-center flex items-center justify-center gap-2 shadow-lg z-50">
+          <span>⚡</span>
+          <span>ኢንተርኔት የለም — መተግበሪያው ሙሉ በሙሉ ከመስመር ውጭ (100% Offline Mode) ያለገደብ በመስራት ላይ ነው</span>
+        </div>
+      )}
+
       {/* Global Top Header with 3-bar hamburger & 8 languages */}
       <Header
         currentLang={currentLang}
@@ -400,22 +487,6 @@ export default function App() {
         onOpenRevenueFormula={() => setIsRevenueFormulaOpen(true)}
       />
 
-      {/* 16 Houses Hub Modal (Collapsed selector for all 16 houses) */}
-      <HouseSelectorModal
-        isOpen={isHouseHubOpen}
-        onClose={() => setIsHouseHubOpen(false)}
-        activeHouse={activeTarget.startsWith('h') ? (activeTarget as HouseId) : 'h1'}
-        onSelectHouse={(hId) => setActiveTarget(hId)}
-        currentLang={currentLang}
-      />
-
-      {/* Revenue Formula Modal (80% Member · 10% Bank · 10% Founder Zebene Asfye) */}
-      <RevenueFormulaModal
-        isOpen={isRevenueFormulaOpen}
-        onClose={() => setIsRevenueFormulaOpen(false)}
-        currentLang={currentLang}
-      />
-
       {/* Master Left-Side 3-Bar Drawer */}
       <MasterDrawer
         isOpen={isDrawerOpen}
@@ -440,37 +511,68 @@ export default function App() {
         isInstallable={isInstallable}
       />
 
-      {/* Builder Sovereign Vault Modal (Direct Access, Founder: ዘበነ አስፍዬ - Zebene Asfye) */}
-      <BuilderVaultModal
-        isOpen={isBuilderVaultOpen}
-        onClose={() => setIsBuilderVaultOpen(false)}
-        builderReserveETB={builderReserveETB}
-        onDisburseToCBE={handleDisburseToCBE}
-      />
+      {/* Lazy-Loaded Auxiliary Modals (Loaded only when opened for zero initial overhead) */}
+      <Suspense fallback={null}>
+        {/* 16 Houses Hub Modal (Collapsed selector for all 16 houses) */}
+        {isHouseHubOpen && (
+          <HouseSelectorModal
+            isOpen={isHouseHubOpen}
+            onClose={() => setIsHouseHubOpen(false)}
+            activeHouse={activeTarget.startsWith('h') ? (activeTarget as HouseId) : 'h1'}
+            onSelectHouse={(hId) => setActiveTarget(hId)}
+            currentLang={currentLang}
+          />
+        )}
 
-      {/* Auth & Profile Modal with Real Photo Upload */}
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        currentUser={currentUser}
-        onSaveProfile={(prof) => {
-          setCurrentUser(prof);
-          showToast(t.announcements.profileSaved);
-        }}
-      />
+        {/* Revenue Formula Modal (80% Member · 10% Bank · 10% Founder Zebene Asfye) */}
+        {isRevenueFormulaOpen && (
+          <RevenueFormulaModal
+            isOpen={isRevenueFormulaOpen}
+            onClose={() => setIsRevenueFormulaOpen(false)}
+            currentLang={currentLang}
+          />
+        )}
 
-      {/* Founding Charter Modal */}
-      <FoundingCharterModal
-        isOpen={isCharterOpen}
-        onClose={() => setIsCharterOpen(false)}
-        currentLang={currentLang}
-      />
+        {/* Builder Sovereign Vault Modal (Direct Access, Founder: ዘበነ አስፍዬ - Zebene Asfye) */}
+        {isBuilderVaultOpen && (
+          <BuilderVaultModal
+            isOpen={isBuilderVaultOpen}
+            onClose={() => setIsBuilderVaultOpen(false)}
+            builderReserveETB={builderReserveETB}
+            onDisburseToCBE={handleDisburseToCBE}
+          />
+        )}
 
-      {/* Admin Audit & Operations Dashboard */}
-      <AdminAuditDashboard
-        isOpen={isAdminAuditOpen}
-        onClose={() => setIsAdminAuditOpen(false)}
-      />
+        {/* Auth & Profile Modal with Real Photo Upload */}
+        {isAuthOpen && (
+          <AuthModal
+            isOpen={isAuthOpen}
+            onClose={() => setIsAuthOpen(false)}
+            currentUser={currentUser}
+            onSaveProfile={(prof) => {
+              setCurrentUser(prof);
+              showToast(t.announcements.profileSaved);
+            }}
+          />
+        )}
+
+        {/* Founding Charter Modal */}
+        {isCharterOpen && (
+          <FoundingCharterModal
+            isOpen={isCharterOpen}
+            onClose={() => setIsCharterOpen(false)}
+            currentLang={currentLang}
+          />
+        )}
+
+        {/* Admin Audit & Operations Dashboard */}
+        {isAdminAuditOpen && (
+          <AdminAuditDashboard
+            isOpen={isAdminAuditOpen}
+            onClose={() => setIsAdminAuditOpen(false)}
+          />
+        )}
+      </Suspense>
 
       {/* Main Content Dashboard */}
       <main className="flex-1 pb-16 pt-2">

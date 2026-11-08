@@ -59,12 +59,14 @@
     
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- Register Offline Service Worker -->
+    <!-- Instant Offline Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((reg) => {
+            console.log('[Oneworld PWA] Offline Engine Active:', reg.scope);
+          })
+          .catch((err) => console.warn('[Oneworld PWA] SW error:', err));
       }
     </script>
   </body>
