@@ -53,7 +53,7 @@ export const HouseSelectorModal: React.FC<HouseSelectorModalProps> = ({
     { id: 'h9', num: 9, icon: Store, title: t.houses.h9.title, desc: t.houses.h9.desc, tag: 'ማስታወቂያና ገበያ' },
     { id: 'h10', num: 10, icon: GraduationCap, title: t.houses.h10.title, desc: t.houses.h10.desc, tag: 'ትምህርት ቤት' },
     { id: 'h11', num: 11, icon: Briefcase, title: t.houses.h11.title, desc: t.houses.h11.desc, tag: 'ተቋማዊ ስልጠና' },
-    { id: 'h12', num: 12, icon: Brain, title: t.houses.h12.title, desc: t.houses.h12.desc, tag: 'ሳይኮሎጂና ምክር' },
+    { id: 'h12', num: 12, icon: Brain, title: t.houses.h12.title, desc: t.houses.h12.desc, tag: 'ሳይኮሎጂና ጤና' },
     { id: 'h13', num: 13, icon: Compass, title: t.houses.h13.title, desc: t.houses.h13.desc, tag: 'ድለላና ፈላጊ' },
     { id: 'h14', num: 14, icon: Scale, title: t.houses.h14.title, desc: t.houses.h14.desc, tag: 'አቤቱታና ዳኝነት' },
     { id: 'h15', num: 15, icon: Receipt, title: t.houses.h15.title, desc: t.houses.h15.desc, tag: 'የአገልግሎት ክፍያ' },

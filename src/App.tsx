@@ -19,6 +19,7 @@ import { AuthModal, UserProfile } from './components/AuthModal';
 import { FoundingCharterModal } from './components/FoundingCharterModal';
 import { HouseSelectorModal } from './components/HouseSelectorModal';
 import { RevenueFormulaModal } from './components/RevenueFormulaModal';
+import { AdminAuditDashboard } from './admin/AdminAuditDashboard';
 import { HouseStageMedia, HouseMemberRecord } from './components/HouseStageMedia';
 import { announceLanguageSwitch } from './services/speechService';
 import { ENV_CONFIG } from './config/env';
@@ -87,6 +88,7 @@ export default function App() {
   const [isCharterOpen, setIsCharterOpen] = useState(false);
   const [isHouseHubOpen, setIsHouseHubOpen] = useState(false);
   const [isRevenueFormulaOpen, setIsRevenueFormulaOpen] = useState(false);
+  const [isAdminAuditOpen, setIsAdminAuditOpen] = useState(false);
 
   // PWA Install State
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
@@ -433,6 +435,7 @@ export default function App() {
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenBuilderVault={() => setIsBuilderVaultOpen(true)}
         onOpenCharter={() => setIsCharterOpen(true)}
+        onOpenAdminAudit={() => setIsAdminAuditOpen(true)}
         onInstallPwa={handleInstallPwa}
         isInstallable={isInstallable}
       />
@@ -461,6 +464,12 @@ export default function App() {
         isOpen={isCharterOpen}
         onClose={() => setIsCharterOpen(false)}
         currentLang={currentLang}
+      />
+
+      {/* Admin Audit & Operations Dashboard */}
+      <AdminAuditDashboard
+        isOpen={isAdminAuditOpen}
+        onClose={() => setIsAdminAuditOpen(false)}
       />
 
       {/* Main Content Dashboard */}

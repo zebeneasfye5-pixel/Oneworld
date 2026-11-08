@@ -100,7 +100,7 @@ export const OneWorldLogo: React.FC<OneWorldLogoProps> = ({
             </span>
           </div>
           <span className={`text-slate-400 font-medium tracking-wide mt-0.5 ${currentSize.sub}`}>
-            15ቱ ዋና ዋና ቤቶች ማህበራዊ አጎራ
+            16ቱ ዋና ዋና ቤቶች ማህበራዊ አጎራ
           </span>
         </div>
       )}

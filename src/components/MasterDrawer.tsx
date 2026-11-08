@@ -42,7 +42,7 @@ export type HouseId =
   | 'h9'  // የማስታወቂያና የገበያ ቤት
   | 'h10' // የትምህርት ቤት
   | 'h11' // ተቋማዊ ስልጠና መስጫ አዳራሽ
-  | 'h12' // የምክርና ሳይኮሎጂ ትሪትመንት ቤት
+  | 'h12' // የሳይኮሎጂ እና የጤና አገልግሎት ቤት
   | 'h13' // የድለላና ፈላጊ/ተፈላጊ ቤት
   | 'h14' // የአቤቱታና የዳኝነት ቤት
   | 'h15' // የአገልግሎት ክፍያ ቤት
@@ -63,6 +63,7 @@ interface MasterDrawerProps {
   onOpenAuth: () => void;
   onOpenBuilderVault: () => void;
   onOpenCharter: () => void;
+  onOpenAdminAudit?: () => void;
   onInstallPwa: () => void;
   isInstallable: boolean;
 }
@@ -82,6 +83,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
   onOpenAuth,
   onOpenBuilderVault,
   onOpenCharter,
+  onOpenAdminAudit,
   onInstallPwa,
   isInstallable
 }) => {
@@ -310,6 +312,25 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
             <BookOpen className="w-4 h-4 text-amber-400" />
             <span>{t.announcements.charterBtn}</span>
           </button>
+
+          {/* Admin Audit Dashboard */}
+          {onOpenAdminAudit && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenAdminAudit();
+              }}
+              className="w-full flex items-center justify-between p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs sm:text-sm font-extrabold text-slate-200 cursor-pointer transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <span>የኦዲትና አስተዳደር ማዕከል (Audit)</span>
+              </div>
+              <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-700">
+                80/10/10
+              </span>
+            </button>
+          )}
 
           {/* Install PWA Button */}
           {isInstallable && (

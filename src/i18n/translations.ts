@@ -217,7 +217,7 @@ export interface TranslationDictionary {
     tags: Record<string, string>;
   };
 
-  // 15 Sovereign Houses
+  // 16 Sovereign Houses
   houses: {
     h1: HouseInfo;
     h2: HouseInfo;
@@ -241,7 +241,7 @@ export interface TranslationDictionary {
 export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
   am: {
     appName: 'Oneworld',
-    appSubtitle: 'የአለማችን ህዝቦች የጋራ 15ቱ ዋና ዋና ቤቶችና ማህበራዊ መድረክ',
+    appSubtitle: 'የአለማችን ህዝቦች የጋራ 16ቱ ዋና ዋና ቤቶችና ማህበራዊ መድረክ',
     dashboard: 'ዋና ዳሽቦርድ',
     installApp: 'ወደ ስልክ ጫን (Install App)',
     installedNotice: 'መተግበሪያው በስልክዎ ላይ ተጭኗል',
@@ -422,10 +422,11 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
         h9: 'ገበያ',
         h10: 'ትምህርት',
         h11: 'ስልጠና',
-        h12: 'ሳይኮሎጂ',
+        h12: 'ሳይኮሎጂና ጤና',
         h13: 'ድለላ',
         h14: 'ዳኝነት',
-        h15: 'ክፍያ'
+        h15: 'ክፍያ',
+        h16: 'ቱሪዝም'
       }
     },
     houses: {
@@ -435,12 +436,12 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h4: { title: '4. የሚስጥር ቤት', desc: 'በትዳር የሚፈላለጉ ጥንዶችና ሚስጥረኞች ሳይባክን የሚመካከሩበት የተጠበቀ ጓዳ', roles: ['የትዳር ፈላጊ ጥንዶች', 'የህይወትና ትዳር ሚስጥር አማካሪ', 'የተጠበቀ ተመካካሪ', 'የቤተሰብ ሽማግሌ'] },
       h5: { title: '5. የሰርግ ቤት', desc: 'የቀጥታ ቪዲዮ የኦንላይን ሰርግ ስነ-ስርአት፣ ሚዜዎች፣ ሽማግሌዎች፣ ጥሎሽና አለም አቀፍ ህጋዊ የጋብቻ ውል ሰነድ', roles: ['ሙሽራ / ሙሽሪት', 'ሚዜ', 'አጋቢ ሽማግሌ', 'የሰርግ ምስክር', 'የክብር ታዳሚ'] },
       h6: { title: '6. የእምነት ቤት', desc: 'ሁሉም እምነቶች እንደየ እምነታቸው ተመዝግበው በየራሳቸው ግሩፕ የሚማማሩበት መንፈሳዊ ማዕከል', roles: ['የሃይማኖት አባት / መምህር', 'የሰንበት/ተመራማሪ አባል', 'የሰላምና አንድነት አምባሳደር', 'ተማሪ'] },
-      h7: { title: '7. የደህንነት አስጠባቂ ቤት', desc: 'የደህንነት ፓሊሶችና የፀጥታ አካላት የሚረብሹ እንቅስቃሴዎችን የሚከታተሉበትና የሚመክሩበት', roles: ['የሰላምና ፀጥታ ሃላፊ', 'የሳይበር ደህንነት ተቆጣጣሪ', 'የህግ አስከባሪ መኮንን', 'የማህበረሰብ ጥበቃ'] },
+      h7: { title: '7. የደህንነት አስጠባቂ ቤት', desc: 'የአለም አቀፍ የወንጀል ክትትል፣ የዲጂታል ፎረንሲክስ፣ የተጠርጣሪዎች ማጣሪያ እና የሀገራት የሰነድ ልውውጥ ሉዓላዊ ኔትወርክ', roles: ['የአለም አቀፍ ወንጀል መርማሪ / ኢንተርፖል', 'የሳይበርና ፎረንሲክስ ስፔሻሊስት', 'የፍትህና የህግ አስከባሪ መኮንን', 'የዲፕሎማሲና አሳልፎ የመስጠት አስተባባሪ'] },
       h8: { title: '8. የታለንት ሾው ቤት', desc: 'የቴክኖሎጂ ፈጠራ፣ መሪነት፣ ሙዚቃ፣ ኮሜዲ፣ ትምህርትና ተሰጥኦዎች በዳኞችና በላይክ የሚወዳደሩበት', roles: ['ተወዳዳሪ ባለተሰጥኦ', 'ዋና ዳኛ', 'የሙዚቃና ጥበብ አሰልጣኝ', 'የታዳሚ ድምፅ ሰጪ'] },
       h9: { title: '9. የማስታወቂያና የገበያ ቤት', desc: 'አምራቾች፣ ነጋዴዎችና ባለሀብቶች ምርታቸውን በቪዲዮና ድምፅ የሚያስተዋውቁበትና ቀጥታ የሚሸጡበት', roles: ['ዋና አምራች / ላኪ', 'ነጋዴ / ቸርቻሪ', 'ገዢ / ሸማች', 'የንግድ ድርድር አስተባባሪ'] },
       h10: { title: '10. የትምህርት ቤት', desc: 'አለም አቀፍ ቋንቋ፣ AI፣ ቴክኖሎጂ፣ ሂሳብ፣ ጤና፣ ፊዚክስና ጥንታዊ ጥበባት አጫጭር ትምህርቶች የሚሰጡበት', roles: ['የዩኒቨርሲቲ ፕሮፌሰር / መምህር', 'የAIና ቴክኖሎጂ አሰልጣኝ', 'ተማሪ / ተመራማሪ', 'የጥበብ አዋቂ'] },
       h11: { title: '11. ተቋማዊ ስልጠና መስጫ አዳራሽ', desc: 'በአለም፣ በሀገር፣ በክልል፣ በወረዳና በቀበሌ ደረጃ መንግስታዊና መንግስታዊ ላልሆኑ ተቋማት የቪዲዮ ስልጠና', roles: ['የተቋም ዋና ስራ አስፈፃሚ', 'የስልጠና ዳይሬክተር', 'ሰልጣኝ ሰራተኛ', 'የአቅም ግንባታ ባለሙያ'] },
-      h12: { title: '12. የምክርና ሳይኮሎጂ ትሪትመንት ቤት', desc: 'የስነ-ልቦና ህክምናና የምክር አገልግሎት ሰጪዎች ከተገልጋዮች ጋር በቪዲዮና ድምፅ የሚገናኙበት', roles: ['ክሊኒካል ሳይኮሎጂስት', 'የአዕምሮ ጤና አማካሪ', 'ተገልጋይ / ታካሚ', 'የማገገሚያ አስተባባሪ'] },
+      h12: { title: '12. የሳይኮሎጂ እና የጤና አገልግሎት ቤት', desc: 'የስነ-ልቦና ህክምና እና የጤና ባለሙያዎች ከተገልጋዮች ጋር በቪዲዮና ድምፅ የሚገናኙበት ሚስጥራዊ ክሊኒክ', roles: ['የጤናና ስነ-ልቦና ስፔሻሊስት', 'ክሊኒካል ሳይኮሎጂስት', 'የአዕምሮ ጤና አማካሪ', 'ተገልጋይ / ታካሚ'] },
       h13: { title: '13. የድለላና ፈላጊ/ተፈላጊ ቤት', desc: 'ደላሎችና ተገልጋዮች እንዲሁም በቀጥታ ፈላጊና ተፈላጊ ተገናኝተው ጉዳያቸውን የሚፈፅሙበት', roles: ['ህጋዊ የሪልስቴትና መኪና ደላላ', 'የሸቀጥ አቅራቢ / ፈላጊ', 'ቀጥታ ገዥ / ተከራይ', 'የንግድ አማካሪ'] },
       h14: { title: '14. የአቤቱታና የዳኝነት ቤት', desc: 'ዳኞችና በደል የደረሰባቸው አቤቱታ አቅራቢዎች ተገናኝተው ውሳኔ በድምፅና በሰነድ የሚያገኙበት ፍርድ ቤት', roles: ['የግልግል ዳኛ', 'ጠበቃና የህግ አማካሪ', 'አቤቱታ አቅራቢ', 'ተከሳሽ / መልስ ሰጪ'] },
       h15: { title: '15. የአገልግሎት ክፍያ ቤት', desc: 'የመብራት፣ የውሃ፣ የትራንስፖርትና ሌሎች አገልግሎቶች ክፍያ በCBE እና ቴሌብር የሚፈፀምበት', roles: ['የመብራትና ውሃ ተጠቃሚ', 'የክፍያ ዴስክ ኦፊሰር', 'የባንክ አስተባባሪ', 'የቴሌኮም ተጠቃሚ'] },
@@ -794,9 +795,9 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       title: 'ምምስራት፣ ሕግን መምርሕን መድረኽ «OneWorld» (Official Charter)',
       founderLabel: 'መስራቲ፡ ዘበነ አስፍዬ (Zebene Asfye) · ጥቅምቲ 2026 ፈ',
       section1Title: 'ክፍሊ ፩፡ ኣዋጅ ምምስራትን ራእይን',
-      section1Text1: 'እዚ «OneWorld» ዝተሰምየ ናይ 15 ኣባይቲ ሓባራዊ መድረኽ ደቂ ሰባት ብኢትዮጵያዊ መራሒ ራእይ ዘበነ አስፍዬ (Zebene Asfye) ኣብ 2026 ዝተመስረተ ሉኣላዊ መድረኽ እዩ።',
+      section1Text1: 'እዚ «OneWorld» ዝተሰምየ ናይ 16 ኣባይቲ ሓባራዊ መድረኽ ደቂ ሰባት ብኢትዮጵያዊ መራሒ ራእይ ዘበነ አስፍዬ (Zebene Asfye) ኣብ 2026 ዝተመስረተ ሉኣላዊ መድረኽ እዩ።',
       section1Text2: 'ቀንዲ ዕላማኡ ንህዝቢ ዓለም ብጽቡቕ ኣተሓሳስባ፣ ብቴክኖሎጂ፣ ብፖለቲካዊን ቁጠባዊን ሓሳባት ንምቅርራብን ሓድነት ንምህናጽን እዩ።',
-      section2Title: 'ክፍሊ ፪፡ ሓለዋን ምፍላይን ሓበሬታ 15ቱ ኣባይቲ (Data Isolation)',
+      section2Title: 'ክፍሊ ፪፡ ሓለዋን ምፍላይን ሓበሬታ 16ቱ ኣባይቲ (Data Isolation)',
       section2Rule1: 'ምስጢራዊነት ሓበሬታ፡ ሓደ ቤት ካብ ካልእ ቤት ዝኾነ ሓበሬታ ክረክብ ኣይክእልን። ኩሉ ዘተታት ኣብቲ ቤቱ ጥራይ ዝተሓጽረ እዩ።',
       section2Rule2: 'ውዕል መርዓን ፍርድን፡ ኣብ ቤተ መርዓን ቤተ ፍርድን ዝግበር ውዕል ብዓለምለኸ ሕጊ ፍትሓብሄር ተመዝጊቡ ሕጋዊ ማሕተም ይወሃቦ።',
       section3Title: 'ክፍሊ ፫፡ ኣከፋፍላ ኣታዊ፣ ባንክን ኮሚሽን መሃዚን (60% / 10% / 10% / 20%)',
@@ -865,7 +866,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
   },
   en: {
     appName: 'Oneworld',
-    appSubtitle: 'Global 15 Sovereign Houses & Universal Knowledge Agora',
+    appSubtitle: 'Global 16 Sovereign Houses & Universal Knowledge Agora',
     dashboard: 'Main Dashboard',
     installApp: 'Install App on Phone',
     installedNotice: 'Application is installed on your device',
@@ -1031,8 +1032,8 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       founderNotice: 'Founder: Zebene Asfye'
     },
     drawer: {
-      searchPlaceholder: 'Search houses by title or number (1-15)...',
-      housesHeading: '15 Sovereign Houses in Order (Houses 1-15)',
+      searchPlaceholder: 'Search houses by title or number (1-16)...',
+      housesHeading: '16 Sovereign Houses in Order (Houses 1-16)',
       profile: 'Profile',
       tags: {
         h1: 'Open',
@@ -1046,10 +1047,11 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
         h9: 'Market',
         h10: 'Academy',
         h11: 'Training',
-        h12: 'Clinic',
+        h12: 'Psychology & Health',
         h13: 'Brokerage',
         h14: 'Tribunal',
-        h15: 'Payments'
+        h15: 'Payments',
+        h16: 'Tourism'
       }
     },
     houses: {
@@ -1059,12 +1061,12 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       h4: { title: '4. Sanctuary of Confidential Courtship', desc: 'Confidential courtship, matrimony preparation, and discreet personal consultations', roles: ['Courtship Candidate', 'Matrimony Counselor', 'Confidential Confidant', 'Family Elder'] },
       h5: { title: '5. Virtual Wedding & Legal Matrimony Hall', desc: 'Live virtual weddings with bridal party, elders, dowry, and internationally valid marriage contracts', roles: ['Bride / Groom', 'Bridal Party Member', 'Presiding Elder', 'Marriage Witness', 'Guest of Honor'] },
       h6: { title: '6. House of Faith & Wisdom', desc: 'Spiritual fellowship and harmonious interfaith knowledge exchange in dedicated chapels', roles: ['Faith Leader / Priest', 'Scholar / Researcher', 'Peace Ambassador', 'Student of Faith'] },
-      h7: { title: '7. Cyber Security & Peacekeeping Chamber', desc: 'Coordinated chamber for security police, peacekeepers, and moderators to maintain order', roles: ['Security Commander', 'Cyber Security Warden', 'Law Enforcement Officer', 'Community Guardian'] },
+      h7: { title: '7. Global Security, Crime Investigation & Extradition Chamber', desc: 'Interpol-grade international crime tracking, digital forensics, cross-border evidence exchange, and sovereign extradition treaties', roles: ['Global Crime Investigator / Interpol', 'Cyber & Forensic Specialist', 'Law Enforcement Officer', 'Extradition & Legal Liaison'] },
       h8: { title: '8. Global Talent Arena', desc: 'Live stage for technology innovation, leadership, vocal performance, comedy, and arts', roles: ['Talent Competitor', 'Head Judge', 'Artistic Mentor', 'Voting Audience'] },
       h9: { title: '9. World Expo & Marketplace', desc: 'High-definition video product showcase, direct manufacturer negotiation, and commerce', roles: ['Manufacturer / Exporter', 'Merchant / Retailer', 'Direct Buyer', 'Trade Coordinator'] },
       h10: { title: '10. Global Academy of Knowledge', desc: 'Intensive courses in languages, AI, computing, mathematics, health, and ancient sciences', roles: ['University Professor', 'AI & Tech Instructor', 'Researcher / Scholar', 'Student'] },
       h11: { title: '11. Institutional Training Hall', desc: 'Certified video training programs for public, private, and international institutions', roles: ['Executive Director', 'Training Coordinator', 'Professional Trainee', 'Capacity Specialist'] },
-      h12: { title: '12. Clinic of Psychology & Treatment', desc: 'Licensed psychological counseling, mental wellness, and therapeutic video sessions', roles: ['Clinical Psychologist', 'Mental Health Counselor', 'Client / Patient', 'Recovery Coordinator'] },
+      h12: { title: '12. Psychology & Healthcare Services House', desc: 'Licensed psychological therapy, mental health, and telemedicine healthcare consultations in secure rooms', roles: ['Healthcare & Psychology Specialist', 'Clinical Psychologist', 'Mental Health Counselor', 'Client / Patient'] },
       h13: { title: '13. Brokerage & Direct Matching Exchange', desc: 'Certified real estate, auto, and commodity brokers linking buyers and sellers seamlessly', roles: ['Licensed Broker', 'Asset Provider', 'Direct Buyer / Tenant', 'Trade Consultant'] },
       h14: { title: '14. High Judicial & Arbitration Tribunal', desc: 'Official arbiters and certified judges resolving claims with binding audio-visual decrees', roles: ['Senior Arbitrator / Judge', 'Legal Advocate', 'Claimant / Complainant', 'Respondent'] },
       h15: { title: '15. Global Utility Payment Hub', desc: 'Instant settlement for power, water, telecom, and transit via CBE and Telebirr', roles: ['Utility Subscriber', 'Payment Desk Officer', 'Bank Coordinator', 'Telecom User'] },

@@ -93,7 +93,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               የአባላት ምዝገባና የማንነት ማረጋገጫ (Official Registration)
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              በስልክ ቁጥርና የይለፍ ቃል ወደ 15ቱ ቤቶች መግቢያ ህጋዊ ሰነድ
+              በስልክ ቁጥርና የይለፍ ቃል ወደ 16ቱ ቤቶች መግቢያ ህጋዊ ሰነድ
             </p>
           </div>
         </div>
