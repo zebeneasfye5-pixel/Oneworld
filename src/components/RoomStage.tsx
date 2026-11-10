@@ -31,8 +31,10 @@ import {
   RefreshCw,
   AlertCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ArrowLeft
 } from 'lucide-react';
+import { UserProfile } from './AuthModal';
 import { translateTextWithGemini } from '../services/geminiService';
 import { 
   startSpeechRecognition, 
@@ -43,6 +45,7 @@ import { cameraManager } from '../services/cameraManager';
 import { GiftModal } from './GiftModal';
 import { PersonalRoomModal } from './PersonalRoomModal';
 import { TRANSLATIONS, AppLanguage } from '../i18n/translations';
+import { RemotePeerData } from '../services/realtimeMesh';
 
 interface RoomStageProps {
   rooms: Room[];
@@ -50,8 +53,10 @@ interface RoomStageProps {
   onSelectRoom: (room: Room) => void;
   userLang: LanguageCode;
   userBalanceETB: number;
+  currentUser: UserProfile;
   occupants: RoomOccupant[];
   messages: LiveSpeechMessage[];
+  remotePeers?: Map<string, RemotePeerData>;
   onSendMessage: (msg: LiveSpeechMessage) => void;
   onSendGift: (gift: VirtualGift, recipient: RoomOccupant) => void;
   onCreatePersonalRoom: (room: Room) => void;
@@ -67,8 +72,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   onSelectRoom,
   userLang,
   userBalanceETB,
+  currentUser,
   occupants,
   messages,
+  remotePeers,
   onSendMessage,
   onSendGift,
   onCreatePersonalRoom,
@@ -413,11 +420,11 @@ export const RoomStage: React.FC<RoomStageProps> = ({
 
     // 1. INSTANT ARRIVAL: Dispatched immediately with 0ms delay
     const newMsg: LiveSpeechMessage = {
-      id: `text-${Date.now()}`,
-      speakerName: 'እርስዎ (You - User)',
-      speakerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
-      sourceLang: userLang,
-      originalText: textToSend,
+       id: `text-${Date.now()}`,
+       speakerName: currentUser.fullName || 'እርስዎ (You - User)',
+       speakerAvatar: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+       sourceLang: userLang,
+       originalText: textToSend,
       translations: {
         am: textToSend,
         en: textToSend,
@@ -728,18 +735,32 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       </div>
                     ) : !isVideoOn ? (
                       <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4">
-                        <VideoOff className="w-10 h-10 text-red-400 mb-2" />
+                        <div className="relative mb-3">
+                          <img
+                            src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                            alt={currentUser.fullName}
+                            className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                              isMicOn && audioVolumeLevel > 15
+                                ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
+                                : 'border-slate-700'
+                            }`}
+                          />
+                          {isMicOn && audioVolumeLevel > 15 && (
+                            <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
+                          )}
+                        </div>
+                        <span className="text-white font-bold text-xs mb-2">ድምፅ ብቻ (Audio Only)</span>
                         <button
                           onClick={() => startCamera(cameraFacing)}
-                          className="px-4 py-2 bg-amber-500 text-slate-950 font-black rounded-xl text-xs cursor-pointer"
+                          className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
                         >
-                          ካሜራውን አብራ
+                          ካሜራ አብራ
                         </button>
                       </div>
                     ) : (
                       <div 
                         className="w-full h-full bg-cover bg-center" 
-                        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=800&q=80')` }}
+                        style={{ backgroundImage: `url('${currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=800&q=80'}')` }}
                       />
                     )}
                   </div>
@@ -771,6 +792,97 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     </div>
                   </div>
                 </div>
+
+                {/* Speaker 3+: Live Remote Peers Connected Across Other Phones / Laptops */}
+                {remotePeers && Array.from(remotePeers.values()).map((peer) => (
+                  <div 
+                    key={peer.id}
+                    className="bg-slate-950/80 border-2 border-emerald-500/60 rounded-3xl p-3.5 flex flex-col justify-between shadow-2xl animate-fadeIn"
+                  >
+                    {/* Top Bar OUTSIDE Video Frame */}
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+                      <span className="flex items-center gap-1.5 bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md">
+                        <span className="w-2 h-2 rounded-full bg-emerald-950 animate-ping" />
+                        #{peer.seatNumber || 2} · {peer.name}
+                      </span>
+                      <span className="bg-slate-900 text-white text-xs px-2.5 py-1 rounded-xl font-bold border border-slate-700">
+                        {peer.countryFlag || '🌍'} {peer.country || 'Oneworld'}
+                      </span>
+                    </div>
+
+                    {/* Remote Live Video Box with 0ms WebRTC Stream */}
+                    <div className={`relative rounded-2xl overflow-hidden bg-black border border-slate-700 w-full ${
+                      isFullBodyMode ? 'h-[440px] sm:h-[500px]' : 'h-[300px] sm:h-[350px]'
+                    }`}>
+                      {peer.stream && peer.isVideoOn ? (
+                        <video
+                          ref={(el) => {
+                            if (el && peer.stream && el.srcObject !== peer.stream) {
+                              el.srcObject = peer.stream;
+                              el.playsInline = true;
+                              el.play().catch(() => {});
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          className={`w-full h-full ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'}`}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
+                          <div className="relative mb-3">
+                            <img
+                              src={peer.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'}
+                              alt={peer.name}
+                              className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                                peer.isSpeaking
+                                  ? 'border-emerald-400 ring-8 ring-emerald-400/40 scale-105'
+                                  : 'border-slate-700'
+                              }`}
+                            />
+                            {peer.isSpeaking && (
+                              <span className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
+                            )}
+                          </div>
+                          <span className="text-white font-bold text-xs">ድምፅ ብቻ (Audio Only)</span>
+                        </div>
+                      )}
+
+                      {/* Hidden WebRTC Audio Playback so remote peer is heard clearly */}
+                      {peer.stream && (
+                        <audio
+                          ref={(el) => {
+                            if (el && peer.stream && el.srcObject !== peer.stream) {
+                              el.srcObject = peer.stream;
+                              el.play().catch(() => {});
+                            }
+                          }}
+                          autoPlay
+                        />
+                      )}
+                    </div>
+
+                    {/* Bottom Info Card OUTSIDE Video Frame */}
+                    <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
+                      <div>
+                        <h4 className="text-white font-black text-sm sm:text-base">{peer.name}</h4>
+                        <p className="text-xs text-white font-medium">{peer.role || 'የቀጥታ ተሳታፊ'}</p>
+                      </div>
+                      <div>
+                        {!peer.isMuted ? (
+                          <div className="flex items-center gap-1.5 bg-emerald-950/90 border border-emerald-500/70 text-white text-xs px-2.5 py-1 rounded-xl font-black">
+                            <Mic className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                            <span>ድምፅ በርቷል</span>
+                          </div>
+                        ) : (
+                          <span className="flex items-center gap-1 bg-red-950/90 border border-red-500/60 text-white text-xs px-2.5 py-1 rounded-xl font-bold">
+                            <MicOff className="w-3.5 h-3.5 text-red-400" />
+                            <span>ድምፅ ጠፍቷል</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* Floating Real-Time Live Reaction Emojis Animation Layer */}
@@ -826,8 +938,16 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   <Minimize2 className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                 </button>
 
-                {/* Top Subtle Focus Indicator */}
-                <div className="absolute top-4 left-4 z-40 pointer-events-none">
+                {/* Top Subtle Focus Indicator & Back Arrow Button */}
+                <div className="absolute top-4 left-4 z-40 flex items-center gap-2">
+                  <button
+                    onClick={() => setIsFullscreen(false)}
+                    title="ተመለስ (Go Back)"
+                    className="p-2.5 rounded-full bg-black/70 hover:bg-slate-800 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-2xl flex items-center gap-1.5 px-3.5 group"
+                  >
+                    <ArrowLeft className="w-4 h-4 text-amber-400 group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-xs font-bold text-white hidden sm:inline">ተመለስ</span>
+                  </button>
                   <span className="bg-black/60 backdrop-blur-md text-amber-400 border border-amber-400/30 text-xs font-black px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                     {fullscreenFocus === 'host' ? 'መድረክ መሪ · ዶ/ር ዘበነ አስፍዬ (Host)' : 'እርስዎ በ100% ሙሉ አካል (Full Body)'}
@@ -1105,27 +1225,33 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     <>
                       <div className="relative mt-2 mb-1.5">
                         <img
-                          src={occupant.avatar}
-                          alt={occupant.name}
-                          className="w-11 h-11 rounded-full object-cover border-2 border-amber-500/50 shadow-md"
+                          src={isUserSeat ? (currentUser.avatarUrl || occupant.avatar) : occupant.avatar}
+                          alt={isUserSeat ? currentUser.fullName : occupant.name}
+                          className={`w-11 h-11 rounded-full object-cover border-2 shadow-md transition-transform duration-200 ${
+                            isUserSeat && isMicOn && audioVolumeLevel > 15
+                              ? 'border-amber-400 ring-4 ring-amber-400/50 scale-110'
+                              : occupant.isSpeaking
+                              ? 'border-amber-400 ring-4 ring-amber-400/50 scale-105'
+                              : 'border-amber-500/50'
+                          }`}
                         />
                         <span className="absolute -bottom-1 -right-1 text-sm">
                           {occupant.countryFlag}
                         </span>
-                        {occupant.isSpeaking && (
+                        {((isUserSeat && isMicOn && audioVolumeLevel > 15) || occupant.isSpeaking) && (
                           <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 animate-ping" />
                         )}
                       </div>
                       <span className="text-xs sm:text-sm font-black text-white truncate w-full">
-                        {occupant.name}
+                        {isUserSeat ? currentUser.fullName : occupant.name}
                       </span>
                       <div className="flex items-center gap-1.5 mt-1">
-                        {occupant.isMuted ? (
-                          <MicOff className="w-3.5 h-3.5 text-red-400" />
+                        {(isUserSeat ? isMicOn : !occupant.isMuted) ? (
+                          <Mic className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
                         ) : (
-                          <Mic className="w-3.5 h-3.5 text-amber-400" />
+                          <MicOff className="w-3.5 h-3.5 text-red-400" />
                         )}
-                        {occupant.isVideoOn ? (
+                        {(isUserSeat ? isVideoOn : occupant.isVideoOn) ? (
                           <Video className="w-3.5 h-3.5 text-amber-400" />
                         ) : (
                           <VideoOff className="w-3.5 h-3.5 text-slate-500" />

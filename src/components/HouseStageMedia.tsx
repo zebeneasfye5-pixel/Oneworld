@@ -19,7 +19,10 @@ import {
   Lock,
   Volume2,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { UserProfile } from './AuthModal';
 import { AppLanguage, TRANSLATIONS } from '../i18n/translations';
@@ -60,6 +63,7 @@ interface HouseStageMediaProps {
   houseMemberships: Record<string, HouseMemberRecord>;
   onRegisterHouseMember: (record: HouseMemberRecord) => void;
   onShowToast: (msg: string) => void;
+  onGoBack?: () => void;
 }
 
 export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
@@ -71,12 +75,14 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   currentLang,
   houseMemberships,
   onRegisterHouseMember,
-  onShowToast
+  onShowToast,
+  onGoBack
 }) => {
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.am;
   // House Registration Gate: Houses 2-16 strictly require member registration!
   const activeMembership: HouseMemberRecord | null = houseMemberships[houseId] || null;
   const membership = activeMembership;
+  const [showDetails, setShowDetails] = useState(false);
 
   // Registration Form State
   const [selectedRole, setSelectedRole] = useState(houseRoleOptions[0] || 'Member');
@@ -571,9 +577,19 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         isFullscreen ? 'p-8 bg-[#0a0d14] fixed inset-0 z-50 overflow-y-auto' : ''
       }`}
     >
-      {/* Top Header Bar */}
+      {/* Top Header Bar with Back Arrow Navigation */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
         <div className="flex items-center gap-3">
+          {onGoBack && (
+            <button
+              onClick={onGoBack}
+              title="ወደ ዋናው አዳራሽ ተመለስ (Back to Main Hall)"
+              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 hover:border-amber-400 flex items-center gap-1.5 font-black text-xs cursor-pointer transition shadow-md group"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span>ተመለስ</span>
+            </button>
+          )}
           <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-2xl">
             🏛️
           </div>
@@ -599,8 +615,17 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
           </div>
         </div>
 
-        {/* Toolbar: Mic, Cam, Zoom Controls, Fullscreen */}
+        {/* Toolbar: Mic, Cam, Zoom Controls, Fullscreen, Read More Toggle */}
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Read More Collapsible Details Toggle (Zero Text Clutter) */}
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 cursor-pointer transition shadow-md flex items-center gap-1"
+            title={showDetails ? 'ዝርዝር ደብቅ (Hide Details)' : 'ተጨማሪ ዝርዝር (Read More)'}
+          >
+            {showDetails ? <ChevronUp className="w-4 h-4 text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-400" />}
+          </button>
+
           {/* Zoom In / Zoom Out Buttons */}
           <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-xl p-1 gap-1">
             <button
@@ -689,6 +714,17 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         </div>
       </div>
 
+      {/* Collapsible Details Drawer (Tucks away verbose text cleanly) */}
+      {showDetails && (
+        <div className="p-4 bg-slate-950/90 rounded-2xl border border-slate-800 text-xs text-slate-300 space-y-2 animate-fadeIn">
+          <p className="font-bold text-amber-400">ስለ ቤቱ አጭር መግለጫ (House Purpose)፦</p>
+          <p className="leading-relaxed">{houseDescription}</p>
+          <p className="text-[11px] text-slate-400">
+            ይህ ቤት የተመሰረተው በአለምአቀፍ የማህበረሰብ ደንቦችና ግዴታዎች መሰረት ነው። ተጠቃሚዎች ሁሉንም ተግባራት በከፍተኛ ሀላፊነት ያከናውናሉ።
+          </p>
+        </div>
+      )}
+
       {/* Scalable Substantially Enlarged Video Grid Stage (Zoom & Full-Body Controlled) */}
       <div 
         className="transition-transform duration-200 origin-top overflow-hidden"
@@ -755,12 +791,28 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-slate-900">
-                    <img
-                      src={profilePhotoUrl || currentUser.avatarUrl}
-                      alt={currentUser.fullName}
-                      className="w-28 h-28 rounded-2xl object-cover border-2 border-amber-400 shadow-lg"
-                    />
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
+                    <div className="relative mb-3">
+                      <img
+                        src={profilePhotoUrl || currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                        alt={currentUser.fullName}
+                        className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                          isMicOn
+                            ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
+                            : 'border-slate-700'
+                        }`}
+                      />
+                      {isMicOn && (
+                        <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
+                      )}
+                    </div>
+                    <span className="text-white font-bold text-xs mb-2">ድምፅ ብቻ (Audio Only)</span>
+                    <button
+                      onClick={() => startCamera(cameraFacing)}
+                      className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
+                    >
+                      ካሜራ አብራ
+                    </button>
                   </div>
                 )}
               </div>
@@ -857,6 +909,12 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             const isTakenByMe = userSeat === seatNo;
             const isTakenByOther = participants.some((p) => p.seatNumber === seatNo);
 
+            const occupant = participants.find((p) => p.seatNumber === seatNo);
+            const avatarUrl = isTakenByMe 
+              ? (profilePhotoUrl || currentUser.avatarUrl) 
+              : occupant?.avatar;
+            const isSpeakingNow = isTakenByMe ? isMicOn : occupant?.isSpeaking;
+
             return (
               <button
                 key={seatNo}
@@ -869,17 +927,37 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     onShowToast(`${t.chairs.seatPrefix}${seatNo}: ${t.stageMedia.occupied}`);
                   }
                 }}
-                className={`py-2.5 px-2 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 text-center cursor-pointer ${
+                className={`py-2 px-1.5 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 text-center cursor-pointer ${
                   isTakenByMe
-                    ? 'bg-emerald-600/30 border-emerald-500 text-emerald-200 ring-2 ring-emerald-500/50'
+                    ? 'bg-amber-950/40 border-amber-500 text-amber-200 ring-2 ring-amber-500/50 shadow-md'
                     : isTakenByOther
-                    ? 'bg-slate-900 border-slate-800 text-slate-500 opacity-70'
+                    ? 'bg-slate-900 border-slate-700 text-slate-300'
                     : 'bg-slate-900/60 border-slate-800/80 hover:border-amber-500/50 text-slate-300 hover:text-white'
                 }`}
               >
-                <span className="text-[10px] font-mono font-bold">#{seatNo}</span>
-                <span className="text-[9px] mt-0.5 truncate max-w-full">
-                  {isTakenByMe ? t.stageMedia.yourSeat : isTakenByOther ? t.stageMedia.occupied : t.stageMedia.takeSeat}
+                <span className="text-[10px] font-mono font-bold text-amber-400">#{seatNo}</span>
+                {avatarUrl ? (
+                  <div className="relative my-1">
+                    <img
+                      src={avatarUrl}
+                      alt={`Seat ${seatNo}`}
+                      className={`w-7 h-7 rounded-full object-cover border transition-transform ${
+                        isSpeakingNow
+                          ? 'border-amber-400 ring-2 ring-amber-400 scale-105'
+                          : 'border-slate-700'
+                      }`}
+                    />
+                    {isSpeakingNow && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 my-1 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-[10px] text-slate-500 font-bold">
+                    +
+                  </div>
+                )}
+                <span className="text-[9px] truncate max-w-full font-bold">
+                  {isTakenByMe ? t.stageMedia.yourSeat : isTakenByOther ? (occupant?.name?.split(' ')[0] || t.stageMedia.occupied) : t.stageMedia.takeSeat}
                 </span>
               </button>
             );

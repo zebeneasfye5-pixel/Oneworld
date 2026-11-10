@@ -115,6 +115,10 @@ export function speakText(text: string, lang: LanguageCode): void {
   if (!text || text.trim() === '') return;
 
   try {
+    // Unstick any paused speech queue on mobile Chrome / Safari
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.cancel(); // cancel pending
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -130,18 +134,36 @@ export function speakText(text: string, lang: LanguageCode): void {
       de: 'de-DE'
     };
 
-    utterance.lang = langVoiceMap[lang] || 'en-US';
+    const targetBcp = langVoiceMap[lang] || 'en-US';
+    utterance.lang = targetBcp;
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
 
     // Pick appropriate voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find(v => v.lang.toLowerCase().startsWith(utterance.lang.substring(0, 2).toLowerCase()));
-    if (voice) {
-      utterance.voice = voice;
+    let voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) {
+      // Trigger voice list populate for mobile
+      window.speechSynthesis.onvoiceschanged = () => {
+        voices = window.speechSynthesis.getVoices();
+        const v = voices.find(
+          (voc) => voc.lang.toLowerCase().startsWith(targetBcp.substring(0, 2).toLowerCase())
+        );
+        if (v) utterance.voice = v;
+      };
+    } else {
+      const voice = voices.find(
+        (v) => v.lang.toLowerCase().startsWith(targetBcp.substring(0, 2).toLowerCase())
+      );
+      if (voice) {
+        utterance.voice = voice;
+      }
     }
 
+    // Keep voice synthesis alive on mobile
     window.speechSynthesis.speak(utterance);
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
   } catch (e) {
     console.warn('SpeechSynthesis error:', e);
   }

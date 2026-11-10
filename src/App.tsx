@@ -620,8 +620,10 @@ export default function App() {
             onSelectRoom={setCurrentRoom}
             userLang={currentLang as any}
             userBalanceETB={balanceETB}
+            currentUser={currentUser}
             occupants={realtime.combinedOccupants}
             messages={messages}
+            remotePeers={realtime.remotePeers}
             onSendMessage={handleSendMessage}
             onSendGift={handleSendGift}
             onCreatePersonalRoom={handleCreatePersonalRoom}
@@ -645,6 +647,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h2'] && <HouseFamilyKinship />}
           </div>
@@ -662,6 +665,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h3'] && <HouseLeadership />}
           </div>
@@ -679,6 +683,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h4'] && <HouseConfidentialCourtship />}
           </div>
@@ -696,6 +701,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h5'] && <HouseVirtualWedding />}
           </div>
@@ -713,6 +719,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h6'] && <HouseFaith />}
           </div>
@@ -730,6 +737,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h7'] && <HouseSecurityChamber />}
           </div>
@@ -747,6 +755,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h8'] && <TalentShow onEarnRoyalty={handleAddRoyalty} />}
           </div>
@@ -764,6 +773,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h9'] && (
               <HouseMarketplaceExpo
@@ -786,6 +796,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h10'] && (
               <AIAcademy
@@ -808,6 +819,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h11'] && <HouseInstitutionalTraining />}
           </div>
@@ -825,6 +837,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h12'] && <HousePsychologyCounseling />}
           </div>
@@ -842,6 +855,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h13'] && <HouseBrokerageMatching />}
           </div>
@@ -859,6 +873,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h14'] && <HouseJudicialTribunal />}
           </div>
@@ -876,6 +891,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h15'] && (
               <HouseUtilityPayments
@@ -899,6 +915,7 @@ export default function App() {
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
+              onGoBack={() => setActiveTarget('h1')}
             />
             {houseMemberships['h16'] && (
               <HouseTourismHeritage

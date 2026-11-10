@@ -31,6 +31,7 @@ interface UseRealtimeRoomOptions {
 
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
+    { urls: 'stun:stun.cloudflare.com:3478' },
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
@@ -77,8 +78,9 @@ export function useRealtimeRoom({
             autoGainControl: true
           },
           video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 640, max: 1280 },
+            height: { ideal: 480, max: 720 },
+            frameRate: { ideal: 24, max: 30 },
             facingMode: 'user'
           }
         });
@@ -161,12 +163,21 @@ export function useRealtimeRoom({
     const pc = new RTCPeerConnection(ICE_SERVERS);
     peerConnectionsRef.current.set(targetPeerId, pc);
 
-    // Add local tracks to peer connection
+    // Add local tracks to peer connection with maintain-framerate to eradicate video stuttering
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current!);
-      });
-    }
+       localStreamRef.current.getTracks().forEach((track) => {
+         const sender = pc.addTrack(track, localStreamRef.current!);
+         if (track.kind === 'video') {
+           try {
+             const params = sender.getParameters();
+             (params as any).degradationPreference = 'maintain-framerate';
+             sender.setParameters(params).catch(() => {});
+           } catch {
+             // fallback
+           }
+         }
+       });
+     }
 
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
