@@ -88,11 +88,17 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Quick Profile / Auth */}
           <button
             onClick={onOpenAuth}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/80 rounded-xl text-xs sm:text-sm font-extrabold text-slate-200 transition-colors cursor-pointer"
-            title={t.header.profile}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer shadow-sm ${
+              user?.isGuest
+                ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/60'
+                : 'bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-slate-200'
+            }`}
+            title={user?.isGuest ? 'ይግቡ ወይም ይመዝገቡ' : t.header.profile}
           >
             <User className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline max-w-[90px] truncate">{user?.fullName.split(' ')[0] || t.header.profile}</span>
+            <span className="max-w-[110px] truncate">
+              {user?.isGuest ? 'ግባ / ተመዝገብ' : (user?.fullName.split(' ')[0] || t.header.profile)}
+            </span>
           </button>
 
           {/* Wallet Trigger with clean balance pill */}

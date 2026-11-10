@@ -228,15 +228,15 @@ export function useRealtimeRoom({
     let reconnectTimeout: any;
 
     function connect() {
-      // Continuous wss:// protocol resolution with malformed URL cleanup (e.g. wss://://onrender.com -> wss://onrender.com/ws)
+      // Continuous wss:// protocol resolution with malformed URL cleanup (e.g. wss://onrender.com/ws or https://onrender.com)
       const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-      const rawCustomUrl = (import.meta.env.VITE_WS_URL || '').trim();
+      const rawCustomUrl = (import.meta.env.VITE_WS_URL || import.meta.env.VITE_BACKEND_URL || '').trim();
       const defaultHost = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
 
       let wsUrl = '';
       if (rawCustomUrl) {
         // Sanitize any accidentally malformed strings (like wss://://hostname or missing path)
-        let cleaned = rawCustomUrl.replace(/^(wss?:\/\/)+/, '').replace(/^\/+/, '');
+        let cleaned = rawCustomUrl.replace(/^(wss?:\/\/|https?:\/\/)+/, '').replace(/^\/+/, '');
         if (!cleaned.endsWith('/ws') && !cleaned.includes('?')) {
           cleaned = `${cleaned}/ws`;
         }

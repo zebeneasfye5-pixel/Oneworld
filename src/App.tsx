@@ -105,18 +105,7 @@ export default function App() {
     } catch {
       // safe fallback
     }
-    // Default membership in House 1 for the founder
-    return {
-      h1: {
-        houseId: 'h1',
-        memberId: 'OW-H1-0001',
-        fullName: 'ዘበነ አስፍዬ (Zebene Asfye)',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
-        roleInHouse: 'የመድረኩ መስራችና የጋራ ቤት መሪ',
-        registeredDate: '2026-10-26',
-        seatNumber: 1
-      }
-    };
+    return {};
   });
 
   const handleRegisterHouseMember = (record: HouseMemberRecord) => {
@@ -185,18 +174,26 @@ export default function App() {
     }
   };
 
-  // User Profile
-  const [currentUser, setCurrentUser] = useState<UserProfile>({
-    phoneNumber: '0911234567',
-    fullName: 'ዘበነ አስፍዬ (Zebene Asfye)',
-    gender: 'ወንድ (Male)',
-    age: 32,
-    nationality: 'ኢትዮጵያዊ (Ethiopian)',
-    address: 'አዲስ አበባ፣ ኢትዮጵያ',
-    idNumber: 'ETH-ID-2026-9814',
-    roleTitle: 'የመድረኩ መስራችና የሰላም አምባሳደር',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
-    verifiedAt: '2026-10-26'
+  // User Profile: Check localStorage or generate unique device guest session
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+    try {
+      const saved = localStorage.getItem('oneworld_auth_user');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    const deviceSalt = Math.random().toString(36).substring(2, 7);
+    return {
+      phoneNumber: '',
+      fullName: `ተጠቃሚ_${deviceSalt.toUpperCase()}`,
+      gender: 'ያልተገለጸ',
+      age: 26,
+      nationality: 'ኢትዮጵያዊ (Ethiopian)',
+      address: 'አዲስ አበባ',
+      idNumber: `USER-${Date.now().toString(36)}-${deviceSalt}`,
+      roleTitle: 'የማህበረሰብ አባል (Community Member)',
+      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+      verifiedAt: new Date().toISOString().split('T')[0],
+      isGuest: true
+    };
   });
 
   // Financial Balances with 100% Offline LocalStorage Persistence
@@ -363,7 +360,7 @@ export default function App() {
 
   const handleSendGift = (gift: VirtualGift, recipient: RoomOccupant) => {
     if (balanceETB < gift.priceETB) {
-      alert(t.announcements.insufficientFunds);
+      showToast(`⚠️ ${t.announcements.insufficientFunds}`);
       return;
     }
     setBalanceETB((prev) => prev - gift.priceETB);
@@ -381,7 +378,7 @@ export default function App() {
     showToast(`"${newRoom.titleAm}" አዳራሽ ተከፍቷል!`);
   };
 
-  // General Financial Handlers (Formula: 60% Member, 10% Bank, 10% Founder ዘበነ አስፍዬ, 20% Community)
+  // General Financial Handlers (Formula: 80% Member, 10% Bank, 10% Founder ዘበነ አስፍዬ)
   const handleDeposit = (amount: number, bankName: string) => {
     setBalanceETB((prev) => prev + amount);
     const devCut = Math.round(amount * 0.10);
@@ -391,7 +388,7 @@ export default function App() {
 
   const handleWithdraw = (amount: number, bankName: string): boolean => {
     if (balanceETB < amount) {
-      alert(`ይቅርታ፣ በቂ ሂሳብ የለዎትም። የሂሳብዎ ቀሪ፡ ${balanceETB.toLocaleString()} ብር ነው`);
+      showToast(`⚠️ ይቅርታ፣ በቂ ሂሳብ የለዎትም። የሂሳብዎ ቀሪ፡ ${balanceETB.toLocaleString()} ብር ነው`);
       return false;
     }
     setBalanceETB((prev) => prev - amount);
@@ -403,7 +400,7 @@ export default function App() {
 
   const handleDeductBalance = (amount: number, reason: string): boolean => {
     if (balanceETB < amount) {
-      alert('ይቅርታ፣ በቂ ሂሳብ የለዎትም።');
+      showToast('⚠️ ይቅርታ፣ በቂ ሂሳብ የለዎትም።');
       return false;
     }
     setBalanceETB((prev) => prev - amount);
@@ -411,6 +408,40 @@ export default function App() {
     setBuilderReserveETB((prev) => prev + devCut);
     showToast(`${amount.toLocaleString()} ብር ተከፍሏል (${reason})`);
     return true;
+  };
+
+  const handleSaveProfile = (profile: UserProfile) => {
+    const updated = { ...profile, isGuest: false };
+    setCurrentUser(updated);
+    try {
+      localStorage.setItem('oneworld_auth_user', JSON.stringify(updated));
+    } catch {}
+    showToast(`🎉 እንኳን ደህና መጡ ${profile.fullName}! መለያዎ ጸድቋል`);
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('oneworld_auth_user');
+      localStorage.removeItem('oneworld_house_memberships');
+    } catch {}
+    const deviceSalt = Math.random().toString(36).substring(2, 7);
+    const guestUser: UserProfile = {
+      phoneNumber: '',
+      fullName: `ተጠቃሚ_${deviceSalt.toUpperCase()}`,
+      gender: 'ያልተገለጸ',
+      age: 26,
+      nationality: 'ኢትዮጵያዊ (Ethiopian)',
+      address: '',
+      idNumber: `USER-${Date.now().toString(36)}-${deviceSalt}`,
+      roleTitle: 'የማህበረሰብ አባል',
+      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+      verifiedAt: new Date().toISOString().split('T')[0],
+      isGuest: true
+    };
+    setCurrentUser(guestUser);
+    setHouseMemberships({});
+    setIsAuthOpen(true);
+    showToast('ከመለያዎ በተሳካ ሁኔታ ወጥተዋል (Logged Out)');
   };
 
   const handleCreditBalance = (amount: number, reason: string) => {
@@ -509,6 +540,7 @@ export default function App() {
         onOpenAdminAudit={() => setIsAdminAuditOpen(true)}
         onInstallPwa={handleInstallPwa}
         isInstallable={isInstallable}
+        onLogout={handleLogout}
       />
 
       {/* Lazy-Loaded Auxiliary Modals (Loaded only when opened for zero initial overhead) */}
@@ -549,10 +581,8 @@ export default function App() {
             isOpen={isAuthOpen}
             onClose={() => setIsAuthOpen(false)}
             currentUser={currentUser}
-            onSaveProfile={(prof) => {
-              setCurrentUser(prof);
-              showToast(t.announcements.profileSaved);
-            }}
+            onSaveProfile={handleSaveProfile}
+            onLogout={handleLogout}
           />
         )}
 

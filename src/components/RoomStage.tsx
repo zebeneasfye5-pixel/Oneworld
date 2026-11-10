@@ -96,6 +96,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isFullBodyMode, setIsFullBodyMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenFocus, setFullscreenFocus] = useState<'host' | 'user'>('host');
   const [audioVolumeLevel, setAudioVolumeLevel] = useState<number>(0);
   const [showStageDetails, setShowStageDetails] = useState(false);
   const [isSubRoomsOpen, setIsSubRoomsOpen] = useState(false);
@@ -521,16 +522,15 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   </p>
                 </div>
 
-                {/* Stage Controls: Dedicated Full Screen, Zoom In/Out, Full-Body Mode, Hand Raise */}
+                {/* Stage Controls: Iconic Minimalist Bar (Zero Text Clutter) */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Dedicated Full Screen on Command Button */}
+                  {/* Dedicated Full Screen Button (Icon Only) */}
                   <button
                     onClick={toggleFullscreen}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 border border-amber-400 shadow-md cursor-pointer transition transform hover:scale-105"
-                    title="በራስ ትእዛዝ በሙሉ ስክሪን ክፈት (Open Full Screen)"
+                    className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 border border-amber-400 shadow-md cursor-pointer transition transform hover:scale-105"
+                    title="በሙሉ ስክሪን ክፈት (100% Edge-to-Edge Fullscreen)"
                   >
                     <Maximize2 className="w-4 h-4 text-slate-950" />
-                    <span>🖥️ በሙሉ ስክሪን ክፈት</span>
                   </button>
 
                   {/* Zoom Controls */}
@@ -542,7 +542,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     >
                       <ZoomOut className="w-4 h-4" />
                     </button>
-                    <span className="text-xs sm:text-sm font-mono font-black text-white px-2">
+                    <span className="text-xs font-mono font-black text-amber-400 px-1.5">
                       {Math.round(zoomScale * 100)}%
                     </span>
                     <button
@@ -555,46 +555,45 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     <button
                       onClick={handleResetZoom}
                       title="መደበኛ መጠን (Reset)"
-                      className="text-xs font-black text-white hover:text-amber-400 px-1.5 cursor-pointer"
+                      className="text-[11px] font-black text-white hover:text-amber-400 px-1 cursor-pointer"
                     >
                       100%
                     </button>
                   </div>
 
-                  {/* Full-Body Mode Toggle */}
+                  {/* Full-Body Mode Toggle (Icon Only) */}
                   <button
                     onClick={() => setIsFullBodyMode(!isFullBodyMode)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer border shadow-md ${
+                    className={`p-2.5 rounded-xl transition-all cursor-pointer border shadow-md ${
                       isFullBodyMode
                         ? 'bg-amber-500 text-slate-950 border-amber-400 ring-2 ring-amber-400'
                         : 'bg-slate-900 text-white border-slate-700 hover:bg-slate-800'
                     }`}
-                    title="ሙሉ አካልና ቁመት ማሳያ (Full Body Mode)"
+                    title={isFullBodyMode ? 'መደበኛ ስክሪን (Standard View)' : 'ሙሉ አካልና ቁመት (Full Body Mode)'}
                   >
-                    <Maximize2 className="w-4 h-4" />
-                    <span>{isFullBodyMode ? 'መደበኛ ስክሪን' : 'ሙሉ አካል'}</span>
+                    <Layers className="w-4 h-4" />
                   </button>
 
-                  {/* Hand Raise */}
+                  {/* Hand Raise (Icon Only) */}
                   <button
                     onClick={() => setHandRaised(!handRaised)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-colors cursor-pointer shadow-md ${
+                    className={`p-2.5 rounded-xl transition-colors cursor-pointer shadow-md ${
                       handRaised
                         ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400'
                         : 'bg-slate-900 text-white hover:text-white border border-slate-700 hover:bg-slate-800'
                     }`}
+                    title={handRaised ? 'እጅ አውርድ (Lower Hand)' : 'እጅ አንሳ (Raise Hand)'}
                   >
                     <Hand className="w-4 h-4" />
-                    <span>{handRaised ? t.chairs.lowerHand : t.chairs.raiseHand}</span>
                   </button>
 
                   {/* Collapsible Read More Toggle */}
                   <button
                     onClick={() => setShowStageDetails(!showStageDetails)}
-                    className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 cursor-pointer"
+                    className="p-2.5 rounded-xl text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 border border-slate-700 cursor-pointer transition shadow-md"
+                    title={showStageDetails ? 'ዝርዝር ደብቅ (Hide Details)' : 'ተጨማሪ መረጃ (Read More)'}
                   >
-                    <span>{showStageDetails ? 'ዝርዝር ደብቅ' : 'ተጨማሪ አንብብ (Read More)'}</span>
-                    {showStageDetails ? <ChevronUp className="w-3.5 h-3.5 text-amber-400" /> : <ChevronDown className="w-3.5 h-3.5 text-amber-400" />}
+                    {showStageDetails ? <ChevronUp className="w-4 h-4 text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-400" />}
                   </button>
                 </div>
               </div>
@@ -815,151 +814,215 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               </div>
             </div>
 
-            {/* FULL SCREEN THEATER OVERLAY - Pure Edge-to-Edge Stream with Zero Text Obstruction */}
+            {/* 100% FULL-SCREEN SINGLE-SPEAKER CINEMA THEATER (Zero Split, Edge-to-Edge Single Body View) */}
             {isFullscreen && (
-              <div className="fixed inset-0 z-50 bg-black overflow-hidden flex flex-col md:flex-row animate-fadeIn">
-                {/* Floating Minimal Exit Button (Top Right) */}
+              <div className="fixed inset-0 z-50 bg-black overflow-hidden flex items-center justify-center animate-fadeIn select-none">
+                {/* Floating Minimal Exit Button (Top Right, Icon Only) */}
                 <button
                   onClick={() => setIsFullscreen(false)}
                   title="ከሙሉ ስክሪን ውጣ (Exit Full Screen)"
-                  className="absolute top-4 right-4 z-40 p-3 rounded-full bg-black/60 hover:bg-red-600/90 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-2xl group flex items-center gap-2"
+                  className="absolute top-4 right-4 z-40 p-3 rounded-full bg-black/70 hover:bg-red-600 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-2xl group flex items-center justify-center"
                 >
                   <Minimize2 className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
-                  <span className="text-xs font-bold hidden sm:inline">ከሙሉ ስክሪን ውጣ</span>
                 </button>
 
-                {/* Speaker 1 Video - 100% pure video frame, zero text overlay */}
-                <div className="flex-1 relative bg-black w-full h-1/2 md:h-full overflow-hidden border-b md:border-b-0 md:border-r border-white/10">
-                  <div 
-                    className="w-full h-full bg-cover bg-center"
-                    style={{ backgroundImage: `url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1600&q=85')` }}
-                  />
-                  {/* Subtle translucent corner badge */}
-                  <div className="absolute top-4 left-4 z-20 pointer-events-none">
-                    <span className="bg-black/50 backdrop-blur-md text-amber-400 border border-amber-400/30 text-[11px] font-black px-3 py-1 rounded-full">
-                      ዶ/ር ዘበነ አስፍዬ · መድረክ መሪ
-                    </span>
-                  </div>
+                {/* Top Subtle Focus Indicator */}
+                <div className="absolute top-4 left-4 z-40 pointer-events-none">
+                  <span className="bg-black/60 backdrop-blur-md text-amber-400 border border-amber-400/30 text-xs font-black px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    {fullscreenFocus === 'host' ? 'መድረክ መሪ · ዶ/ር ዘበነ አስፍዬ (Host)' : 'እርስዎ በ100% ሙሉ አካል (Full Body)'}
+                  </span>
                 </div>
 
-                {/* Speaker 2 Video (User stream) - 100% pure video frame */}
-                <div className="flex-1 relative bg-black w-full h-1/2 md:h-full overflow-hidden">
-                  {isVideoOn && isUsingRealWebcam && cameraActive ? (
-                    <video
-                      ref={(el) => {
-                        if (el && mediaStreamRef.current) {
-                          if (el.srcObject !== mediaStreamRef.current) {
-                            el.srcObject = mediaStreamRef.current;
-                          }
-                          el.muted = true;
-                          el.playsInline = true;
-                          el.play().catch(() => {});
-                        }
-                      }}
-                      autoPlay
-                      playsInline
-                      muted
-                      className={`w-full h-full object-cover ${
-                        cameraFacing === 'user' ? 'transform -scale-x-100' : ''
-                      }`}
+                {/* 100% Full Screen Speaker View (ONE person filling 100% of the screen) */}
+                <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
+                  {fullscreenFocus === 'host' ? (
+                    /* Host in 100% Full Edge-to-Edge Screen */
+                    <div 
+                      className="w-full h-full bg-cover bg-center transition-all duration-300"
+                      style={{ backgroundImage: `url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1600&q=85')` }}
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-slate-950 via-[#0a0d18] to-slate-900 flex flex-col items-center justify-center p-4">
-                      <button
-                        onClick={() => startCamera('user')}
-                        className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-2xl text-xs sm:text-sm shadow-xl flex items-center gap-2 cursor-pointer transition-transform hover:scale-105"
-                      >
-                        <Video className="w-4 h-4" />
-                        <span>📹 ካሜራዎን ያብሩ</span>
-                      </button>
-                    </div>
+                    /* User's Own Camera in 100% Full Edge-to-Edge Screen */
+                    isVideoOn && isUsingRealWebcam && cameraActive ? (
+                      <video
+                        ref={(el) => {
+                          if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+                            el.srcObject = mediaStreamRef.current;
+                            el.muted = true;
+                            el.playsInline = true;
+                            el.play().catch(() => {});
+                          }
+                        }}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full h-full object-cover transition-all duration-300 ${
+                          cameraFacing === 'user' ? 'transform -scale-x-100' : ''
+                        }`}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-slate-950 via-[#0a0d18] to-slate-900 flex flex-col items-center justify-center p-4">
+                        <button
+                          onClick={() => startCamera('user')}
+                          className="p-5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl shadow-2xl flex items-center justify-center cursor-pointer transition transform hover:scale-105"
+                          title="ካሜራዎን ያብሩ (Start Camera)"
+                        >
+                          <Video className="w-8 h-8" />
+                        </button>
+                      </div>
+                    )
                   )}
-                  {/* Subtle translucent corner badge */}
-                  <div className="absolute top-4 left-4 md:left-4 z-20 pointer-events-none">
-                    <span className="bg-black/50 backdrop-blur-md text-slate-200 border border-white/20 text-[11px] font-black px-3 py-1 rounded-full">
-                      እርስዎ (ወንበር #{userSeatedNumber || 1})
+                </div>
+
+                {/* Picture-in-Picture (PiP) Floating Corner Mini-Tile (Click to Swap Focus!) */}
+                <div 
+                  onClick={() => setFullscreenFocus((prev) => (prev === 'host' ? 'user' : 'host'))}
+                  title={fullscreenFocus === 'host' ? 'እርስዎን በሙሉ ስክሪን ለማየት ይጫኑ (Focus User)' : 'መድረክ መሪውን በሙሉ ስክሪን ለማየት ይጫኑ (Focus Host)'}
+                  className="absolute bottom-24 right-4 sm:right-6 z-40 w-28 h-40 sm:w-36 sm:h-52 rounded-2xl border-2 border-amber-400/80 overflow-hidden shadow-2xl bg-black cursor-pointer hover:scale-105 hover:border-amber-300 transition-all group"
+                >
+                  {fullscreenFocus === 'host' ? (
+                    /* PiP shows User */
+                    isVideoOn && isUsingRealWebcam && cameraActive ? (
+                      <video
+                        ref={(el) => {
+                          if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+                            el.srcObject = mediaStreamRef.current;
+                            el.muted = true;
+                            el.playsInline = true;
+                            el.play().catch(() => {});
+                          }
+                        }}
+                        autoPlay
+                        playsInline
+                        muted
+                        className={`w-full h-full object-cover ${
+                          cameraFacing === 'user' ? 'transform -scale-x-100' : ''
+                        }`}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-2 text-center">
+                        <VideoOff className="w-6 h-6 text-slate-500 mb-1" />
+                        <span className="text-[10px] text-slate-400 font-bold">ካሜራዎ</span>
+                      </div>
+                    )
+                  ) : (
+                    /* PiP shows Host */
+                    <div 
+                      className="w-full h-full bg-cover bg-center"
+                      style={{ backgroundImage: `url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80')` }}
+                    />
+                  )}
+                  {/* Subtle Badge & Swap Icon */}
+                  <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
+                    <span className="bg-black/70 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-400/30">
+                      {fullscreenFocus === 'host' ? 'እርስዎ' : 'መድረክ መሪ'}
                     </span>
+                  </div>
+                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <RefreshCw className="w-6 h-6 text-white animate-spin" />
                   </div>
                 </div>
 
-                {/* Floating Minimal Glass Controller (Centered at Bottom) */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 bg-black/75 hover:bg-black/90 backdrop-blur-xl px-4 py-2.5 rounded-full border border-white/20 shadow-2xl flex items-center gap-2.5 transition-all">
+                {/* Floating Minimal Glass Controller (Centered at Bottom - ZERO Text Clutter) */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 bg-black/80 hover:bg-black/95 backdrop-blur-xl px-5 py-3 rounded-full border border-white/20 shadow-2xl flex items-center gap-3 transition-all">
+                  {/* Mic Toggle (Icon Only) */}
                   <button
                     onClick={toggleMicrophone}
-                    title={isMicOn ? 'ድምፅ አጥፋ' : 'ድምፅ አብራ'}
-                    className={`p-3 rounded-full transition-all cursor-pointer ${
+                    title={isMicOn ? 'ድምፅ አጥፋ (Mute Mic)' : 'ድምፅ አብራ (Unmute Mic)'}
+                    className={`p-3.5 rounded-full transition-all cursor-pointer ${
                       isMicOn
                         ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
                         : 'bg-white/10 hover:bg-white/20 text-white'
                     }`}
                   >
-                    {isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4 text-red-400" />}
+                    {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5 text-red-400" />}
                   </button>
 
+                  {/* Video Toggle (Icon Only) */}
                   <button
                     onClick={toggleVideo}
-                    title={isVideoOn ? 'ካሜራ አጥፋ' : 'ካሜራ አብራ'}
-                    className={`p-3 rounded-full transition-all cursor-pointer ${
+                    title={isVideoOn ? 'ካሜራ አጥፋ (Turn Off Camera)' : 'ካሜራ አብራ (Turn On Camera)'}
+                    className={`p-3.5 rounded-full transition-all cursor-pointer ${
                       isVideoOn
                         ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
                         : 'bg-white/10 hover:bg-white/20 text-white'
                     }`}
                   >
-                    {isVideoOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4 text-red-400" />}
+                    {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5 text-red-400" />}
                   </button>
 
+                  {/* Flip Camera (Icon Only) */}
                   <button
                     onClick={handleFlipCamera}
                     title="ካሜራ አዙር (የፊት / የኋላ)"
-                    className="p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                    className="p-3.5 rounded-full bg-white/10 hover:bg-white/20 text-amber-400 transition-all cursor-pointer"
                   >
-                    <RefreshCw className="w-4 h-4 text-amber-400" />
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
+
+                  {/* Focus Swap (Icon Only) */}
+                  <button
+                    onClick={() => setFullscreenFocus((prev) => (prev === 'host' ? 'user' : 'host'))}
+                    title="እይታ ቀይር (Switch 100% Screen Focus)"
+                    className="p-3.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all cursor-pointer"
+                  >
+                    <Maximize2 className="w-5 h-5" />
                   </button>
 
                   <div className="h-6 w-px bg-white/20 mx-1" />
 
+                  {/* Exit Full Screen (Icon Only) */}
                   <button
                     onClick={() => setIsFullscreen(false)}
-                    title="ከሙሉ ስክሪን ውጣ"
-                    className="px-4 py-2 bg-red-600/90 hover:bg-red-600 text-white text-xs font-black rounded-full flex items-center gap-1.5 cursor-pointer shadow-lg transition-transform hover:scale-105"
+                    title="ከሙሉ ስክሪን ውጣ (Exit Full Screen)"
+                    className="p-3.5 bg-red-600/90 hover:bg-red-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg transition-transform hover:scale-105"
                   >
-                    <Minimize2 className="w-3.5 h-3.5" />
-                    <span>ውጣ</span>
+                    <Minimize2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Primary Controls Bar for Mic, Video, Seating & Gifts */}
+            {/* Primary Controls Bar: Sleek Icon Buttons with Zero Text Clutter */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0a0d14] p-3.5 rounded-2xl border border-slate-800 shadow-xl">
               <div className="flex items-center gap-2">
-                {/* Unrestricted Mic Button */}
+                {/* Unrestricted Mic Button (Icon Only) */}
                 <button
                   onClick={toggleMicrophone}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm sm:text-base font-black transition-all cursor-pointer shadow-md ${
+                  className={`p-3.5 rounded-2xl transition-all cursor-pointer shadow-md ${
                     isMicOn
-                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 ring-2 ring-amber-400'
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 ring-2 ring-amber-400 shadow-amber-500/20'
                       : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700'
                   }`}
-                  title="ማይክሮፎኑ ያለገደብ ድምፅ እንዲያስተላልፍ ያድርጉ"
+                  title={isMicOn ? 'ድምፅ አጥፋ (Mute Mic)' : 'ድምፅ አብራ (Unmute Mic)'}
                 >
-                  {isMicOn ? <Mic className="w-4 h-4 text-slate-950" /> : <MicOff className="w-4 h-4 text-red-400" />}
-                  <span>{isMicOn ? t.roomStage.micMute : t.roomStage.micUnmute}</span>
+                  {isMicOn ? <Mic className="w-5 h-5 text-slate-950" /> : <MicOff className="w-5 h-5 text-red-400" />}
                 </button>
 
-                {/* Unrestricted Camera Button */}
+                {/* Unrestricted Camera Button (Icon Only) */}
                 <button
                   onClick={toggleVideo}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-sm sm:text-base font-black transition-all cursor-pointer shadow-md ${
+                  className={`p-3.5 rounded-2xl transition-all cursor-pointer shadow-md ${
                     isVideoOn && cameraActive
-                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 ring-2 ring-amber-400'
+                      ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 ring-2 ring-amber-400 shadow-amber-500/20'
                       : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700'
                   }`}
-                  title="የቪዲዮ ካሜራውን በሙሉ ጥራት ያብሩ"
+                  title={isVideoOn && cameraActive ? 'ካሜራ አጥፋ (Turn Off Camera)' : 'ካሜራ አብራ (Turn On Camera)'}
                 >
-                  {isVideoOn && cameraActive ? <Video className="w-4 h-4 text-slate-950" /> : <VideoOff className="w-4 h-4 text-red-400" />}
-                  <span>{isVideoOn && cameraActive ? t.roomStage.camClose : t.roomStage.camOpen}</span>
+                  {isVideoOn && cameraActive ? <Video className="w-5 h-5 text-slate-950" /> : <VideoOff className="w-5 h-5 text-red-400" />}
                 </button>
+
+                {/* Flip Camera Button (Icon Only) */}
+                {cameraActive && (
+                  <button
+                    onClick={handleFlipCamera}
+                    className="p-3.5 bg-slate-900 hover:bg-slate-800 text-amber-400 rounded-2xl border border-slate-700 transition cursor-pointer shadow-md"
+                    title="ካሜራ አዙር (የፊት / የኋላ)"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
+                )}
               </div>
 
               {/* Seating controls & Gift */}

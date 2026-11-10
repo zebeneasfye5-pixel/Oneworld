@@ -14,7 +14,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { ENV_CONFIG } from '../config/env';
+import { ENV_CONFIG, getApiUrl } from '../config/env';
 
 interface BuilderVaultModalProps {
   isOpen: boolean;
@@ -53,7 +53,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
 
     try {
       if (gateway === 'chapa') {
-        const res = await fetch('/api/payments/chapa/initialize', {
+        const res = await fetch(getApiUrl('/api/payments/chapa/initialize'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -67,7 +67,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
         const data = await res.json();
         setGatewayStatus(`የChapa ክፍያ ፍሰት ተጀምሯል፡ ${data.data?.checkout_url || 'የተዘጋጀ'}`);
       } else if (gateway === 'stripe') {
-        const res = await fetch('/api/payments/stripe/create-intent', {
+        const res = await fetch(getApiUrl('/api/payments/stripe/create-intent'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount: paymentAmount, currency: 'usd' })
@@ -75,7 +75,7 @@ export const BuilderVaultModal: React.FC<BuilderVaultModalProps> = ({
         const data = await res.json();
         setGatewayStatus(`የStripe ክፍያ ፍሰት ተዘጋጅቷል፡ ${data.clientSecret ? data.clientSecret.slice(0, 24) + '...' : 'የተዘጋጀ'}`);
       } else if (gateway === 'paypal') {
-        const res = await fetch('/api/payments/paypal/create-order', {
+        const res = await fetch(getApiUrl('/api/payments/paypal/create-order'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount: paymentAmount, currency: 'USD' })

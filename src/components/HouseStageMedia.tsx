@@ -74,16 +74,8 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   onShowToast
 }) => {
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.am;
-  const activeMembership: HouseMemberRecord = houseMemberships[houseId] || {
-    houseId,
-    memberId: `OW-${houseId.toUpperCase()}-001`,
-    fullName: currentUser.fullName || 'ዘበነ አስፍዬ (Zebene Asfye)',
-    avatarUrl: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
-    roleInHouse: houseRoleOptions[0] || 'Member',
-    profession: 'የመድረክ መሪና የክብር አባል',
-    registeredDate: '2026-10-26',
-    seatNumber: 1
-  };
+  // House Registration Gate: Houses 2-16 strictly require member registration!
+  const activeMembership: HouseMemberRecord | null = houseMemberships[houseId] || null;
   const membership = activeMembership;
 
   // Registration Form State
@@ -360,7 +352,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
     // Strict 2-person limit check for House 4 (ሚስጥር ቤት)
     if (isHouse4 && seatNo > 2) {
-      alert('የሚስጥር ቤቱ በአንድ ጊዜ ከ2 ሰው በላይ ማስተናገድ አይችልም (Max 2 Persons Limit)!');
+      onShowToast('⚠️ የሚስጥር ቤቱ በአንድ ጊዜ ከ2 ሰው በላይ ማስተናገድ አይችልም (Max 2 Persons Limit)!');
       return;
     }
 
@@ -387,7 +379,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
     // Compulsory external title check for House 3 (ባለስልጣን ቤት)
     if (houseId === 'h3' && !externalTitle.trim()) {
-      alert('በባለስልጣን ቤት ለመመዝገብ ከቤቱ ውጭ ያለዎትን የመንግስት/የተቋም የስልጣን ማዕረግ መሙላት ግዴታ ነው!');
+      onShowToast('⚠️ በባለስልጣን ቤት ለመመዝገብ ከቤቱ ውጭ ያለዎትን የስልጣን ማዕረግ መሙላት ግዴታ ነው!');
       return;
     }
 
@@ -637,58 +629,61 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             </button>
           </div>
 
-          {/* Full-Body / Fullscreen Mode Toggle */}
+          {/* Full-Body Toggle (Icon only) */}
           <button
             onClick={() => setIsFullBodyMode(!isFullBodyMode)}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+            className={`p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
               isFullBodyMode
-                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md'
+                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md ring-2 ring-amber-400/50'
                 : 'bg-slate-900 text-slate-300 border-slate-700 hover:text-white'
             }`}
-            title="ሙሉ አካልና ቁመት ማሳያ (Full Body Mode)"
+            title={isFullBodyMode ? 'መደበኛ ስክሪን (Standard View)' : 'ሙሉ አካልና ቁመት (Full Body 100%)'}
           >
-            <Maximize2 className="w-3.5 h-3.5" />
-            <span>{isFullBodyMode ? 'መደበኛ ስክሪን' : 'ሙሉ አካል (Full-Body)'}</span>
+            <Maximize2 className="w-4 h-4" />
           </button>
 
+          {/* Fullscreen Toggle (Icon only) */}
           <button
             onClick={toggleFullscreen}
-            title={isFullscreen ? 'ውጣ' : 'ሙሉ ስክሪን (Fullscreen)'}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer"
+            title={isFullscreen ? 'ከሙሉ ስክሪን ውጣ (Exit Fullscreen)' : 'በሙሉ ስክሪን ክፈት (Fullscreen 100%)'}
+            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition shadow-md"
           >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            {isFullscreen ? <Minimize2 className="w-4 h-4 text-amber-400" /> : <Maximize2 className="w-4 h-4" />}
           </button>
 
+          {/* Mic Toggle (Icon only) */}
           <button
             onClick={toggleMic}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer ${
+            title={isMicOn ? 'ድምፅ አጥፋ (Mute Mic)' : 'ድምፅ አብራ (Unmute Mic)'}
+            className={`p-2.5 rounded-xl transition shadow-md cursor-pointer ${
               isMicOn
                 ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400/50'
                 : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
             }`}
           >
             {isMicOn ? <Mic className="w-4 h-4 text-slate-950" /> : <MicOff className="w-4 h-4 text-red-400" />}
-            <span>{isMicOn ? t.stageMedia.micOn : t.stageMedia.micOff}</span>
           </button>
 
+          {/* Video Toggle (Icon only) */}
           <button
             onClick={toggleVideo}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-md cursor-pointer ${
+            title={isVideoOn ? 'ካሜራ አጥፋ (Turn Off Camera)' : 'ካሜራ አብራ (Turn On Camera)'}
+            className={`p-2.5 rounded-xl transition shadow-md cursor-pointer ${
               isVideoOn
                 ? 'bg-amber-500 text-slate-950 shadow-amber-500/30 ring-2 ring-amber-400/50'
                 : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700'
             }`}
           >
             {isVideoOn ? <Video className="w-4 h-4 text-slate-950" /> : <VideoOff className="w-4 h-4 text-red-400" />}
-            <span>{isVideoOn ? t.stageMedia.camOn : t.stageMedia.camOff}</span>
           </button>
 
           {userSeat !== null && (
             <button
               onClick={handleLeaveSeat}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 cursor-pointer"
+              title={t.stageMedia.leaveSeat}
+              className="p-2.5 rounded-xl text-xs font-bold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 cursor-pointer transition shadow-md"
             >
-              {t.stageMedia.leaveSeat}
+              🚪
             </button>
           )}
         </div>

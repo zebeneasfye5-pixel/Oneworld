@@ -66,6 +66,7 @@ interface MasterDrawerProps {
   onOpenAdminAudit?: () => void;
   onInstallPwa: () => void;
   isInstallable: boolean;
+  onLogout?: () => void;
 }
 
 export const MasterDrawer: React.FC<MasterDrawerProps> = ({
@@ -85,7 +86,8 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
   onOpenCharter,
   onOpenAdminAudit,
   onInstallPwa,
-  isInstallable
+  isInstallable,
+  onLogout
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const t = TRANSLATIONS[currentLang];
@@ -144,27 +146,45 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
         <div className="p-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-emerald-600 flex items-center justify-center text-slate-950 font-bold text-xs shadow-md">
-              {user?.fullName.charAt(0) || 'ዘ'}
+              {user?.fullName.charAt(0) || '👤'}
             </div>
             <div>
               <div className="text-xs font-bold text-white truncate max-w-[150px]">
-                {user?.fullName || 'ዘበነ አስፍዬ'}
+                {user?.isGuest ? 'እንግዳ ተጠቃሚ (Guest)' : (user?.fullName || 'ተጠቃሚ')}
               </div>
-              <span className="text-[10px] text-emerald-400 font-semibold block">
-                {user?.roleTitle || 'የመድረኩ መስራች'}
+              <span className="text-[10px] text-amber-400 font-semibold block">
+                {user?.isGuest ? 'ያልተመዘገበ' : (user?.roleTitle || 'የማህበረሰብ አባል')}
               </span>
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              onClose();
-              onOpenAuth();
-            }}
-            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold rounded-lg border border-slate-700 cursor-pointer"
-          >
-            {t.header.profile}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                onClose();
+                onOpenAuth();
+              }}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer transition shadow-sm ${
+                user?.isGuest
+                  ? 'bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+              }`}
+            >
+              {user?.isGuest ? 'ግባ / ተመዝገብ' : t.header.profile}
+            </button>
+            {user && !user.isGuest && onLogout && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onLogout();
+                }}
+                className="px-2 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/60 text-[10px] font-bold rounded-lg cursor-pointer"
+                title="ከመለያ ውጣ"
+              >
+                ውጣ
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Master Drawer De-cluttered Hub: Financial Balances & 8-Languages Selection */}
