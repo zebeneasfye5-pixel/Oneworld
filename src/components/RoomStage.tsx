@@ -53,7 +53,7 @@ interface RoomStageProps {
   onSelectRoom: (room: Room) => void;
   userLang: LanguageCode;
   userBalanceETB: number;
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   occupants: RoomOccupant[];
   messages: LiveSpeechMessage[];
   remotePeers?: Map<string, RemotePeerData>;
@@ -421,8 +421,8 @@ export const RoomStage: React.FC<RoomStageProps> = ({
     // 1. INSTANT ARRIVAL: Dispatched immediately with 0ms delay
     const newMsg: LiveSpeechMessage = {
        id: `text-${Date.now()}`,
-       speakerName: currentUser.fullName || 'እርስዎ (You - User)',
-       speakerAvatar: currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+       speakerName: currentUser?.fullName || 'እርስዎ (You - User)',
+       speakerAvatar: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
        sourceLang: userLang,
        originalText: textToSend,
       translations: {
@@ -737,8 +737,8 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4">
                         <div className="relative mb-3">
                           <img
-                            src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                            alt={currentUser.fullName}
+                            src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                            alt={currentUser?.fullName || 'እርስዎ'}
                             className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
                               isMicOn && audioVolumeLevel > 15
                                 ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
@@ -760,7 +760,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     ) : (
                       <div 
                         className="w-full h-full bg-cover bg-center" 
-                        style={{ backgroundImage: `url('${currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=800&q=80'}')` }}
+                        style={{ backgroundImage: `url('${currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=800&q=80'}')` }}
                       />
                     )}
                   </div>
@@ -1225,8 +1225,8 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     <>
                       <div className="relative mt-2 mb-1.5">
                         <img
-                          src={isUserSeat ? (currentUser.avatarUrl || occupant.avatar) : occupant.avatar}
-                          alt={isUserSeat ? currentUser.fullName : occupant.name}
+                          src={isUserSeat ? (currentUser?.avatarUrl || occupant.avatar) : occupant.avatar}
+                          alt={isUserSeat ? (currentUser?.fullName || occupant.name) : occupant.name}
                           className={`w-11 h-11 rounded-full object-cover border-2 shadow-md transition-transform duration-200 ${
                             isUserSeat && isMicOn && audioVolumeLevel > 15
                               ? 'border-amber-400 ring-4 ring-amber-400/50 scale-110'
@@ -1243,7 +1243,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                         )}
                       </div>
                       <span className="text-xs sm:text-sm font-black text-white truncate w-full">
-                        {isUserSeat ? currentUser.fullName : occupant.name}
+                        {isUserSeat ? (currentUser?.fullName || occupant.name) : occupant.name}
                       </span>
                       <div className="flex items-center gap-1.5 mt-1">
                         {(isUserSeat ? isMicOn : !occupant.isMuted) ? (
@@ -1259,11 +1259,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       </div>
                     </>
                   ) : (
-                    <div className="py-2.5 flex flex-col items-center">
-                      <div className="w-9 h-9 rounded-full border-2 border-dashed border-slate-700 flex items-center justify-center text-amber-400 mb-1 text-base font-black">
+                    <div className="py-3 flex flex-col items-center justify-center">
+                      <div className="w-8 h-8 rounded-full border border-dashed border-slate-700 hover:border-amber-400 flex items-center justify-center text-amber-400 text-sm font-black transition">
                         +
                       </div>
-                      <span className="text-xs font-extrabold text-slate-300">{t.chairs.openSeat}</span>
                     </div>
                   )}
                 </div>

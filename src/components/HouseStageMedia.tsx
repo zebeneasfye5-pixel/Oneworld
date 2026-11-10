@@ -58,7 +58,7 @@ interface HouseStageMediaProps {
   houseTitle: string;
   houseDescription: string;
   houseRoleOptions: string[];
-  currentUser: UserProfile;
+  currentUser: UserProfile | null;
   currentLang: AppLanguage;
   houseMemberships: Record<string, HouseMemberRecord>;
   onRegisterHouseMember: (record: HouseMemberRecord) => void;
@@ -89,7 +89,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   const [profession, setProfession] = useState('');
   const [externalTitle, setExternalTitle] = useState('');
   const [securityBadge, setSecurityBadge] = useState('');
-  const [profilePhotoUrl, setProfilePhotoUrl] = useState(currentUser.avatarUrl || '');
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState(currentUser?.avatarUrl || '');
   const [hasAgreedToBylaws, setHasAgreedToBylaws] = useState(true);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -295,12 +295,15 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   const handleResetZoom = () => setZoomScale(1);
 
   const toggleFullscreen = () => {
-    if (!stageContainerRef.current) return;
-    if (!document.fullscreenElement) {
-      stageContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
-    }
+    setIsFullscreen((prev) => {
+      const next = !prev;
+      if (next && stageContainerRef.current?.requestFullscreen) {
+        stageContainerRef.current.requestFullscreen().catch(() => {});
+      } else if (!next && document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      return next;
+    });
   };
 
   const toggleMic = async () => {
@@ -389,14 +392,17 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
       return;
     }
 
+    const userName = currentUser?.fullName || 'የተመዘገበ አባል';
+    const userAvatar = profilePhotoUrl || currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80';
+
     const record: HouseMemberRecord = {
       houseId,
       memberId: `OW-${houseId.toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      fullName: currentUser.fullName,
-      avatarUrl: profilePhotoUrl || currentUser.avatarUrl,
+      fullName: userName,
+      avatarUrl: userAvatar,
       roleInHouse: selectedRole,
       profession: profession || 'ባለሙያ',
-      externalTitle: externalTitle || currentUser.roleTitle,
+      externalTitle: externalTitle || currentUser?.roleTitle || 'የማህበረሰብ አባል',
       securityBadge: securityBadge || 'OW-SEC-VALID',
       registeredDate: '2026-10-26',
       seatNumber: 1
@@ -417,18 +423,12 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
         <div className="max-w-2xl mx-auto space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/10">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-2xl shadow-lg shadow-amber-500/10">
               🏛️
             </div>
-            <span className="text-[11px] font-black uppercase tracking-widest text-amber-400 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full inline-block">
-              {t.stageMedia.regRequired}
-            </span>
-            <h2 className="text-xl md:text-2xl font-black text-white">
-              {t.stageMedia.joinPromptPrefix} {houseTitle} {t.stageMedia.joinPromptSuffix}
+            <h2 className="text-lg md:text-xl font-black text-white">
+              {houseTitle}
             </h2>
-            <p className="text-xs text-slate-300 max-w-lg mx-auto">
-              {houseDescription} · መድረኩን ለመጠቀምና በውይይቱ ለመሳተፍ አስገዳጅ የምዝገባ ቅጽ ይሙሉ
-            </p>
           </div>
 
           <form onSubmit={handleRegister} className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 text-left space-y-4 shadow-2xl">
@@ -436,8 +436,8 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-950/80 border border-slate-800 rounded-2xl">
               <div className="relative group">
                 <img
-                  src={profilePhotoUrl}
-                  alt={currentUser.fullName}
+                  src={profilePhotoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                  alt={currentUser?.fullName || 'Profile'}
                   className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-500 shadow-md"
                 />
                 <button
@@ -794,8 +794,8 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                   <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
                     <div className="relative mb-3">
                       <img
-                        src={profilePhotoUrl || currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                        alt={currentUser.fullName}
+                        src={profilePhotoUrl || currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                        alt={currentUser?.fullName || membership.fullName}
                         className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
                           isMicOn
                             ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
@@ -820,7 +820,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
               {/* Bottom Info Card OUTSIDE Video Frame */}
               <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
                 <div>
-                  <h4 className="text-white font-black text-sm sm:text-base">{currentUser.fullName}</h4>
+                  <h4 className="text-white font-black text-sm sm:text-base">{currentUser?.fullName || membership.fullName}</h4>
                   <p className="text-xs text-white font-medium">{membership.roleInHouse}</p>
                 </div>
                 <div>
@@ -911,7 +911,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
             const occupant = participants.find((p) => p.seatNumber === seatNo);
             const avatarUrl = isTakenByMe 
-              ? (profilePhotoUrl || currentUser.avatarUrl) 
+              ? (profilePhotoUrl || currentUser?.avatarUrl) 
               : occupant?.avatar;
             const isSpeakingNow = isTakenByMe ? isMicOn : occupant?.isSpeaking;
 
@@ -924,10 +924,10 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                   } else if (!isTakenByOther) {
                     handleClaimSeat(seatNo);
                   } else {
-                    onShowToast(`${t.chairs.seatPrefix}${seatNo}: ${t.stageMedia.occupied}`);
+                    onShowToast(`ወንበር #${seatNo}: ተይዟል`);
                   }
                 }}
-                className={`py-2 px-1.5 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 text-center cursor-pointer ${
+                className={`py-2 px-1 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 text-center cursor-pointer ${
                   isTakenByMe
                     ? 'bg-amber-950/40 border-amber-500 text-amber-200 ring-2 ring-amber-500/50 shadow-md'
                     : isTakenByOther
@@ -935,9 +935,9 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     : 'bg-slate-900/60 border-slate-800/80 hover:border-amber-500/50 text-slate-300 hover:text-white'
                 }`}
               >
-                <span className="text-[10px] font-mono font-bold text-amber-400">#{seatNo}</span>
+                <span className="text-[11px] font-mono font-bold text-amber-400">#{seatNo}</span>
                 {avatarUrl ? (
-                  <div className="relative my-1">
+                  <div className="relative my-0.5">
                     <img
                       src={avatarUrl}
                       alt={`Seat ${seatNo}`}
@@ -952,13 +952,15 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="w-6 h-6 my-1 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-[10px] text-slate-500 font-bold">
+                  <div className="w-6 h-6 my-0.5 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-[10px] text-slate-500 font-bold">
                     +
                   </div>
                 )}
-                <span className="text-[9px] truncate max-w-full font-bold">
-                  {isTakenByMe ? t.stageMedia.yourSeat : isTakenByOther ? (occupant?.name?.split(' ')[0] || t.stageMedia.occupied) : t.stageMedia.takeSeat}
-                </span>
+                {isTakenByMe ? (
+                  <span className="text-[8px] text-amber-300 font-bold">እርስዎ</span>
+                ) : isTakenByOther && occupant ? (
+                  <span className="text-[8px] text-slate-400 font-bold truncate max-w-[42px]">{occupant.name.split(' ')[0]}</span>
+                ) : null}
               </button>
             );
           })}

@@ -174,26 +174,18 @@ export default function App() {
     }
   };
 
-  // User Profile: Check localStorage or generate unique device guest session
-  const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
+  // User Profile: Check localStorage for verified logged-in account (Strict Authentication Gate)
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     try {
       const saved = localStorage.getItem('oneworld_auth_user');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && !parsed.isGuest && parsed.phoneNumber) {
+          return parsed;
+        }
+      }
     } catch {}
-    const deviceSalt = Math.random().toString(36).substring(2, 7);
-    return {
-      phoneNumber: '',
-      fullName: `ተጠቃሚ_${deviceSalt.toUpperCase()}`,
-      gender: 'ያልተገለጸ',
-      age: 26,
-      nationality: 'ኢትዮጵያዊ (Ethiopian)',
-      address: 'አዲስ አበባ',
-      idNumber: `USER-${Date.now().toString(36)}-${deviceSalt}`,
-      roleTitle: 'የማህበረሰብ አባል (Community Member)',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
-      verifiedAt: new Date().toISOString().split('T')[0],
-      isGuest: true
-    };
+    return null;
   });
 
   // Financial Balances with 100% Offline LocalStorage Persistence
@@ -275,11 +267,11 @@ export default function App() {
   const realtime = useRealtimeRoom({
     roomId: activeTarget.startsWith('h') ? activeTarget : 'h1',
     currentUser: {
-      id: currentUser.idNumber || 'user-self',
-      fullName: currentUser.fullName,
-      avatarUrl: currentUser.avatarUrl,
-      roleTitle: currentUser.roleTitle,
-      nationality: currentUser.nationality
+      id: currentUser?.idNumber || 'pending-auth',
+      fullName: currentUser?.fullName || 'ተጠቃሚ',
+      avatarUrl: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+      roleTitle: currentUser?.roleTitle || 'የማህበረሰብ አባል',
+      nationality: currentUser?.nationality || 'ኢትዮጵያ'
     },
     initialOccupants: INITIAL_OCCUPANTS,
     onMessageReceived: (msg) => {
@@ -323,6 +315,11 @@ export default function App() {
 
   // House 1 actions
   const handleClaimSeat = (seatNumber: number) => {
+    if (!currentUser) {
+      setIsAuthOpen(true);
+      showToast('እባክዎ ወንበር ከመያዝዎ በፊት መጀመሪያ ወደ መለያዎ ይግቡ ወይም ይመዝገቡ!');
+      return;
+    }
     setUserSeatedNumber(seatNumber);
     realtime.claimSeatRealtime(seatNumber);
     setOccupants((prev) => {
@@ -423,25 +420,13 @@ export default function App() {
     try {
       localStorage.removeItem('oneworld_auth_user');
       localStorage.removeItem('oneworld_house_memberships');
+      localStorage.removeItem('oneworld_user_seat');
     } catch {}
-    const deviceSalt = Math.random().toString(36).substring(2, 7);
-    const guestUser: UserProfile = {
-      phoneNumber: '',
-      fullName: `ተጠቃሚ_${deviceSalt.toUpperCase()}`,
-      gender: 'ያልተገለጸ',
-      age: 26,
-      nationality: 'ኢትዮጵያዊ (Ethiopian)',
-      address: '',
-      idNumber: `USER-${Date.now().toString(36)}-${deviceSalt}`,
-      roleTitle: 'የማህበረሰብ አባል',
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
-      verifiedAt: new Date().toISOString().split('T')[0],
-      isGuest: true
-    };
-    setCurrentUser(guestUser);
+    setCurrentUser(null);
     setHouseMemberships({});
+    setUserSeatedNumber(null);
     setIsAuthOpen(true);
-    showToast('ከመለያዎ በተሳካ ሁኔታ ወጥተዋል (Logged Out)');
+    showToast('ከመለያዎ በተሳካ ሁኔታ ወጥተዋል (Logged Out)። በድጋሚ ለመግባት ፓስዋርድዎን ያስገቡ።');
   };
 
   const handleCreditBalance = (amount: number, reason: string) => {
@@ -575,14 +560,17 @@ export default function App() {
           />
         )}
 
-        {/* Auth & Profile Modal with Real Photo Upload */}
-        {isAuthOpen && (
+        {/* Mandatory Authentication Gate: If user has no account, this blocks access until sign up or login */}
+        {(!currentUser || isAuthOpen) && (
           <AuthModal
-            isOpen={isAuthOpen}
-            onClose={() => setIsAuthOpen(false)}
+            isOpen={!currentUser || isAuthOpen}
+            onClose={() => {
+              if (currentUser) setIsAuthOpen(false);
+            }}
             currentUser={currentUser}
             onSaveProfile={handleSaveProfile}
             onLogout={handleLogout}
+            canDismiss={!!currentUser}
           />
         )}
 
