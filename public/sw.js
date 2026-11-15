@@ -1,7 +1,7 @@
 // Oneworld Progressive Web App (PWA) Service Worker
 // Version: 3.0.0 - Fast Edge Caching & WebView-Safe Fetch Handling
 
-const CACHE_NAME = 'oneworld-offline-v7';
+const CACHE_NAME = 'oneworld-offline-v8';
 const STATIC_PRECACHE = [
   '/',
   '/index.html',

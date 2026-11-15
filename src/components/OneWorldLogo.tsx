@@ -12,10 +12,10 @@ export const OneWorldLogo: React.FC<OneWorldLogoProps> = ({
   className = ''
 }) => {
   const sizeMap = {
-    sm: { icon: 32, text: 'text-base', sub: 'text-[9px]' },
-    md: { icon: 42, text: 'text-lg', sub: 'text-[10px]' },
-    lg: { icon: 54, text: 'text-2xl', sub: 'text-xs' },
-    xl: { icon: 72, text: 'text-3xl', sub: 'text-sm' }
+    sm: { icon: 34, text: 'text-xl', sub: 'text-xs' },
+    md: { icon: 44, text: 'text-2xl', sub: 'text-xs' },
+    lg: { icon: 58, text: 'text-3xl', sub: 'text-sm' },
+    xl: { icon: 76, text: 'text-4xl', sub: 'text-base' }
   };
 
   const currentSize = sizeMap[size];
