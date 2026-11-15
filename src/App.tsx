@@ -6,9 +6,7 @@ import {
   VirtualGift 
 } from './types';
 import { 
-  INITIAL_ROOMS, 
-  INITIAL_OCCUPANTS, 
-  INITIAL_SPEECH_MESSAGES 
+  INITIAL_ROOMS 
 } from './data/initialData';
 import { AppLanguage, TRANSLATIONS } from './i18n/translations';
 import { Header } from './components/Header';
@@ -17,7 +15,7 @@ import { MasterDrawer, HouseId } from './components/MasterDrawer';
 import type { UserProfile } from './components/AuthModal';
 import { HouseStageMedia, HouseMemberRecord } from './components/HouseStageMedia';
 import { announceLanguageSwitch } from './services/speechService';
-import { ENV_CONFIG } from './config/env';
+import { ENV_CONFIG, getApiUrl } from './config/env';
 
 // Lazy-loaded on-demand modals for ultra-fast initial page speed
 const BuilderVaultModal = lazy(() => import('./components/BuilderVaultModal').then((m) => ({ default: m.BuilderVaultModal })));
@@ -118,6 +116,11 @@ export default function App() {
       }
       return updated;
     });
+    fetch(getApiUrl(`/api/houses/${encodeURIComponent(record.houseId)}/register`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record)
+    }).catch(() => {});
   };
 
   // Listen for beforeinstallprompt
@@ -188,37 +191,37 @@ export default function App() {
     return null;
   });
 
-  // Financial Balances with 100% Offline LocalStorage Persistence
+  // Financial Balances with 100% Offline LocalStorage Persistence (Zero fake pre-loaded numbers)
   const [balanceETB, setBalanceETB] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('oneworld_balance_etb');
-      return saved ? Number(saved) : 34850;
+      return saved ? Number(saved) : 0;
     } catch {
-      return 34850;
+      return 0;
     }
   });
   const [balanceUSD, setBalanceUSD] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('oneworld_balance_usd');
-      return saved ? Number(saved) : 290;
+      return saved ? Number(saved) : 0;
     } catch {
-      return 290;
+      return 0;
     }
   });
   const [royaltyPoints, setRoyaltyPoints] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('oneworld_royalty_points');
-      return saved ? Number(saved) : 620;
+      return saved ? Number(saved) : 0;
     } catch {
-      return 620;
+      return 0;
     }
   });
   const [builderReserveETB, setBuilderReserveETB] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('oneworld_builder_reserve');
-      return saved ? Number(saved) : 18420;
+      return saved ? Number(saved) : 0;
     } catch {
-      return 18420;
+      return 0;
     }
   });
 
@@ -232,29 +235,26 @@ export default function App() {
     } catch {}
   }, [balanceETB, balanceUSD, royaltyPoints, builderReserveETB]);
 
-  // Virtual Rooms State (House 1)
+  // Virtual Rooms & Live Messages State (Zero fake messages)
   const [rooms, setRooms] = useState<Room[]>(INITIAL_ROOMS);
   const [currentRoom, setCurrentRoom] = useState<Room>(INITIAL_ROOMS[0]);
-  const [occupants, setOccupants] = useState<RoomOccupant[]>(INITIAL_OCCUPANTS);
-  const [messages, setMessages] = useState<LiveSpeechMessage[]>(INITIAL_SPEECH_MESSAGES);
-  const [userSeatedNumber, setUserSeatedNumber] = useState<number | null>(() => {
-    try {
-      const saved = localStorage.getItem('oneworld_user_seat');
-      return saved ? Number(saved) : 1;
-    } catch {
-      return 1;
-    }
-  });
+  const [messages, setMessages] = useState<LiveSpeechMessage[]>([]);
 
+  // Fetch server-persisted custom rooms on startup
   useEffect(() => {
-    try {
-      if (userSeatedNumber !== null) {
-        localStorage.setItem('oneworld_user_seat', userSeatedNumber.toString());
-      } else {
-        localStorage.removeItem('oneworld_user_seat');
-      }
-    } catch {}
-  }, [userSeatedNumber]);
+    fetch(getApiUrl('/api/rooms'))
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.rooms && Array.isArray(data.rooms) && data.rooms.length > 0) {
+          setRooms((prev) => {
+            const seen = new Set(prev.map((r) => r.id));
+            const newRooms = data.rooms.filter((r: Room) => r?.id && !seen.has(r.id));
+            return newRooms.length > 0 ? [...newRooms, ...prev] : prev;
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Toast
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -263,9 +263,28 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const recordAuditTransaction = (source: string, grossETB: number, gateway = 'Oneworld Ledger') => {
+    if (!grossETB || grossETB <= 0) return;
+    fetch(getApiUrl('/api/audit/transaction'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source, gateway, grossETB })
+    }).catch(() => {});
+  };
+
+  const activeRealtimeRoomId =
+    activeTarget === 'h1'
+      ? currentRoom?.id && currentRoom.id !== 'room-1'
+        ? currentRoom.id
+        : 'h1'
+      : activeTarget.startsWith('h')
+      ? activeTarget
+      : 'h1';
+
   // Live Multi-User WebRTC & WebSocket Mesh Connection
   const realtime = useRealtimeRoom({
-    roomId: activeTarget.startsWith('h') ? activeTarget : 'h1',
+    roomId: activeRealtimeRoomId,
+    enabled: !!currentUser,
     currentUser: {
       id: currentUser?.idNumber || 'pending-auth',
       fullName: currentUser?.fullName || 'ተጠቃሚ',
@@ -273,9 +292,23 @@ export default function App() {
       roleTitle: currentUser?.roleTitle || 'የማህበረሰብ አባል',
       nationality: currentUser?.nationality || 'ኢትዮጵያ'
     },
-    initialOccupants: INITIAL_OCCUPANTS,
     onMessageReceived: (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+    },
+    onMessageUpdated: (messageId, translations) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, translations: { ...m.translations, ...translations } }
+            : m
+        )
+      );
+    },
+    onRoomHistory: (_rid, historyMsgs) => {
+      setMessages(historyMsgs || []);
+    },
+    onRoomCreated: (newRoom) => {
+      setRooms((prev) => (prev.some((r) => r.id === newRoom.id) ? prev : [newRoom, ...prev]));
     },
     onGiftReceived: (gift, senderName) => {
       showToast(`🎁 ${gift.nameAm} ከ ${senderName} ተልኮልዎታል!`);
@@ -313,46 +346,36 @@ export default function App() {
 
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.am;
 
-  // House 1 actions
+  // House 1 & Unified Seat Actions
   const handleClaimSeat = (seatNumber: number) => {
     if (!currentUser) {
       setIsAuthOpen(true);
       showToast('እባክዎ ወንበር ከመያዝዎ በፊት መጀመሪያ ወደ መለያዎ ይግቡ ወይም ይመዝገቡ!');
       return;
     }
-    setUserSeatedNumber(seatNumber);
     realtime.claimSeatRealtime(seatNumber);
-    setOccupants((prev) => {
-      const updated = prev.filter((o) => o.id !== 'user-self');
-      const userOccupant: RoomOccupant = {
-        id: 'user-self',
-        name: currentUser.fullName,
-        avatar: currentUser.avatarUrl,
-        country: 'ኢትዮጵያ',
-        countryFlag: '🇪🇹',
-        preferredLang: currentLang as any,
-        isSpeaking: false,
-        isMuted: true,
-        isVideoOn: true,
-        seatNumber: seatNumber,
-        royaltyPointsEarned: 280,
-        titleBadge: currentUser.roleTitle
-      };
-      return [...updated, userOccupant];
-    });
     showToast(`${t.chairs.seatPrefix}${seatNumber}: ${t.announcements.seatClaimed}`);
   };
 
   const handleLeaveSeat = () => {
-    setUserSeatedNumber(null);
     realtime.leaveSeatRealtime();
-    setOccupants((prev) => prev.filter((o) => o.id !== 'user-self'));
     showToast(t.announcements.seatLeft);
   };
 
   const handleSendMessage = (msg: LiveSpeechMessage) => {
-    setMessages((prev) => [...prev, msg]);
+    setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
     realtime.sendRealtimeMessage(msg);
+  };
+
+  const handleTranslationComplete = (messageId: string, translations: Record<string, string>) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, translations: { ...m.translations, ...translations } }
+          : m
+      )
+    );
+    realtime.broadcastTranslationUpdate(messageId, translations);
   };
 
   const handleSendGift = (gift: VirtualGift, recipient: RoomOccupant) => {
@@ -361,17 +384,23 @@ export default function App() {
       return;
     }
     setBalanceETB((prev) => prev - gift.priceETB);
-    const builderCut = Math.round(gift.priceETB * 0.10); // 10% to Developer
+    const builderCut = Math.round(gift.priceETB * 0.10);
     setBuilderReserveETB((prev) => prev + builderCut);
     realtime.sendGiftRealtime(gift, recipient.id);
+    recordAuditTransaction(`Virtual Gift -> ${recipient.name}`, gift.priceETB, 'Oneworld Gifts');
     showToast(`${gift.icon} ${gift.nameAm} -> ${recipient.name} (${t.announcements.giftSent})`);
     safeConfetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
   };
 
   const handleCreatePersonalRoom = (newRoom: Room) => {
-    setRooms([newRoom, ...rooms]);
+    setRooms((prev) => (prev.some((r) => r.id === newRoom.id) ? prev : [newRoom, ...prev]));
     setCurrentRoom(newRoom);
-    setUserSeatedNumber(1);
+    realtime.claimSeatRealtime(1);
+    fetch(getApiUrl('/api/rooms'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newRoom)
+    }).catch(() => {});
     showToast(`"${newRoom.titleAm}" አዳራሽ ተከፍቷል!`);
   };
 
@@ -380,6 +409,7 @@ export default function App() {
     setBalanceETB((prev) => prev + amount);
     const devCut = Math.round(amount * 0.10);
     setBuilderReserveETB((prev) => prev + devCut);
+    recordAuditTransaction(`Deposit via ${bankName}`, amount, bankName);
     showToast(`የ${amount.toLocaleString()} ብር ገቢ በ${bankName} ተፈፅሟል!`);
   };
 
@@ -391,6 +421,7 @@ export default function App() {
     setBalanceETB((prev) => prev - amount);
     const devCut = Math.round(amount * 0.10);
     setBuilderReserveETB((prev) => prev + devCut);
+    recordAuditTransaction(`Withdraw to ${bankName}`, amount, bankName);
     showToast(`የ${amount.toLocaleString()} ብር ወጪ ወደ ${bankName} ተላልፏል!`);
     return true;
   };
@@ -403,6 +434,7 @@ export default function App() {
     setBalanceETB((prev) => prev - amount);
     const devCut = Math.round(amount * 0.10);
     setBuilderReserveETB((prev) => prev + devCut);
+    recordAuditTransaction(reason, amount, 'Oneworld Wallet');
     showToast(`${amount.toLocaleString()} ብር ተከፍሏል (${reason})`);
     return true;
   };
@@ -424,7 +456,6 @@ export default function App() {
     } catch {}
     setCurrentUser(null);
     setHouseMemberships({});
-    setUserSeatedNumber(null);
     setIsAuthOpen(true);
     showToast('ከመለያዎ በተሳካ ሁኔታ ወጥተዋል (Logged Out)። በድጋሚ ለመግባት ፓስዋርድዎን ያስገቡ።');
   };
@@ -460,7 +491,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0c0f17] text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#0c0f17] text-white flex flex-col font-sans font-extrabold selection:bg-amber-500 selection:text-slate-950">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 p-4 bg-emerald-950/95 border border-emerald-500/60 text-emerald-200 text-xs font-bold rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce">
@@ -484,6 +515,7 @@ export default function App() {
         balanceETB={balanceETB}
         balanceUSD={balanceUSD}
         royaltyPoints={royaltyPoints}
+        onlineCount={realtime.onlineCount}
         onOpenWallet={() => setActiveTarget('bank')}
         onOpenDrawer={() => setIsDrawerOpen(true)}
         onOpenBuilderVault={() => setIsBuilderVaultOpen(true)}
@@ -612,303 +644,80 @@ export default function App() {
             occupants={realtime.combinedOccupants}
             messages={messages}
             remotePeers={realtime.remotePeers}
+            localStream={realtime.localStream}
+            isMicMuted={realtime.isMicMuted}
+            isVideoOff={realtime.isVideoOff}
+            isSpeaking={realtime.isSpeaking}
+            cameraFacing={realtime.cameraFacing}
+            cameraError={realtime.cameraError}
+            onToggleMic={realtime.toggleMic}
+            onToggleVideo={realtime.toggleVideo}
+            onFlipCamera={realtime.flipCamera}
+            onRetryCamera={() => realtime.acquireMedia(realtime.cameraFacing)}
+            onTranslationComplete={handleTranslationComplete}
             onSendMessage={handleSendMessage}
             onSendGift={handleSendGift}
             onCreatePersonalRoom={handleCreatePersonalRoom}
             onClaimSeat={handleClaimSeat}
             onLeaveSeat={handleLeaveSeat}
-            userSeatedNumber={userSeatedNumber}
+            userSeatedNumber={realtime.seatNumber}
             onAddRoyalty={handleAddRoyalty}
           />
         )}
 
-        {/* Houses 2 to 16: Lazy-Loaded with dedicated membership gate, Zoom stage, mic, and numbered chairs */}
-        {activeTarget === 'h2' && (
+        {/* Houses 2 to 16: Live WebRTC Media Stage, Membership Gate & Specialized Content */}
+        {(['h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9', 'h10', 'h11', 'h12', 'h13', 'h14', 'h15', 'h16'] as const).includes(activeTarget as any) && (
           <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
             <HouseStageMedia
-              houseId="h2"
-              houseTitle={houseMeta('h2').title}
-              houseDescription={houseMeta('h2').desc}
-              houseRoleOptions={houseMeta('h2').roles}
+              houseId={activeTarget}
+              houseTitle={houseMeta(activeTarget).title}
+              houseDescription={houseMeta(activeTarget).desc}
+              houseRoleOptions={houseMeta(activeTarget).roles}
               currentUser={currentUser}
               currentLang={currentLang}
               houseMemberships={houseMemberships}
               onRegisterHouseMember={handleRegisterHouseMember}
               onShowToast={showToast}
               onGoBack={() => setActiveTarget('h1')}
+              localStream={realtime.localStream}
+              remotePeers={realtime.remotePeers}
+              isMicMuted={realtime.isMicMuted}
+              isVideoOff={realtime.isVideoOff}
+              isSpeaking={realtime.isSpeaking}
+              cameraFacing={realtime.cameraFacing}
+              cameraError={realtime.cameraError}
+              onToggleMic={realtime.toggleMic}
+              onToggleVideo={realtime.toggleVideo}
+              onFlipCamera={realtime.flipCamera}
+              onRetryCamera={() => realtime.acquireMedia(realtime.cameraFacing)}
+              userSeat={realtime.seatNumber}
+              onClaimSeat={handleClaimSeat}
+              onLeaveSeat={handleLeaveSeat}
             />
-            {houseMemberships['h2'] && <HouseFamilyKinship />}
-          </div>
-        )}
-
-        {activeTarget === 'h3' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h3"
-              houseTitle={houseMeta('h3').title}
-              houseDescription={houseMeta('h3').desc}
-              houseRoleOptions={houseMeta('h3').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h3'] && <HouseLeadership />}
-          </div>
-        )}
-
-        {activeTarget === 'h4' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h4"
-              houseTitle={houseMeta('h4').title}
-              houseDescription={houseMeta('h4').desc}
-              houseRoleOptions={houseMeta('h4').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h4'] && <HouseConfidentialCourtship />}
-          </div>
-        )}
-
-        {activeTarget === 'h5' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h5"
-              houseTitle={houseMeta('h5').title}
-              houseDescription={houseMeta('h5').desc}
-              houseRoleOptions={houseMeta('h5').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h5'] && <HouseVirtualWedding />}
-          </div>
-        )}
-
-        {activeTarget === 'h6' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h6"
-              houseTitle={houseMeta('h6').title}
-              houseDescription={houseMeta('h6').desc}
-              houseRoleOptions={houseMeta('h6').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h6'] && <HouseFaith />}
-          </div>
-        )}
-
-        {activeTarget === 'h7' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h7"
-              houseTitle={houseMeta('h7').title}
-              houseDescription={houseMeta('h7').desc}
-              houseRoleOptions={houseMeta('h7').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h7'] && <HouseSecurityChamber />}
-          </div>
-        )}
-
-        {activeTarget === 'h8' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h8"
-              houseTitle={houseMeta('h8').title}
-              houseDescription={houseMeta('h8').desc}
-              houseRoleOptions={houseMeta('h8').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h8'] && <TalentShow onEarnRoyalty={handleAddRoyalty} />}
-          </div>
-        )}
-
-        {activeTarget === 'h9' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h9"
-              houseTitle={houseMeta('h9').title}
-              houseDescription={houseMeta('h9').desc}
-              houseRoleOptions={houseMeta('h9').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h9'] && (
-              <HouseMarketplaceExpo
-                userBalanceETB={balanceETB}
-                onPurchase={handleDeductBalance}
-              />
-            )}
-          </div>
-        )}
-
-        {activeTarget === 'h10' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h10"
-              houseTitle={houseMeta('h10').title}
-              houseDescription={houseMeta('h10').desc}
-              houseRoleOptions={houseMeta('h10').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h10'] && (
-              <AIAcademy
-                userLang={currentLang as any}
-                onEarnRoyalty={handleAddRoyalty}
-              />
-            )}
-          </div>
-        )}
-
-        {activeTarget === 'h11' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h11"
-              houseTitle={houseMeta('h11').title}
-              houseDescription={houseMeta('h11').desc}
-              houseRoleOptions={houseMeta('h11').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h11'] && <HouseInstitutionalTraining />}
-          </div>
-        )}
-
-        {activeTarget === 'h12' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h12"
-              houseTitle={houseMeta('h12').title}
-              houseDescription={houseMeta('h12').desc}
-              houseRoleOptions={houseMeta('h12').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h12'] && <HousePsychologyCounseling />}
-          </div>
-        )}
-
-        {activeTarget === 'h13' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h13"
-              houseTitle={houseMeta('h13').title}
-              houseDescription={houseMeta('h13').desc}
-              houseRoleOptions={houseMeta('h13').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h13'] && <HouseBrokerageMatching />}
-          </div>
-        )}
-
-        {activeTarget === 'h14' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h14"
-              houseTitle={houseMeta('h14').title}
-              houseDescription={houseMeta('h14').desc}
-              houseRoleOptions={houseMeta('h14').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h14'] && <HouseJudicialTribunal />}
-          </div>
-        )}
-
-        {activeTarget === 'h15' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h15"
-              houseTitle={houseMeta('h15').title}
-              houseDescription={houseMeta('h15').desc}
-              houseRoleOptions={houseMeta('h15').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h15'] && (
-              <HouseUtilityPayments
-                userBalanceETB={balanceETB}
-                onPayBill={handleDeductBalance}
-              />
-            )}
-          </div>
-        )}
-
-        {/* House 16: የቱሪዝም እና የቅርስ ቤት (Global Tourism & Heritage Expo) */}
-        {activeTarget === 'h16' && (
-          <div className="max-w-7xl mx-auto px-4 lg:px-8 space-y-6">
-            <HouseStageMedia
-              houseId="h16"
-              houseTitle={houseMeta('h16').title}
-              houseDescription={houseMeta('h16').desc}
-              houseRoleOptions={houseMeta('h16').roles}
-              currentUser={currentUser}
-              currentLang={currentLang}
-              houseMemberships={houseMemberships}
-              onRegisterHouseMember={handleRegisterHouseMember}
-              onShowToast={showToast}
-              onGoBack={() => setActiveTarget('h1')}
-            />
-            {houseMemberships['h16'] && (
-              <HouseTourismHeritage
-                currentLang={currentLang}
-              />
+            {houseMemberships[activeTarget] && (
+              <>
+                {activeTarget === 'h2' && <HouseFamilyKinship />}
+                {activeTarget === 'h3' && <HouseLeadership />}
+                {activeTarget === 'h4' && <HouseConfidentialCourtship />}
+                {activeTarget === 'h5' && <HouseVirtualWedding />}
+                {activeTarget === 'h6' && <HouseFaith />}
+                {activeTarget === 'h7' && <HouseSecurityChamber />}
+                {activeTarget === 'h8' && <TalentShow onEarnRoyalty={handleAddRoyalty} />}
+                {activeTarget === 'h9' && (
+                  <HouseMarketplaceExpo userBalanceETB={balanceETB} onPurchase={handleDeductBalance} />
+                )}
+                {activeTarget === 'h10' && (
+                  <AIAcademy userLang={currentLang as any} onEarnRoyalty={handleAddRoyalty} />
+                )}
+                {activeTarget === 'h11' && <HouseInstitutionalTraining />}
+                {activeTarget === 'h12' && <HousePsychologyCounseling />}
+                {activeTarget === 'h13' && <HouseBrokerageMatching />}
+                {activeTarget === 'h14' && <HouseJudicialTribunal />}
+                {activeTarget === 'h15' && (
+                  <HouseUtilityPayments userBalanceETB={balanceETB} onPayBill={handleDeductBalance} />
+                )}
+                {activeTarget === 'h16' && <HouseTourismHeritage currentLang={currentLang} />}
+              </>
             )}
           </div>
         )}

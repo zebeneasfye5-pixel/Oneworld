@@ -22,7 +22,7 @@ interface TalentShowProps {
 
 export const TalentShow: React.FC<TalentShowProps> = ({ onEarnRoyalty }) => {
   const [contestants, setContestants] = useState<TalentContestant[]>(INITIAL_TALENT_CONTESTANTS);
-  const [activeContestantId, setActiveContestantId] = useState<string>(INITIAL_TALENT_CONTESTANTS[0].id);
+  const [activeContestantId, setActiveContestantId] = useState<string>(INITIAL_TALENT_CONTESTANTS[0]?.id || '');
   const [isAuditionModalOpen, setIsAuditionModalOpen] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
 
@@ -35,6 +35,7 @@ export const TalentShow: React.FC<TalentShowProps> = ({ onEarnRoyalty }) => {
   const activeContestant = contestants.find((c) => c.id === activeContestantId) || contestants[0];
 
   const handleVoteLike = (contestantId: string) => {
+    if (!activeContestant) return;
     setContestants((prev) =>
       prev.map((c) => {
         if (c.id === contestantId) {
@@ -67,8 +68,8 @@ export const TalentShow: React.FC<TalentShowProps> = ({ onEarnRoyalty }) => {
       countryFlag: '🇪🇹',
       performanceTitle: `"${newTitle.trim()}"`,
       videoPlaceholderBg: 'from-blue-900 to-indigo-950',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160',
-      bio: newBio.trim() || 'በአለም አንድ መድረክ ላይ የቀረበ ድንቅ ተሰጥኦ።',
+      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=160',
+      bio: newBio.trim() || 'በአለም አንድ መድረክ ላይ የቀረበ ተሰጥኦ።',
       judgeScores: { creativity: 9.5, impact: 9.6, skill: 9.4 },
       audienceLikes: 1,
       earnedRoyaltiesETB: 50
@@ -78,7 +79,6 @@ export const TalentShow: React.FC<TalentShowProps> = ({ onEarnRoyalty }) => {
     setActiveContestantId(newContestant.id);
     setIsAuditionModalOpen(false);
     confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 } });
-    alert('የተሰጥኦ ስራዎ በተሳካ ሁኔታ ቀርቧል! ዳኞችና ተሳታፊዎች ድምፅ እየሰጡ ነው።');
   };
 
   return (
@@ -106,7 +106,21 @@ export const TalentShow: React.FC<TalentShowProps> = ({ onEarnRoyalty }) => {
         </button>
       </div>
 
-      {/* Main Video Arena Stage */}
+      {!activeContestant ? (
+        <div className="bg-[#101626] border border-slate-800 rounded-2xl p-10 text-center space-y-4">
+          <Trophy className="w-12 h-12 text-amber-400 mx-auto" />
+          <h3 className="text-base font-black text-white">ተሰጥኦዎን ለአለም ያሳዩ</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            በዚህ መድረክ የመጀመሪያውን የግጥም፣ የሙዚቃ ወይም የቴክኖሎጂ ፈጠራ ስራዎን ያቅርቡ።
+          </p>
+          <button
+            onClick={() => setIsAuditionModalOpen(true)}
+            className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer"
+          >
+            + ስራዎን ያቅርቡ
+          </button>
+        </div>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Main Performance Screen & Judge Scoring Panel */}
         <div className="lg:col-span-2 space-y-6">
@@ -279,6 +293,7 @@ export const TalentShow: React.FC<TalentShowProps> = ({ onEarnRoyalty }) => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Audition Modal */}
       {isAuditionModalOpen && (

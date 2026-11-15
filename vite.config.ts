@@ -22,9 +22,12 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     build: {
-      target: 'esnext',
-      minify: true,
+      // Telegram, IMO, WhatsApp Android/iOS WebView + modern browsers compatibility
+      target: ['es2020', 'chrome87', 'safari14', 'firefox78'],
+      minify: 'esbuild' as const,
       cssMinify: true,
+      cssCodeSplit: true,
+      chunkSizeWarningLimit: 800,
       rollupOptions: {
         output: {
           manualChunks(id: string) {
@@ -33,6 +36,9 @@ export default defineConfig(() => {
             }
             if (id.includes('node_modules/lucide-react')) {
               return 'vendor-icons';
+            }
+            if (id.includes('node_modules/motion')) {
+              return 'vendor-motion';
             }
           }
         }

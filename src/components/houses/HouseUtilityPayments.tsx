@@ -61,7 +61,7 @@ export const HouseUtilityPayments: React.FC<HouseUtilityPaymentsProps> = ({
   ]);
 
   const [selectedService, setSelectedService] = useState<UtilityService>(services[0]);
-  const [customerNumber, setCustomerNumber] = useState(services[0].sampleCustomerNumber);
+  const [customerNumber, setCustomerNumber] = useState('');
   const [billAmount, setBillAmount] = useState<number>(services[0].standardAmountETB);
   const [selectedPaymentGateway, setSelectedPaymentGateway] = useState<'CBE' | 'TELEBIRR' | 'AWASH'>('CBE');
   const [lastReceipt, setLastReceipt] = useState<{ txId: string; amount: number; service: string } | null>(null);
@@ -129,7 +129,7 @@ export const HouseUtilityPayments: React.FC<HouseUtilityPaymentsProps> = ({
                   key={svc.id}
                   onClick={() => {
                     setSelectedService(svc);
-                    setCustomerNumber(svc.sampleCustomerNumber);
+                    setCustomerNumber('');
                     setBillAmount(svc.standardAmountETB);
                     setLastReceipt(null);
                   }}

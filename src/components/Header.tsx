@@ -10,6 +10,7 @@ interface HeaderProps {
   balanceETB: number;
   balanceUSD: number;
   royaltyPoints: number;
+  onlineCount?: number;
   onOpenWallet: () => void;
   onOpenDrawer: () => void;
   onOpenBuilderVault: () => void;
@@ -25,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   balanceETB,
   balanceUSD,
   royaltyPoints,
+  onlineCount = 1,
   onOpenWallet,
   onOpenDrawer,
   onOpenBuilderVault,
@@ -55,14 +57,13 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Live Global Presence */}
-          {/* Live Global Presence */}
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs sm:text-sm text-slate-300">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
             <Users className="w-4 h-4 text-slate-300" />
-            <span className="font-extrabold text-white">184,920</span>
+            <span className="font-extrabold text-white">{Math.max(1, onlineCount).toLocaleString()}</span>
             <span className="text-xs text-emerald-400 font-black">{t.header.live}</span>
           </div>
         </div>

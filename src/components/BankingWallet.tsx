@@ -52,7 +52,7 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
 
   // Form states
   const [amountInput, setAmountInput] = useState<number>(1000);
-  const [selectedBankId, setSelectedBankId] = useState<string>(INITIAL_BANK_ACCOUNTS[0].id);
+  const [selectedBankId, setSelectedBankId] = useState<string>(INITIAL_BANK_ACCOUNTS[0]?.id || '');
 
   // New Bank Form
   const [newBankName, setNewBankName] = useState('የኢትዮጵያ ንግድ ባንክ (CBE)');
@@ -65,32 +65,7 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
   const [loanReason, setLoanReason] = useState('');
 
   // Peer Loans Registry
-  const [peerLoans, setPeerLoans] = useState<PeerCreditItem[]>([
-    {
-      id: 'loan-1',
-      borrowerName: 'ዘበነ አስፍዬ (Zebene Asfye)',
-      borrowerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120',
-      amount: 10000,
-      currency: 'ETB',
-      reason: 'የአዳራሽ ማስፋፊያና የቴክኖሎጂ አገልጋይ መሳሪያዎች ግዢ',
-      repaymentPeriodDays: 30,
-      interestRate: 0,
-      status: 'የፀደቀ',
-      backersCount: 14
-    },
-    {
-      id: 'loan-2',
-      borrowerName: 'ትዕግስት መኮንን',
-      borrowerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120',
-      amount: 3000,
-      currency: 'ETB',
-      reason: 'የጥቃቅን የሽመና ስራ ፈጠራ ማስፋፊያ',
-      repaymentPeriodDays: 15,
-      interestRate: 0,
-      status: 'ጥያቄ የቀረበ',
-      backersCount: 5
-    }
-  ]);
+  const [peerLoans, setPeerLoans] = useState<PeerCreditItem[]>([]);
 
   // Total calculated reserves for audit display
   const bankReserveTotal = Math.round(balanceETB * 0.10);
@@ -100,7 +75,11 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
     e.preventDefault();
     if (amountInput <= 0) return;
 
-    const bank = bankAccounts.find((b) => b.id === selectedBankId) || bankAccounts[0];
+    const bank = bankAccounts.find((b) => b.id === selectedBankId) || bankAccounts[0] || {
+      id: 'direct',
+      bankName: 'ቀጥታ የቴሌብር / የባንክ መስመር',
+      accountNumber: 'DIRECT'
+    };
     onDeposit(amountInput, bank.bankName);
 
     const newTx: TransactionRecord = {
@@ -116,7 +95,6 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
     setTransactions([newTx, ...transactions]);
     setIsDepositModalOpen(false);
     confetti({ particleCount: 60, spread: 60, origin: { y: 0.6 } });
-    alert(`የ${amountInput.toLocaleString()} ብር ገቢ በ${bank.bankName} በኩል በተሳካ ሁኔታ ተፈፅሟል!`);
   };
 
   const handleWithdrawSubmit = (e: React.FormEvent) => {
@@ -124,6 +102,11 @@ export const BankingWallet: React.FC<BankingWalletProps> = ({
     if (amountInput <= 0) return;
 
     const bank = bankAccounts.find((b) => b.id === selectedBankId) || bankAccounts[0];
+    if (!bank) {
+      setIsWithdrawModalOpen(false);
+      setIsAddBankModalOpen(true);
+      return;
+    }
     const success = onWithdraw(amountInput, bank.bankName);
     if (!success) return;
 

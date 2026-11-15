@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { User, Phone, Lock, CheckCircle2, X, Camera, Shield, LogIn, UserPlus, KeyRound, AlertTriangle } from 'lucide-react';
+import { User, Phone, Lock, X, Camera, LogIn, UserPlus, KeyRound, AlertTriangle, Loader2 } from 'lucide-react';
+import { getApiUrl } from '../config/env';
 
 export interface UserProfile {
   phoneNumber: string; // Phone or Email
@@ -43,6 +44,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sign up fields
   const [fullName, setFullName] = useState(currentUser?.fullName || '');
@@ -73,9 +75,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       const key = acc.phoneNumber.trim().toLowerCase();
       accounts[key] = acc;
       localStorage.setItem('oneworld_registered_accounts', JSON.stringify(accounts));
-    } catch (e) {
-      console.warn('Storage save error:', e);
-    }
+    } catch {}
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,7 +91,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -119,31 +119,89 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return;
       }
 
-      const uniqueUserId = `USER-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-      const newProfile: UserProfile = {
-        phoneNumber: cleanId,
-        fullName: fullName.trim(),
-        gender,
-        age: Number(age) || 26,
-        nationality,
-        address: address.trim() || 'ኢትዮጵያ',
-        idNumber: uniqueUserId,
-        roleTitle: roleTitle.trim() || 'የማህበረሰብ አባል',
-        avatarUrl: avatarUrl,
-        verifiedAt: new Date().toISOString().split('T')[0],
-        isGuest: false
-      };
+      setIsSubmitting(true);
+      try {
+        const res = await fetch(getApiUrl('/api/auth/register'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phoneNumber: cleanId,
+            password,
+            fullName: fullName.trim(),
+            gender,
+            age: Number(age) || 26,
+            nationality,
+            address: address.trim() || 'ኢትዮጵያ',
+            roleTitle: roleTitle.trim() || 'የማህበረሰብ አባል',
+            avatarUrl
+          })
+        });
 
-      saveStoredAccount({
-        phoneNumber: cleanId,
-        passwordHash: password,
-        profile: newProfile
-      });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setErrorMessage(data?.error || 'ምዝገባው አልተሳካም። እባክዎ እንደገና ይሞክሩ።');
+          setIsSubmitting(false);
+          return;
+        }
 
-      onSaveProfile(newProfile);
-      onClose();
+        const profile: UserProfile = data.profile;
+        saveStoredAccount({
+          phoneNumber: cleanId,
+          passwordHash: password,
+          profile
+        });
+        onSaveProfile(profile);
+        onClose();
+      } catch {
+        // Offline resilience when server cannot be reached
+        const uniqueUserId = `USER-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        const fallbackProfile: UserProfile = {
+          phoneNumber: cleanId,
+          fullName: fullName.trim(),
+          gender,
+          age: Number(age) || 26,
+          nationality,
+          address: address.trim() || 'ኢትዮጵያ',
+          idNumber: uniqueUserId,
+          roleTitle: roleTitle.trim() || 'የማህበረሰብ አባል',
+          avatarUrl,
+          verifiedAt: new Date().toISOString().split('T')[0],
+          isGuest: false
+        };
+        saveStoredAccount({ phoneNumber: cleanId, passwordHash: password, profile: fallbackProfile });
+        onSaveProfile(fallbackProfile);
+        onClose();
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
-      // Sign in mode
+      // Cross-device server login first, then local offline cache fallback
+      setIsSubmitting(true);
+      try {
+        const res = await fetch(getApiUrl('/api/auth/login'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumber: cleanId, password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data?.profile) {
+          saveStoredAccount({ phoneNumber: cleanId, passwordHash: password, profile: data.profile });
+          onSaveProfile({ ...data.profile, isGuest: false });
+          onClose();
+          setIsSubmitting(false);
+          return;
+        }
+        if (res.status === 401 || res.status === 404) {
+          setErrorMessage(data?.error || 'ስልክ ቁጥሩ ወይም የይለፍ ቃሉ የተሳሳተ ነው!');
+          setIsSubmitting(false);
+          return;
+        }
+      } catch {
+        // Offline fallback check
+      } finally {
+        setIsSubmitting(false);
+      }
+
       const existing = accounts[accountKey];
       if (!existing) {
         setErrorMessage('ይህ ስልክ ቁጥር ወይም ኢሜል አልተመዘገበም! እባክዎ መጀመሪያ "አዲስ መለያ ይፍጠሩ" የሚለውን ይምረጡ።');
@@ -186,7 +244,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         </div>
 
-        {/* Error Alert Banner */}
         {errorMessage && (
           <div className="mb-4 p-3 rounded-2xl bg-red-950/80 border border-red-500/60 text-red-200 text-xs font-bold flex items-center gap-2 animate-fadeIn">
             <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0" />
@@ -194,7 +251,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
         )}
 
-        {/* Auth Mode Toggle Tabs */}
         <div className="flex items-center gap-2 p-1 bg-slate-900/90 border border-slate-800 rounded-2xl mb-5">
           <button
             type="button"
@@ -228,7 +284,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {authMode === 'signup' && (
-            /* Profile Photo Upload */
             <div className="flex items-center gap-4 p-3 bg-slate-900/60 border border-slate-800 rounded-2xl">
               <div className="relative">
                 <img
@@ -261,7 +316,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          {/* Identifier (Phone or Email) */}
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">
               ስልክ ቁጥር ወይም ኢሜል (Phone or Email) *
@@ -279,7 +333,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           </div>
 
-          {/* Password & Confirm Password */}
           <div className={`grid gap-3 ${authMode === 'signup' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -322,7 +375,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {authMode === 'signup' && (
             <>
-              {/* Full Name & Gender */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -353,7 +405,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              {/* Age & Nationality */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -382,7 +433,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              {/* Address & Role */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -413,7 +463,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
-            {/* Sign Out Button (if logged in) */}
             {currentUser && onLogout ? (
               <button
                 type="button"
@@ -439,9 +488,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               )}
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-950/40 cursor-pointer transition flex items-center gap-1.5"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 disabled:opacity-60 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-950/40 cursor-pointer transition flex items-center gap-1.5"
               >
-                {authMode === 'signin' ? <LogIn className="w-3.5 h-3.5" /> : <UserPlus className="w-3.5 h-3.5" />}
+                {isSubmitting ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : authMode === 'signin' ? (
+                  <LogIn className="w-3.5 h-3.5" />
+                ) : (
+                  <UserPlus className="w-3.5 h-3.5" />
+                )}
                 <span>{authMode === 'signin' ? 'ግባ (Sign In)' : 'ተመዝገብና ግባ (Register)'}</span>
               </button>
             </div>

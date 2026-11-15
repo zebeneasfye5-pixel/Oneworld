@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Room, 
   RoomOccupant, 
@@ -19,20 +20,16 @@ import {
   Globe2, 
   Sparkles, 
   Hand, 
-  UserCheck, 
-  Award,
   Layers,
   ZoomIn,
   ZoomOut,
   Maximize2,
   Minimize2,
-  Activity,
-  Camera,
   RefreshCw,
-  AlertCircle,
   ChevronDown,
   ChevronUp,
-  ArrowLeft
+  ArrowLeft,
+  Armchair
 } from 'lucide-react';
 import { UserProfile } from './AuthModal';
 import { translateTextWithGemini } from '../services/geminiService';
@@ -46,6 +43,7 @@ import { GiftModal } from './GiftModal';
 import { PersonalRoomModal } from './PersonalRoomModal';
 import { TRANSLATIONS, AppLanguage } from '../i18n/translations';
 import { RemotePeerData } from '../services/realtimeMesh';
+import { EdgeToEdgeVideo } from './EdgeToEdgeVideo';
 
 interface RoomStageProps {
   rooms: Room[];
@@ -57,6 +55,17 @@ interface RoomStageProps {
   occupants: RoomOccupant[];
   messages: LiveSpeechMessage[];
   remotePeers?: Map<string, RemotePeerData>;
+  localStream?: MediaStream | null;
+  isMicMuted?: boolean;
+  isVideoOff?: boolean;
+  isSpeaking?: boolean;
+  cameraFacing?: 'user' | 'environment';
+  cameraError?: string | null;
+  onToggleMic?: () => void;
+  onToggleVideo?: () => void;
+  onFlipCamera?: () => void;
+  onRetryCamera?: () => void;
+  onTranslationComplete?: (messageId: string, translations: Record<string, string>) => void;
   onSendMessage: (msg: LiveSpeechMessage) => void;
   onSendGift: (gift: VirtualGift, recipient: RoomOccupant) => void;
   onCreatePersonalRoom: (room: Room) => void;
@@ -76,6 +85,17 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   occupants,
   messages,
   remotePeers,
+  localStream = null,
+  isMicMuted = true,
+  isVideoOff = false,
+  isSpeaking = false,
+  cameraFacing = 'user',
+  cameraError = null,
+  onToggleMic,
+  onToggleVideo,
+  onFlipCamera,
+  onRetryCamera,
+  onTranslationComplete,
   onSendMessage,
   onSendGift,
   onCreatePersonalRoom,
@@ -85,15 +105,13 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   onAddRoyalty
 }) => {
   const t = TRANSLATIONS[userLang as AppLanguage] || TRANSLATIONS.am;
-  const [isMicOn, setIsMicOn] = useState(false);
-  const [isVideoOn, setIsVideoOn] = useState(true);
+  const isMicOn = !isMicMuted;
+  const isVideoOn = !isVideoOff;
+  const cameraActive = !!(localStream && localStream.getVideoTracks().some((tr) => tr.readyState === 'live'));
+  const remotePeersList = remotePeers ? Array.from(remotePeers.values()) : [];
+
   const [isUsingRealWebcam, setIsUsingRealWebcam] = useState(true);
-  const [cameraFacing, setCameraFacing] = useState<'user' | 'environment'>('user');
-  const [cameraLoading, setCameraLoading] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [cameraActive, setCameraActive] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [isTranslating, setIsTranslating] = useState(false);
   const [selectedRecipient, setSelectedRecipient] = useState<RoomOccupant | null>(null);
   const [isGiftModalOpen, setIsGiftModalOpen] = useState(false);
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = useState(false);
@@ -103,8 +121,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isFullBodyMode, setIsFullBodyMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenFocus, setFullscreenFocus] = useState<'host' | 'user'>('host');
-  const [audioVolumeLevel, setAudioVolumeLevel] = useState<number>(0);
+  const [fullscreenTargetId, setFullscreenTargetId] = useState<string>('local');
   const [showStageDetails, setShowStageDetails] = useState(false);
   const [isSubRoomsOpen, setIsSubRoomsOpen] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<Array<{ id: number; emoji: string; left: number }>>([]);
@@ -122,126 +139,39 @@ export const RoomStage: React.FC<RoomStageProps> = ({
     setIsFullscreen((prev) => !prev);
   };
 
-  // Real media stream & audio analyser refs
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+    };
+  }, [isFullscreen]);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const micStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animFrameRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Attach active stream to video element whenever element is mounted
-  const attachStreamToVideo = (stream: MediaStream) => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = stream;
+  // Attach unified WebRTC localStream to video element cleanly
+  useEffect(() => {
+    if (videoRef.current && localStream && isVideoOn && isUsingRealWebcam) {
+      if (videoRef.current.srcObject !== localStream) {
+        videoRef.current.srcObject = localStream;
+      }
       videoRef.current.muted = true;
       videoRef.current.playsInline = true;
-      videoRef.current.play().catch((err) => {
-        console.warn('Video element play notice:', err);
-      });
+      videoRef.current.play().catch(() => {});
     }
-  };
+  }, [localStream, isVideoOn, isUsingRealWebcam, isFullscreen]);
 
-  // Ultra-Fast Zero-Latency Camera Controller with Warm Track Support
-  const startCamera = async (facing: 'user' | 'environment' = cameraFacing) => {
-    setCameraLoading(true);
-    setCameraError(null);
-
-    // Warm-track instant activation (0ms): If video track already exists, just enable it!
-    if (mediaStreamRef.current && mediaStreamRef.current.getVideoTracks().length > 0 && cameraFacing === facing) {
-      mediaStreamRef.current.getVideoTracks().forEach((track) => {
-        track.enabled = true;
-      });
-      setCameraActive(true);
-      setIsVideoOn(true);
-      setIsUsingRealWebcam(true);
-      setCameraLoading(false);
-      attachStreamToVideo(mediaStreamRef.current);
-      return;
-    }
-
-    // If changing facingMode, stop old tracks
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getVideoTracks().forEach((track) => track.stop());
-    }
-
-    let stream: MediaStream | null = null;
-
-    // Fast-capture Tier 1: Facing mode with zero resolution-probing delay
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facing },
-        audio: false // Kept decoupled for instant video startup
-      });
-    } catch (err1) {
-      console.warn('Fast Tier 1 camera notice, trying universal:', err1);
-      // Fast-capture Tier 2: Universal constraint fallback
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      } catch (err2: any) {
-        console.warn('All camera attempts failed:', err2);
-        setCameraLoading(false);
-        const isDenied = err2?.name === 'NotAllowedError' || err2?.name === 'PermissionDeniedError';
-        setCameraError(
-          isDenied
-            ? 'የካሜራ ፍቃድ አልተሰጠም። እባክዎ ከላይ በብራውዘርዎ የካሜራ ፍቃድ (Allow) ይስጡና እዚህ እንደገና ይጫኑ።'
-            : 'ካሜራ ማግኘት አልተቻለም። እባክዎ "ካሜራውን እንደገና ሞክር" የሚለውን ይጫኑ።'
-        );
-        setCameraActive(false);
-        return;
-      }
-    }
-
-    if (stream) {
-      mediaStreamRef.current = stream;
-      setCameraFacing(facing);
-      setCameraActive(true);
-      setIsVideoOn(true);
-      setIsUsingRealWebcam(true);
-      setCameraLoading(false);
-      setCameraError(null);
-      attachStreamToVideo(stream);
-    }
-  };
-
-  // Instant 0ms Camera Off (Soft-disable video track while keeping driver warm)
-  const stopCamera = () => {
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getVideoTracks().forEach((track) => {
-        track.enabled = false;
-      });
-    }
-    setCameraActive(false);
-    setIsVideoOn(false);
-  };
-
-  const toggleVideo = () => {
-    if (cameraActive && isVideoOn) {
-      stopCamera();
-    } else {
-      startCamera(cameraFacing);
-    }
-  };
-
-  const handleFlipCamera = () => {
-    const nextFacing = cameraFacing === 'user' ? 'environment' : 'user';
-    setCameraFacing(nextFacing);
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getVideoTracks().forEach((track) => track.stop());
-    }
-    startCamera(nextFacing);
-  };
-
-  // Attempt initial fast camera start on mount & listen to voice/touch commands
+  // Listen to voice/touch camera commands + cleanup speech recognition on unmount
   useEffect(() => {
-    startCamera('user').catch(() => {});
-
     const unsubCmd = cameraManager.onCommand((cmd) => {
       if (cmd === 'fullscreen') setIsFullscreen(true);
       else if (cmd === 'exit_fullscreen') setIsFullscreen(false);
@@ -251,97 +181,35 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         setIsFullBodyMode(false);
         setZoomScale(1);
       } else if (cmd === 'start_camera') {
-        startCamera('user');
+        onRetryCamera?.();
       } else if (cmd === 'flip_camera') {
-        handleFlipCamera();
+        onFlipCamera?.();
       }
     });
 
     return () => {
       unsubCmd();
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-      if (micStreamRef.current) {
-        micStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        audioContextRef.current.close().catch(() => {});
-      }
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
+      stopSpeechRecognition();
     };
-  }, []);
+  }, [onFlipCamera, onRetryCamera]);
 
-  // Ultra-Fast Zero-Latency Decoupled Microphone Handling
-  const startMicAudio = async () => {
-    // Warm-track instant unmute (0ms): If mic track exists, simply enable it!
-    if (micStreamRef.current && micStreamRef.current.getAudioTracks().length > 0) {
-      micStreamRef.current.getAudioTracks().forEach((track) => {
-        track.enabled = true;
-      });
-      return;
-    }
-
-    try {
-      const micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-      });
-      micStreamRef.current = micStream;
-
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        audioContextRef.current = ctx;
-        const source = ctx.createMediaStreamSource(micStream);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 64;
-        source.connect(analyser);
-        analyserRef.current = analyser;
-
-        const checkVolume = () => {
-          if (analyserRef.current && isMicOn) {
-            const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-            analyserRef.current.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-              sum += dataArray[i];
-            }
-            const avg = sum / dataArray.length;
-            setAudioVolumeLevel(Math.min(100, Math.round((avg / 128) * 100)));
-          } else {
-            setAudioVolumeLevel(0);
-          }
-          animFrameRef.current = requestAnimationFrame(checkVolume);
-        };
-        checkVolume();
-      }
-    } catch (err) {
-      console.warn('Microphone stream error:', err);
-    }
+  const toggleVideo = () => {
+    onToggleVideo?.();
   };
 
-  // Instant 0ms Mic Mute (Soft-disable track while keeping audio context warm)
-  const stopMicAudio = () => {
-    if (micStreamRef.current) {
-      micStreamRef.current.getAudioTracks().forEach((trk) => {
-        trk.enabled = false;
-      });
-    }
-    setAudioVolumeLevel(0);
+  const handleFlipCamera = () => {
+    onFlipCamera?.();
   };
 
-  // Instant Speech Recognition and Microphone Unrestricted Toggle
+  // Unified Microphone + Live Speech Recognition Toggle
   const toggleMicrophone = () => {
-    const nextState = !isMicOn;
-    setIsMicOn(nextState);
+    const nextMicOn = !isMicOn;
+    onToggleMic?.();
 
-    if (nextState) {
-      startMicAudio();
+    if (nextMicOn) {
       startSpeechRecognition(
         userLang,
-        (text, isFinal) => {
+        (text) => {
           if (text.trim()) {
             handleBroadcastVoiceSpeech(text);
           }
@@ -352,43 +220,33 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         () => {}
       );
     } else {
-      stopMicAudio();
       stopSpeechRecognition();
     }
   };
 
-  // INSTANT SPEECH DELIVERY (0ms Latency Arrival + Parallel Background Translation)
+  // INSTANT SPEECH DELIVERY (0ms Latency Arrival + Real Gemini Background Translation Sync)
   const handleBroadcastVoiceSpeech = (spokenText: string) => {
     if (!spokenText.trim()) return;
 
-    // 1. INSTANT ARRIVAL: Immediately broadcast to the room without any network delays!
-    const msgId = `voice-${Date.now()}`;
+    const msgId = `voice-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const initialTranslations: Record<string, string> = {
+      [userLang]: spokenText
+    };
+
     const newMsg: LiveSpeechMessage = {
       id: msgId,
-      speakerName: 'እርስዎ (You - User)',
-      speakerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80',
+      speakerName: currentUser?.fullName || 'ተጠቃሚ',
+      speakerAvatar: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
       sourceLang: userLang,
       originalText: spokenText,
-      translations: {
-        am: spokenText,
-        en: spokenText,
-        om: spokenText,
-        ti: spokenText,
-        ar: spokenText,
-        fr: spokenText,
-        es: spokenText,
-        zh: spokenText,
-        de: spokenText
-      },
+      translations: initialTranslations,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       seatNumber: userSeatedNumber || 1
     };
 
-    // Emit immediately so user and audience see speech arrive with ZERO latency!
     onSendMessage(newMsg);
-    onAddRoyalty(25, 'የቀጥታ ድምፅ ንግግር ተሳትፎ (Voice Activity)');
+    onAddRoyalty(25, 'የቀጥታ ድምፅ ንግግር ተሳትፎ');
 
-    // 2. Parallel Background Translation: Concurrently translate using Promise.allSettled
     (async () => {
       try {
         const targetLangs: LanguageCode[] = (['am', 'en', 'ar', 'fr', 'om', 'ti', 'es', 'zh', 'de'] as LanguageCode[])
@@ -399,50 +257,51 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         );
 
         const results = await Promise.allSettled(translationPromises);
+        const resolvedTranslations: Record<string, string> = { ...initialTranslations };
+        let hasUpdates = false;
+
         results.forEach((res, index) => {
           if (res.status === 'fulfilled' && res.value) {
-            newMsg.translations[targetLangs[index]] = res.value;
+            resolvedTranslations[targetLangs[index]] = res.value;
+            hasUpdates = true;
           }
         });
+
+        if (hasUpdates) {
+          onTranslationComplete?.(msgId, resolvedTranslations);
+        }
       } catch {
-        // Fallback to original text safely
+        // Keep original text if offline
       }
     })();
   };
 
-  // INSTANT TEXT MESSAGE DELIVERY (0ms Latency Arrival + Parallel Background Translation)
+  // INSTANT TEXT MESSAGE DELIVERY (0ms Latency Arrival + Real Gemini Background Translation Sync)
   const handleSendTextMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
 
-    const textToSend = inputText;
+    const textToSend = inputText.trim();
     setInputText('');
 
-    // 1. INSTANT ARRIVAL: Dispatched immediately with 0ms delay
+    const msgId = `text-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const initialTranslations: Record<string, string> = {
+      [userLang]: textToSend
+    };
+
     const newMsg: LiveSpeechMessage = {
-       id: `text-${Date.now()}`,
-       speakerName: currentUser?.fullName || 'እርስዎ (You - User)',
-       speakerAvatar: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
-       sourceLang: userLang,
-       originalText: textToSend,
-      translations: {
-        am: textToSend,
-        en: textToSend,
-        om: textToSend,
-        ti: textToSend,
-        ar: textToSend,
-        fr: textToSend,
-        es: textToSend,
-        zh: textToSend,
-        de: textToSend
-      },
+      id: msgId,
+      speakerName: currentUser?.fullName || 'ተጠቃሚ',
+      speakerAvatar: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+      sourceLang: userLang,
+      originalText: textToSend,
+      translations: initialTranslations,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       seatNumber: userSeatedNumber || 1
     };
 
     onSendMessage(newMsg);
 
-    // 2. Parallel Background Translation
     (async () => {
       try {
         const targetLangs: LanguageCode[] = (['am', 'en', 'ar', 'fr', 'om', 'ti', 'es', 'zh', 'de'] as LanguageCode[])
@@ -453,13 +312,21 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         );
 
         const results = await Promise.allSettled(translationPromises);
+        const resolvedTranslations: Record<string, string> = { ...initialTranslations };
+        let hasUpdates = false;
+
         results.forEach((res, index) => {
           if (res.status === 'fulfilled' && res.value) {
-            newMsg.translations[targetLangs[index]] = res.value;
+            resolvedTranslations[targetLangs[index]] = res.value;
+            hasUpdates = true;
           }
         });
+
+        if (hasUpdates) {
+          onTranslationComplete?.(msgId, resolvedTranslations);
+        }
       } catch {
-        // Fallback safely
+        // Keep original text if offline
       }
     })();
   };
@@ -618,55 +485,22 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               )}
             </div>
 
-            {/* Scalable Large Stage Video Grid: ZERO text inside the video frames! */}
+            {/* Scalable Real-Time Video Grid: ZERO fake speakers & ZERO text inside video frames */}
             <div 
               className="transition-transform duration-200 origin-top mb-5"
               style={{ transform: `scale(${zoomScale})` }}
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Speaker 1: Dr. Zebene Asfye (Host) - All Text Strictly OUTSIDE Video Frame */}
-                <div className="bg-slate-950/80 border-2 border-amber-500/50 rounded-3xl p-3.5 flex flex-col justify-between shadow-2xl">
-                  {/* Top Bar OUTSIDE Video Frame */}
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                    <span className="flex items-center gap-1 bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md">
-                      <Award className="w-3.5 h-3.5" />
-                      መድረክ መሪ · ዶ/ር ዘበነ አስፍዬ
-                    </span>
-                    <span className="bg-slate-900 text-white text-xs px-2.5 py-1 rounded-xl font-bold border border-slate-700">
-                      🇪🇹 {langFlags[userLang] || 'Oneworld'}
-                    </span>
-                  </div>
-
-                  {/* PURE VIDEO FRAME - ZERO TEXT OVERLAY INSIDE */}
-                  <div className={`relative rounded-2xl overflow-hidden bg-black border border-slate-700 w-full ${
-                    isFullBodyMode ? 'h-[440px] sm:h-[500px]' : 'h-[300px] sm:h-[350px]'
-                  }`}>
-                    <div 
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-300 hover:scale-105" 
-                      style={{ backgroundImage: `url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80')` }}
-                    />
-                  </div>
-
-                  {/* Bottom Info Card OUTSIDE Video Frame */}
-                  <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
-                    <div>
-                      <h4 className="text-white font-black text-sm sm:text-base">ዶ/ር ዘበነ አስፍዬ (Dr. Zebene Asfye)</h4>
-                      <p className="text-xs text-white font-medium">የሰው ልጆች አንድነትና የ16ቱ ቤቶች መድረክ መሪ</p>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-black/80 px-2.5 py-1.5 rounded-xl border border-amber-500/40">
-                      <div className="w-1.5 h-4 bg-amber-400 animate-pulse rounded-full" />
-                      <div className="w-1.5 h-6 bg-amber-400 animate-pulse rounded-full" />
-                      <div className="w-1.5 h-3 bg-amber-400 animate-pulse rounded-full" />
-                      <span className="text-xs text-white font-bold ml-1">{t.chairs.speakingNow}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Speaker 2: Current User - All Text Strictly OUTSIDE Video Frame */}
+              <div className={`grid gap-5 ${
+                remotePeersList.length === 0
+                  ? 'grid-cols-1 max-w-2xl mx-auto'
+                  : 'grid-cols-1 md:grid-cols-2'
+              }`}>
+                {/* Local Authenticated User Video / Audio Card */}
                 <div className="bg-slate-950/80 border-2 border-amber-500/60 rounded-3xl p-3.5 flex flex-col justify-between shadow-2xl">
                   {/* Top Bar OUTSIDE Video Frame */}
                   <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                    <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md">
+                    <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1">
+                      <Armchair className="w-3.5 h-3.5" />
                       {userSeatedNumber ? `${t.chairs.youOnSeat} #${userSeatedNumber}` : t.chairs.youParticipant}
                     </span>
                     <div className="flex items-center gap-1.5">
@@ -683,54 +517,38 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       <button
                         onClick={() => {
                           if (!cameraActive) {
-                            startCamera(cameraFacing);
+                            onRetryCamera?.();
                           } else {
                             setIsUsingRealWebcam(!isUsingRealWebcam);
                           }
                         }}
                         className="bg-slate-900 hover:bg-slate-800 text-xs text-white font-bold px-2.5 py-1 rounded-xl border border-slate-700 cursor-pointer transition shadow-md"
                       >
-                        {cameraActive && isUsingRealWebcam ? '📸 ካሜራ ነቅቷል' : '👤 አቫታር'}
+                        {cameraActive && isUsingRealWebcam ? '📸 ካሜራ' : '👤 ፎቶ'}
                       </button>
                     </div>
                   </div>
 
-                  {/* PURE VIDEO / CAMERA BOX - ZERO TEXT OVERLAY INSIDE */}
+                  {/* PURE VIDEO / AUDIO-ONLY FRAME - ZERO TEXT OVERLAY INSIDE */}
                   <div className={`relative rounded-2xl overflow-hidden bg-black border border-slate-700 w-full ${
                     isFullBodyMode ? 'h-[440px] sm:h-[500px]' : 'h-[300px] sm:h-[350px]'
                   }`}>
-                    {isVideoOn && isUsingRealWebcam && cameraActive ? (
-                      <video
-                        ref={(el) => {
-                          videoRef.current = el;
-                          if (el && mediaStreamRef.current) {
-                            if (el.srcObject !== mediaStreamRef.current) {
-                              el.srcObject = mediaStreamRef.current;
-                            }
-                            el.muted = true;
-                            el.playsInline = true;
-                            el.play().catch(() => {});
-                          }
-                        }}
-                        autoPlay
-                        playsInline
-                        muted
-                        className={`w-full h-full ${
-                          cameraFacing === 'user' ? 'transform -scale-x-100' : ''
-                        } ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'}`}
+                    {isVideoOn && isUsingRealWebcam && cameraActive && localStream ? (
+                      <EdgeToEdgeVideo
+                        stream={localStream}
+                        muted={true}
+                        mirror={cameraFacing === 'user'}
                       />
-                    ) : isVideoOn && isUsingRealWebcam && cameraLoading ? (
-                      <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4">
-                        <div className="w-10 h-10 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin mb-2" />
-                        <span className="text-xs text-white font-bold">ካሜራ በመክፈት ላይ...</span>
-                      </div>
                     ) : isVideoOn && isUsingRealWebcam && !cameraActive ? (
-                      <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4">
+                      <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4 gap-2 text-center">
+                        {cameraError && (
+                          <p className="text-xs text-amber-300 max-w-xs leading-relaxed">{cameraError}</p>
+                        )}
                         <button
-                          onClick={() => startCamera('user')}
+                          onClick={() => onRetryCamera?.()}
                           className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
                         >
-                          📹 ካሜራዬን አብራ (Start Camera)
+                          📹 ካሜራዬን አብራ
                         </button>
                       </div>
                     ) : !isVideoOn ? (
@@ -740,18 +558,18 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                             src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
                             alt={currentUser?.fullName || 'እርስዎ'}
                             className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
-                              isMicOn && audioVolumeLevel > 15
+                              isMicOn && isSpeaking
                                 ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
                                 : 'border-slate-700'
                             }`}
                           />
-                          {isMicOn && audioVolumeLevel > 15 && (
+                          {isMicOn && isSpeaking && (
                             <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
                           )}
                         </div>
                         <span className="text-white font-bold text-xs mb-2">ድምፅ ብቻ (Audio Only)</span>
                         <button
-                          onClick={() => startCamera(cameraFacing)}
+                          onClick={() => toggleVideo()}
                           className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
                         >
                           ካሜራ አብራ
@@ -768,20 +586,14 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   {/* Bottom Info Card OUTSIDE Video Frame */}
                   <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
                     <div>
-                      <h4 className="text-white font-black text-sm sm:text-base">{t.chairs.you}</h4>
-                      <p className="text-xs text-white font-medium">{t.chairs.activeMember}</p>
+                      <h4 className="text-white font-black text-sm sm:text-base">{currentUser?.fullName || t.chairs.you}</h4>
+                      <p className="text-xs text-white font-medium">{currentUser?.roleTitle || t.chairs.activeMember}</p>
                     </div>
                     <div>
                       {isMicOn ? (
                         <div className="flex items-center gap-1.5 bg-amber-950/90 border border-amber-500/70 text-white text-xs px-2.5 py-1 rounded-xl font-black">
                           <Mic className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
                           <span>{t.chairs.micLive}</span>
-                          <div className="w-12 h-2 bg-slate-800 rounded-full overflow-hidden ml-1">
-                            <div 
-                              className="h-full bg-amber-400"
-                              style={{ width: `${Math.max(20, audioVolumeLevel)}%` }}
-                            />
-                          </div>
                         </div>
                       ) : (
                         <span className="flex items-center gap-1 bg-red-950/90 border border-red-500/60 text-white text-xs px-2.5 py-1 rounded-xl font-bold">
@@ -793,16 +605,15 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   </div>
                 </div>
 
-                {/* Speaker 3+: Live Remote Peers Connected Across Other Phones / Laptops */}
-                {remotePeers && Array.from(remotePeers.values()).map((peer) => (
+                {/* Live Remote Peers Connected Across Other Phones / Browsers */}
+                {remotePeersList.map((peer) => (
                   <div 
                     key={peer.id}
                     className="bg-slate-950/80 border-2 border-emerald-500/60 rounded-3xl p-3.5 flex flex-col justify-between shadow-2xl animate-fadeIn"
                   >
-                    {/* Top Bar OUTSIDE Video Frame */}
                     <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
                       <span className="flex items-center gap-1.5 bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md">
-                        <span className="w-2 h-2 rounded-full bg-emerald-950 animate-ping" />
+                        <Armchair className="w-3.5 h-3.5" />
                         #{peer.seatNumber || 2} · {peer.name}
                       </span>
                       <span className="bg-slate-900 text-white text-xs px-2.5 py-1 rounded-xl font-bold border border-slate-700">
@@ -810,28 +621,20 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       </span>
                     </div>
 
-                    {/* Remote Live Video Box with 0ms WebRTC Stream */}
                     <div className={`relative rounded-2xl overflow-hidden bg-black border border-slate-700 w-full ${
                       isFullBodyMode ? 'h-[440px] sm:h-[500px]' : 'h-[300px] sm:h-[350px]'
                     }`}>
                       {peer.stream && peer.isVideoOn ? (
-                        <video
-                          ref={(el) => {
-                            if (el && peer.stream && el.srcObject !== peer.stream) {
-                              el.srcObject = peer.stream;
-                              el.playsInline = true;
-                              el.play().catch(() => {});
-                            }
-                          }}
-                          autoPlay
-                          playsInline
-                          className={`w-full h-full ${isFullBodyMode ? 'object-contain bg-black' : 'object-cover'}`}
+                        <EdgeToEdgeVideo
+                          stream={peer.stream}
+                          muted={false}
+                          mirror={false}
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
                           <div className="relative mb-3">
                             <img
-                              src={peer.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80'}
+                              src={peer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
                               alt={peer.name}
                               className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
                                 peer.isSpeaking
@@ -847,7 +650,6 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                         </div>
                       )}
 
-                      {/* Hidden WebRTC Audio Playback so remote peer is heard clearly */}
                       {peer.stream && (
                         <audio
                           ref={(el) => {
@@ -861,7 +663,6 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       )}
                     </div>
 
-                    {/* Bottom Info Card OUTSIDE Video Frame */}
                     <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
                       <div>
                         <h4 className="text-white font-black text-sm sm:text-base">{peer.name}</h4>
@@ -926,188 +727,155 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               </div>
             </div>
 
-            {/* 100% FULL-SCREEN SINGLE-SPEAKER CINEMA THEATER (Zero Split, Edge-to-Edge Single Body View) */}
-            {isFullscreen && (
-              <div className="fixed inset-0 z-50 bg-black overflow-hidden flex items-center justify-center animate-fadeIn select-none">
-                {/* Floating Minimal Exit Button (Top Right, Icon Only) */}
-                <button
-                  onClick={() => setIsFullscreen(false)}
-                  title="ከሙሉ ስክሪን ውጣ (Exit Full Screen)"
-                  className="absolute top-4 right-4 z-40 p-3 rounded-full bg-black/70 hover:bg-red-600 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-2xl group flex items-center justify-center"
+            {/* 100% FULL-SCREEN SINGLE-SPEAKER CINEMA THEATER (Portal + 100dvh + object-cover Edge-to-Edge) */}
+            {isFullscreen && typeof document !== 'undefined' && createPortal((() => {
+              const activeRemotePeer = fullscreenTargetId !== 'local'
+                ? remotePeersList.find((p) => p.id === fullscreenTargetId) || remotePeersList[0]
+                : undefined;
+              const showingRemote = !!(fullscreenTargetId !== 'local' && activeRemotePeer);
+              const nextSwapId = showingRemote ? 'local' : (remotePeersList[0]?.id || 'local');
+
+              return (
+                <div
+                  className="bg-black overflow-hidden select-none"
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    width: '100%',
+                    height: '100%',
+                    minHeight: '100dvh',
+                    zIndex: 9999
+                  }}
                 >
-                  <Minimize2 className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
-                </button>
-
-                {/* Top Subtle Focus Indicator & Back Arrow Button */}
-                <div className="absolute top-4 left-4 z-40 flex items-center gap-2">
-                  <button
-                    onClick={() => setIsFullscreen(false)}
-                    title="ተመለስ (Go Back)"
-                    className="p-2.5 rounded-full bg-black/70 hover:bg-slate-800 text-white backdrop-blur-md border border-white/20 transition-all cursor-pointer shadow-2xl flex items-center gap-1.5 px-3.5 group"
-                  >
-                    <ArrowLeft className="w-4 h-4 text-amber-400 group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-xs font-bold text-white hidden sm:inline">ተመለስ</span>
-                  </button>
-                  <span className="bg-black/60 backdrop-blur-md text-amber-400 border border-amber-400/30 text-xs font-black px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    {fullscreenFocus === 'host' ? 'መድረክ መሪ · ዶ/ር ዘበነ አስፍዬ (Host)' : 'እርስዎ በ100% ሙሉ አካል (Full Body)'}
-                  </span>
-                </div>
-
-                {/* 100% Full Screen Speaker View (ONE person filling 100% of the screen) */}
-                <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
-                  {fullscreenFocus === 'host' ? (
-                    /* Host in 100% Full Edge-to-Edge Screen */
-                    <div 
-                      className="w-full h-full bg-cover bg-center transition-all duration-300"
-                      style={{ backgroundImage: `url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=1600&q=85')` }}
-                    />
-                  ) : (
-                    /* User's Own Camera in 100% Full Edge-to-Edge Screen */
-                    isVideoOn && isUsingRealWebcam && cameraActive ? (
-                      <video
-                        ref={(el) => {
-                          if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
-                            el.srcObject = mediaStreamRef.current;
-                            el.muted = true;
-                            el.playsInline = true;
-                            el.play().catch(() => {});
-                          }
-                        }}
-                        autoPlay
-                        playsInline
-                        muted
-                        className={`w-full h-full object-cover transition-all duration-300 ${
-                          cameraFacing === 'user' ? 'transform -scale-x-100' : ''
-                        }`}
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-slate-950 via-[#0a0d18] to-slate-900 flex flex-col items-center justify-center p-4">
-                        <button
-                          onClick={() => startCamera('user')}
-                          className="p-5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl shadow-2xl flex items-center justify-center cursor-pointer transition transform hover:scale-105"
-                          title="ካሜራዎን ያብሩ (Start Camera)"
-                        >
-                          <Video className="w-8 h-8" />
-                        </button>
-                      </div>
-                    )
-                  )}
-                </div>
-
-                {/* Picture-in-Picture (PiP) Floating Corner Mini-Tile (Click to Swap Focus!) */}
-                <div 
-                  onClick={() => setFullscreenFocus((prev) => (prev === 'host' ? 'user' : 'host'))}
-                  title={fullscreenFocus === 'host' ? 'እርስዎን በሙሉ ስክሪን ለማየት ይጫኑ (Focus User)' : 'መድረክ መሪውን በሙሉ ስክሪን ለማየት ይጫኑ (Focus Host)'}
-                  className="absolute bottom-24 right-4 sm:right-6 z-40 w-28 h-40 sm:w-36 sm:h-52 rounded-2xl border-2 border-amber-400/80 overflow-hidden shadow-2xl bg-black cursor-pointer hover:scale-105 hover:border-amber-300 transition-all group"
-                >
-                  {fullscreenFocus === 'host' ? (
-                    /* PiP shows User */
-                    isVideoOn && isUsingRealWebcam && cameraActive ? (
-                      <video
-                        ref={(el) => {
-                          if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
-                            el.srcObject = mediaStreamRef.current;
-                            el.muted = true;
-                            el.playsInline = true;
-                            el.play().catch(() => {});
-                          }
-                        }}
-                        autoPlay
-                        playsInline
-                        muted
-                        className={`w-full h-full object-cover ${
-                          cameraFacing === 'user' ? 'transform -scale-x-100' : ''
-                        }`}
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-slate-900 flex flex-col items-center justify-center p-2 text-center">
-                        <VideoOff className="w-6 h-6 text-slate-500 mb-1" />
-                        <span className="text-[10px] text-slate-400 font-bold">ካሜራዎ</span>
-                      </div>
-                    )
-                  ) : (
-                    /* PiP shows Host */
-                    <div 
-                      className="w-full h-full bg-cover bg-center"
-                      style={{ backgroundImage: `url('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80')` }}
-                    />
-                  )}
-                  {/* Subtle Badge & Swap Icon */}
-                  <div className="absolute top-2 left-2 z-10 flex items-center gap-1">
-                    <span className="bg-black/70 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-400/30">
-                      {fullscreenFocus === 'host' ? 'እርስዎ' : 'መድረክ መሪ'}
-                    </span>
-                  </div>
-                  <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <RefreshCw className="w-6 h-6 text-white animate-spin" />
-                  </div>
-                </div>
-
-                {/* Floating Minimal Glass Controller (Centered at Bottom - ZERO Text Clutter) */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 bg-black/80 hover:bg-black/95 backdrop-blur-xl px-5 py-3 rounded-full border border-white/20 shadow-2xl flex items-center gap-3 transition-all">
-                  {/* Mic Toggle (Icon Only) */}
-                  <button
-                    onClick={toggleMicrophone}
-                    title={isMicOn ? 'ድምፅ አጥፋ (Mute Mic)' : 'ድምፅ አብራ (Unmute Mic)'}
-                    className={`p-3.5 rounded-full transition-all cursor-pointer ${
-                      isMicOn
-                        ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
-                        : 'bg-white/10 hover:bg-white/20 text-white'
-                    }`}
-                  >
-                    {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5 text-red-400" />}
-                  </button>
-
-                  {/* Video Toggle (Icon Only) */}
-                  <button
-                    onClick={toggleVideo}
-                    title={isVideoOn ? 'ካሜራ አጥፋ (Turn Off Camera)' : 'ካሜራ አብራ (Turn On Camera)'}
-                    className={`p-3.5 rounded-full transition-all cursor-pointer ${
-                      isVideoOn
-                        ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
-                        : 'bg-white/10 hover:bg-white/20 text-white'
-                    }`}
-                  >
-                    {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5 text-red-400" />}
-                  </button>
-
-                  {/* Flip Camera (Icon Only) */}
-                  <button
-                    onClick={handleFlipCamera}
-                    title="ካሜራ አዙር (የፊት / የኋላ)"
-                    className="p-3.5 rounded-full bg-white/10 hover:bg-white/20 text-amber-400 transition-all cursor-pointer"
-                  >
-                    <RefreshCw className="w-5 h-5" />
-                  </button>
-
-                  {/* Focus Swap (Icon Only) */}
-                  <button
-                    onClick={() => setFullscreenFocus((prev) => (prev === 'host' ? 'user' : 'host'))}
-                    title="እይታ ቀይር (Switch 100% Screen Focus)"
-                    className="p-3.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all cursor-pointer"
-                  >
-                    <Maximize2 className="w-5 h-5" />
-                  </button>
-
-                  <div className="h-6 w-px bg-white/20 mx-1" />
-
-                  {/* Exit Full Screen (Icon Only) */}
+                  {/* Exit Fullscreen Button (Top Right, Icon Only) */}
                   <button
                     onClick={() => setIsFullscreen(false)}
                     title="ከሙሉ ስክሪን ውጣ (Exit Full Screen)"
-                    className="p-3.5 bg-red-600/90 hover:bg-red-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg transition-transform hover:scale-105"
+                    className="absolute top-4 right-4 z-50 p-3 rounded-full bg-black/70 hover:bg-red-600 text-white backdrop-blur-md border border-white/25 transition-all cursor-pointer shadow-2xl group flex items-center justify-center"
                   >
-                    <Minimize2 className="w-5 h-5" />
+                    <Minimize2 className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
                   </button>
+
+                  {/* Back Arrow Button (Top Left) */}
+                  <div className="absolute top-4 left-4 z-50 flex items-center gap-2">
+                    <button
+                      onClick={() => setIsFullscreen(false)}
+                      title="ተመለስ (Go Back)"
+                      className="p-3 rounded-full bg-black/70 hover:bg-slate-800 text-white backdrop-blur-md border border-white/25 transition-all cursor-pointer shadow-2xl flex items-center justify-center group"
+                    >
+                      <ArrowLeft className="w-5 h-5 text-amber-400 group-hover:-translate-x-1 transition-transform" />
+                    </button>
+                  </div>
+
+                  {/* 100% Single Speaker Full Edge-to-Edge Stream (IMO-style zero black bars) */}
+                  <div className="w-full h-full relative overflow-hidden bg-black">
+                    {showingRemote && activeRemotePeer ? (
+                      activeRemotePeer.stream && activeRemotePeer.isVideoOn ? (
+                        <EdgeToEdgeVideo
+                          stream={activeRemotePeer.stream}
+                          muted={false}
+                          mirror={false}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-6">
+                          <img
+                            src={activeRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'}
+                            alt={activeRemotePeer.name}
+                            className={`w-44 h-44 rounded-full object-cover border-4 shadow-2xl ${
+                              activeRemotePeer.isSpeaking ? 'border-emerald-400 ring-8 ring-emerald-400/40' : 'border-slate-700'
+                            }`}
+                          />
+                        </div>
+                      )
+                    ) : isVideoOn && isUsingRealWebcam && cameraActive && localStream ? (
+                      <EdgeToEdgeVideo
+                        stream={localStream}
+                        muted={true}
+                        mirror={cameraFacing === 'user'}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center p-4 gap-4">
+                        <img
+                          src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'}
+                          alt={currentUser?.fullName || 'እርስዎ'}
+                          className={`w-40 h-40 rounded-full object-cover border-4 shadow-2xl ${
+                            isMicOn && isSpeaking ? 'border-amber-400 ring-8 ring-amber-400/40' : 'border-slate-700'
+                          }`}
+                        />
+                        {isVideoOn && !cameraActive && (
+                          <button
+                            onClick={() => onRetryCamera?.()}
+                            className="p-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl shadow-2xl cursor-pointer transition"
+                            title="ካሜራዎን ያብሩ"
+                          >
+                            <Video className="w-7 h-7" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Floating Minimal Glass Controller (Icon Only - Always Inside 100dvh Bottom) */}
+                  <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-50 bg-black/80 hover:bg-black/95 backdrop-blur-xl px-5 py-3 rounded-full border border-white/25 shadow-2xl flex items-center gap-3 transition-all">
+                    <button
+                      onClick={toggleMicrophone}
+                      title={isMicOn ? 'ድምፅ አጥፋ' : 'ድምፅ አብራ'}
+                      className={`p-3.5 rounded-full transition-all cursor-pointer ${
+                        isMicOn
+                          ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                          : 'bg-white/10 hover:bg-white/20 text-white'
+                      }`}
+                    >
+                      {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5 text-red-400" />}
+                    </button>
+
+                    <button
+                      onClick={toggleVideo}
+                      title={isVideoOn ? 'ካሜራ አጥፋ' : 'ካሜራ አብራ'}
+                      className={`p-3.5 rounded-full transition-all cursor-pointer ${
+                        isVideoOn
+                          ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                          : 'bg-white/10 hover:bg-white/20 text-white'
+                      }`}
+                    >
+                      {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5 text-red-400" />}
+                    </button>
+
+                    <button
+                      onClick={handleFlipCamera}
+                      title="ካሜራ አዙር (የፊት / የኋላ)"
+                      className="p-3.5 rounded-full bg-white/10 hover:bg-white/20 text-amber-400 transition-all cursor-pointer"
+                    >
+                      <RefreshCw className="w-5 h-5" />
+                    </button>
+
+                    {remotePeersList.length > 0 && (
+                      <button
+                        onClick={() => setFullscreenTargetId(nextSwapId)}
+                        title="ተናጋሪ ቀይር"
+                        className="p-3.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all cursor-pointer"
+                      >
+                        <Maximize2 className="w-5 h-5" />
+                      </button>
+                    )}
+
+                    <div className="h-6 w-px bg-white/20 mx-1" />
+
+                    <button
+                      onClick={() => setIsFullscreen(false)}
+                      title="ከሙሉ ስክሪን ውጣ"
+                      className="p-3.5 bg-red-600/90 hover:bg-red-600 text-white rounded-full flex items-center justify-center cursor-pointer shadow-lg transition-transform hover:scale-105"
+                    >
+                      <Minimize2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })(), document.body)}
 
             {/* Primary Controls Bar: Sleek Icon Buttons with Zero Text Clutter */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0a0d14] p-3.5 rounded-2xl border border-slate-800 shadow-xl">
               <div className="flex items-center gap-2">
-                {/* Unrestricted Mic Button (Icon Only) */}
                 <button
                   onClick={toggleMicrophone}
                   className={`p-3.5 rounded-2xl transition-all cursor-pointer shadow-md ${
@@ -1120,7 +888,6 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   {isMicOn ? <Mic className="w-5 h-5 text-slate-950" /> : <MicOff className="w-5 h-5 text-red-400" />}
                 </button>
 
-                {/* Unrestricted Camera Button (Icon Only) */}
                 <button
                   onClick={toggleVideo}
                   className={`p-3.5 rounded-2xl transition-all cursor-pointer shadow-md ${
@@ -1133,7 +900,6 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   {isVideoOn && cameraActive ? <Video className="w-5 h-5 text-slate-950" /> : <VideoOff className="w-5 h-5 text-red-400" />}
                 </button>
 
-                {/* Flip Camera Button (Icon Only) */}
                 {cameraActive && (
                   <button
                     onClick={handleFlipCamera}
@@ -1152,7 +918,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     onClick={onLeaveSeat}
                     className="flex items-center gap-2 px-4 py-3 bg-slate-900 hover:bg-red-950/70 hover:text-red-200 text-slate-200 border border-slate-700 rounded-2xl text-sm font-black transition-colors cursor-pointer shadow-md"
                   >
-                    <UserCheck className="w-4 h-4 text-amber-400" />
+                    <Armchair className="w-4 h-4 text-amber-400" />
                     <span>#{userSeatedNumber} {t.roomStage.leaveTheSeat}</span>
                   </button>
                 ) : (
@@ -1160,16 +926,17 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     onClick={() => onClaimSeat(1)}
                     className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-2xl text-sm transition-all shadow-md shadow-amber-950 cursor-pointer"
                   >
-                    <UserCheck className="w-4 h-4" />
+                    <Armchair className="w-4 h-4" />
                     <span>{t.roomStage.takeASeat}</span>
                   </button>
                 )}
 
-                {/* Send Gift to Host */}
                 <button
                   onClick={() => {
-                    const hostOccupant = occupants.find((o) => o.isHost) || occupants[1];
-                    setSelectedRecipient(hostOccupant);
+                    const otherOccupant = occupants.find(
+                      (o) => o.id !== 'user-self' && o.id !== currentUser?.idNumber
+                    ) || occupants[0] || null;
+                    setSelectedRecipient(otherOccupant);
                     setIsGiftModalOpen(true);
                   }}
                   className="flex items-center gap-2 px-4 py-3 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/50 rounded-2xl text-sm font-black transition-colors cursor-pointer shadow-md"
@@ -1181,11 +948,11 @@ export const RoomStage: React.FC<RoomStageProps> = ({
             </div>
           </div>
 
-          {/* Numbered Chairs Section */}
+          {/* Numbered Chairs Section — EVERY Chair displays an Armchair icon */}
           <div className="bg-[#0f1422] border border-slate-800 rounded-3xl p-5 shadow-xl">
             <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-amber-400" />
+                <Armchair className="w-5 h-5 text-amber-400" />
                 <h3 className="text-base font-black text-white">
                   {t.roomStage.numberedChairs}
                 </h3>
@@ -1203,7 +970,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   onClick={() => {
                     if (!isOccupied) {
                       onClaimSeat(seatNum);
-                    } else if (occupant && occupant.id !== 'user-self') {
+                    } else if (occupant && occupant.id !== 'user-self' && occupant.id !== currentUser?.idNumber) {
                       setSelectedRecipient(occupant);
                       setIsGiftModalOpen(true);
                     }
@@ -1216,19 +983,22 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       : 'bg-[#0a0d14] border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-900/50'
                   }`}
                 >
-                  {/* Seat number tag */}
-                  <div className="absolute top-1 left-2 text-xs font-black text-amber-400 font-mono">
-                    #{seatNum}
+                  {/* Chair Icon & Seat Number Badge on EVERY chair */}
+                  <div className="w-full flex items-center justify-between mb-1">
+                    <span className="text-xs font-black text-amber-400 font-mono">
+                      #{seatNum}
+                    </span>
+                    <Armchair className={`w-3.5 h-3.5 ${isOccupied || isUserSeat ? 'text-amber-400' : 'text-slate-500'}`} />
                   </div>
 
                   {isOccupied && occupant ? (
                     <>
-                      <div className="relative mt-2 mb-1.5">
+                      <div className="relative mt-1 mb-1.5">
                         <img
                           src={isUserSeat ? (currentUser?.avatarUrl || occupant.avatar) : occupant.avatar}
                           alt={isUserSeat ? (currentUser?.fullName || occupant.name) : occupant.name}
                           className={`w-11 h-11 rounded-full object-cover border-2 shadow-md transition-transform duration-200 ${
-                            isUserSeat && isMicOn && audioVolumeLevel > 15
+                            isUserSeat && isMicOn && isSpeaking
                               ? 'border-amber-400 ring-4 ring-amber-400/50 scale-110'
                               : occupant.isSpeaking
                               ? 'border-amber-400 ring-4 ring-amber-400/50 scale-105'
@@ -1238,7 +1008,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                         <span className="absolute -bottom-1 -right-1 text-sm">
                           {occupant.countryFlag}
                         </span>
-                        {((isUserSeat && isMicOn && audioVolumeLevel > 15) || occupant.isSpeaking) && (
+                        {((isUserSeat && isMicOn && isSpeaking) || occupant.isSpeaking) && (
                           <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 animate-ping" />
                         )}
                       </div>
@@ -1259,9 +1029,9 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       </div>
                     </>
                   ) : (
-                    <div className="py-3 flex flex-col items-center justify-center">
-                      <div className="w-8 h-8 rounded-full border border-dashed border-slate-700 hover:border-amber-400 flex items-center justify-center text-amber-400 text-sm font-black transition">
-                        +
+                    <div className="py-2.5 flex flex-col items-center justify-center">
+                      <div className="w-9 h-9 rounded-full border border-dashed border-slate-700 hover:border-amber-400 flex items-center justify-center text-amber-400 transition">
+                        <Armchair className="w-4 h-4 text-amber-400" />
                       </div>
                     </div>
                   )}
@@ -1365,7 +1135,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={!inputText.trim() || isTranslating}
+                  disabled={!inputText.trim()}
                   className="p-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 rounded-xl font-black transition-all shadow-md shadow-amber-950 cursor-pointer"
                 >
                   <Send className="w-5 h-5" />

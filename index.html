@@ -2,13 +2,15 @@
 <html lang="am" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>ዓለም አንድ (AlemAnd) - Global Unity & Knowledge Agora</title>
     <meta name="description" content="የአለማችን ህዝቦች የጋራ መሰብሰቢያ፣ የቀጥታ ቪዲዮና ድምፅ ውይይት፣ ራስ-ሰር የቋንቋ ተርጓሚ፣ ዲጂታል እቁብ፣ የበጎ አድራጎት፣ የኤአይ ትምህርት እና የገቢ ማስገኛ መድረክ" />
+    <meta property="og:site_name" content="Oneworld (ዓለም አንድ)" />
     <meta property="og:title" content="ዓለም አንድ (AlemAnd) - Global Unity & Knowledge Agora" />
     <meta property="og:description" content="የአለማችን ህዝቦች የጋራ መሰብሰቢያ፣ የቀጥታ ቪዲዮና ድምፅ ውይይት፣ ራስ-ሰር የቋንቋ ተርጓሚ፣ ዲጂታል እቁብ፣ የበጎ አድራጎት፣ የኤአይ ትምህርት እና የገቢ ማስገኛ መድረክ" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="format-detection" content="telephone=no" />
     <meta name="theme-color" content="#0c0f17" />
     <meta name="color-scheme" content="dark" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -18,56 +20,58 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
-    
-    <!-- High-clarity Ethiopic font weights (500, 600, 700, 800, 900) to prevent thin/shriveled text -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+
+    <!-- Fast bold typography prioritizing wide crisp native system Ethiopic + Plus Jakarta Sans (700-800) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap">
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@700;800&display=swap"
+    />
 
     <style>
-      /* Ensure base background is always dark and typography is bold, solid, prominent and standout */
+      /* Ensure base background is always dark and typography is thick, wide, bold and prominent */
       html, body {
         background-color: #0a0d14;
         color: #ffffff;
         margin: 0;
         padding: 0;
-        font-family: 'Noto Sans Ethiopic', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 17.5px;
-        font-weight: 700;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Ebrima", "Nyala", "Kefa", "Plus Jakarta Sans", sans-serif;
+        font-size: 19px;
+        font-weight: 800;
+        letter-spacing: 0.025em;
         line-height: 1.7;
         -webkit-tap-highlight-color: transparent;
         overflow-x: hidden;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
+        -webkit-font-smoothing: auto;
+        font-synthesis-weight: auto;
       }
+      @keyframes owSpin { to { transform: rotate(360deg); } }
     </style>
   </head>
-  <body class="bg-[#0a0d14] text-white antialiased selection:bg-amber-500 selection:text-slate-950 font-bold">
+  <body class="bg-[#0a0d14] text-white selection:bg-amber-500 selection:text-slate-950 font-black">
     <div id="root">
-      <!-- Instant Mobile Pre-render Shell to eliminate white screen -->
+      <!-- Instant Pre-render Shell to eliminate white screen in slow networks & in-app browsers -->
       <div style="min-height: 100vh; background-color: #0c0f17; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; color: #f8fafc;">
         <div style="width: 58px; height: 58px; border-radius: 50%; border: 3px solid rgba(245, 158, 11, 0.2); border-top-color: #f59e0b; animation: owSpin 0.7s linear infinite; margin-bottom: 20px;"></div>
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-          <h1 style="font-size: 26px; font-weight: 900; letter-spacing: -0.5px; margin: 0; background: linear-gradient(to right, #fbbf24, #10b981, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Oneworld</h1>
+          <h1 style="font-size: 30px; font-weight: 900; letter-spacing: 0.01em; margin: 0; background: linear-gradient(to right, #fbbf24, #10b981, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Oneworld</h1>
         </div>
-        <p style="font-size: 13px; color: #94a3b8; margin: 0; font-weight: 500;">በከፍተኛ ፍጥነት በመከፈት ላይ... እባክዎ ይጠብቁ</p>
-        <style>
-          @keyframes owSpin { to { transform: rotate(360deg); } }
-        </style>
+        <p style="font-size: 16px; color: #ffffff; margin: 0; font-weight: 900;">በከፍተኛ ፍጥነት በመከፈት ላይ... እባክዎ ይጠብቁ</p>
       </div>
     </div>
-    
+
     <script type="module" src="/src/main.tsx"></script>
 
-    <!-- Instant Offline Service Worker Registration -->
+    <!-- Non-blocking Service Worker Registration guarded for WebView environments (Telegram / IMO / WhatsApp) -->
     <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
-          .then((reg) => {
-            console.log('[Oneworld PWA] Offline Engine Active:', reg.scope);
-          })
-          .catch((err) => console.warn('[Oneworld PWA] SW error:', err));
-      }
+      window.addEventListener('load', function () {
+        try {
+          if ('serviceWorker' in navigator && window.isSecureContext) {
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+          }
+        } catch (e) {}
+      });
     </script>
   </body>
 </html>

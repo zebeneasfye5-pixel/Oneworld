@@ -1,7 +1,7 @@
-// Oneworld Progressive Web App (PWA) Offline-First Service Worker
-// Version: 2.1.0 - Ultra-fast caching & 100% offline autonomy
+// Oneworld Progressive Web App (PWA) Service Worker
+// Version: 3.0.0 - Fast Edge Caching & WebView-Safe Fetch Handling
 
-const CACHE_NAME = 'oneworld-offline-v2';
+const CACHE_NAME = 'oneworld-offline-v7';
 const STATIC_PRECACHE = [
   '/',
   '/index.html',
@@ -9,89 +9,72 @@ const STATIC_PRECACHE = [
   '/icon.svg'
 ];
 
-// Install: pre-cache critical shell immediately
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_PRECACHE).catch((err) => {
-        console.warn('[Oneworld SW] Precache warning:', err);
-      });
+      return cache.addAll(STATIC_PRECACHE).catch(() => {});
     })
   );
 });
 
-// Activate: clean up older caches immediately and claim all clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => {
-      return Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            console.log('[Oneworld SW] Removing legacy cache:', key);
-            return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((key) => (key !== CACHE_NAME ? caches.delete(key) : null))))
+      .then(() => self.clients.claim())
   );
 });
 
-// Fetch: Ultra-fast Cache-First strategy with automatic background revalidation
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-
-  // Bypass non-http protocols (chrome-extension, etc.)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (url.pathname === '/ws' || event.request.headers.get('upgrade') === 'websocket') return;
 
-  // Bypass WebSocket upgrade requests
-  if (url.pathname === '/ws' || event.request.headers.get('upgrade') === 'websocket') {
-    return;
-  }
-
-  // Bypass live API calls if they shouldn't be cached, but provide offline responses for data endpoints
+  // Never serve stale or fabricated data for live backend APIs
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(event.request).catch(() => {
-        // Return offline mock JSON so frontend never crashes when offline
-        if (url.pathname === '/api/health') {
-          return new Response(JSON.stringify({ status: 'healthy', offline: true }), {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-        return new Response(JSON.stringify({ offline: true, message: 'Offline Mode Active' }), {
+      fetch(event.request).catch(() =>
+        new Response(JSON.stringify({ error: 'Network unavailable', offline: true }), {
+          status: 503,
           headers: { 'Content-Type': 'application/json' }
-        });
-      })
+        })
+      )
     );
     return;
   }
 
-  // Cache-First with Stale-While-Revalidate for all assets (JS, CSS, HTML, fonts, images)
+  // Network-First for HTML navigations so users get fresh deploys & offline fallback
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match('/index.html').then((r) => r || caches.match('/')))
+    );
+    return;
+  }
+
+  // Stale-While-Revalidate / Cache-First for immutable JS/CSS/font/image assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const clone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, clone);
-            });
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           }
           return networkResponse;
         })
-        .catch(() => {
-          // If offline and request is HTML navigation, serve cached root / index.html
-          if (event.request.mode === 'navigate') {
-            return caches.match('/index.html') || caches.match('/');
-          }
-          return null;
-        });
+        .catch(() => null);
 
-      // Return cached version immediately for lightning speed, or wait for network if not in cache
       return cachedResponse || fetchPromise;
     })
   );
