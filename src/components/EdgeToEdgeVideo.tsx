@@ -4,19 +4,20 @@ interface EdgeToEdgeVideoProps {
   stream: MediaStream | null | undefined;
   muted?: boolean;
   mirror?: boolean;
+  zoom?: number;
   className?: string;
 }
 
 /**
- * EdgeToEdgeVideo (IMO / TikTok style full-bleed renderer)
- * Eliminates black letterboxing/pillarboxing even on Android Chrome & WebView
- * hardware-composited MediaStream surfaces by computing exact cover pixel
- * dimensions against the container box and native videoWidth/videoHeight.
+ * EdgeToEdgeVideo (IMO / TikTok style full-bleed renderer + custom zoom 0.3x - 2.5x)
+ * Eliminates black letterboxing/pillarboxing at zoom >= 1 while letting users smoothly
+ * zoom out (< 1.0 down to 0.3x) or zoom in (> 1.0 up to 2.5x) inside fullscreen.
  */
 export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
   stream,
   muted = false,
   mirror = false,
+  zoom = 1,
   className = '',
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -36,10 +37,10 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
     const vH = video.videoHeight;
 
     if (vW > 0 && vH > 0) {
-      const scale = Math.max(cW / vW, cH / vH);
+      const coverScale = Math.max(cW / vW, cH / vH);
       setBoxSize({
-        w: Math.ceil(vW * scale) + 2,
-        h: Math.ceil(vH * scale) + 2,
+        w: Math.ceil(vW * coverScale) + 2,
+        h: Math.ceil(vH * coverScale) + 2,
       });
     } else {
       setBoxSize(null);
@@ -80,6 +81,12 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
     };
   }, [recalculateCover]);
 
+  const clampedZoom = Math.max(0.3, Math.min(2.5, zoom));
+  const scaleTransform = `scale(${clampedZoom})`;
+  const mirrorTransform = mirror ? 'scaleX(-1)' : '';
+  const centeredTransform = ['translate(-50%, -50%)', scaleTransform, mirrorTransform].filter(Boolean).join(' ');
+  const fallbackTransform = [scaleTransform, mirrorTransform].filter(Boolean).join(' ');
+
   const videoStyle: React.CSSProperties = boxSize
     ? {
         position: 'absolute',
@@ -92,9 +99,9 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
         objectFit: 'cover',
         objectPosition: 'center center',
         display: 'block',
-        transform: mirror
-          ? 'translate(-50%, -50%) scaleX(-1)'
-          : 'translate(-50%, -50%)',
+        transformOrigin: 'center center',
+        transition: 'transform 200ms ease-out',
+        transform: centeredTransform,
       }
     : {
         position: 'absolute',
@@ -106,7 +113,9 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
         objectFit: 'cover',
         objectPosition: 'center center',
         display: 'block',
-        transform: mirror ? 'scaleX(-1)' : undefined,
+        transformOrigin: 'center center',
+        transition: 'transform 200ms ease-out',
+        transform: fallbackTransform,
       };
 
   return (

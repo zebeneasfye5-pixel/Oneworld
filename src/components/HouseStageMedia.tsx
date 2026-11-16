@@ -19,7 +19,8 @@ import {
   ArrowLeft,
   ChevronDown,
   ChevronUp,
-  Armchair
+  Armchair,
+  Layers
 } from 'lucide-react';
 import { UserProfile } from './AuthModal';
 import { AppLanguage, TRANSLATIONS } from '../i18n/translations';
@@ -109,10 +110,9 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   // Zoom & Display Controls
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenZoom, setFullscreenZoom] = useState<number>(0.85);
   const [fullscreenTargetId, setFullscreenTargetId] = useState<'local' | string>('local');
   const [isFullBodyMode, setIsFullBodyMode] = useState(false);
-  const stageContainerRef = useRef<HTMLDivElement | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Lock body scroll cleanly when fullscreen cinema portal is active
   useEffect(() => {
@@ -139,18 +139,6 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     }
   }, [currentUser?.avatarUrl, profilePhotoUrl]);
 
-  // Attach live localStream to self video element cleanly
-  useEffect(() => {
-    if (videoRef.current && localStream && !isVideoOff) {
-      if (videoRef.current.srcObject !== localStream) {
-        videoRef.current.srcObject = localStream;
-      }
-      videoRef.current.muted = true;
-      videoRef.current.playsInline = true;
-      videoRef.current.play().catch(() => {});
-    }
-  }, [localStream, isVideoOff, userSeat, membership]);
-
   const isHouse4 = houseId === 'h4';
   const liveRemotePeers = remotePeers ? Array.from(remotePeers.values()) : [];
 
@@ -168,22 +156,12 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     }
   };
 
-  const handleZoomIn = () => setZoomScale((prev) => Math.min(prev + 0.2, 2.0));
-  const handleZoomOut = () => setZoomScale((prev) => Math.max(prev - 0.2, 0.8));
+  const handleZoomIn = () => setZoomScale((prev) => Math.min(2.5, +(prev + 0.15).toFixed(2)));
+  const handleZoomOut = () => setZoomScale((prev) => Math.max(0.4, +(prev - 0.15).toFixed(2)));
   const handleResetZoom = () => setZoomScale(1);
 
   const toggleFullscreen = () => {
-    setIsFullscreen((prev) => {
-      const next = !prev;
-      try {
-        if (next && stageContainerRef.current?.requestFullscreen) {
-          stageContainerRef.current.requestFullscreen().catch(() => {});
-        } else if (!next && document.fullscreenElement && document.exitFullscreen) {
-          document.exitFullscreen().catch(() => {});
-        }
-      } catch {}
-      return next;
-    });
+    setIsFullscreen((prev) => !prev);
   };
 
   const handleToggleMic = () => {
@@ -222,7 +200,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
       onClaimSeat?.(seatNo);
       onShowToast(`${t.chairs.seatPrefix}${seatNo}: ${t.stageMedia.takeSeat}`);
     } else {
-      onShowToast(`ወንበር #${seatNo}: በ ${occupant.name} ተይዟል`);
+      onShowToast(`ወንበር ${seatNo}: በ ${occupant.name} ተይዟል`);
     }
   };
 
@@ -396,7 +374,6 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
   return (
     <div
-      ref={stageContainerRef}
       className="bg-[#0f1422] border border-slate-800 rounded-3xl p-4 md:p-6 shadow-2xl mb-8 space-y-6"
     >
       {/* Top Header Bar with Back Arrow Navigation */}
@@ -435,25 +412,30 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
           </div>
         </div>
 
-        {/* Toolbar (Icons Only) */}
+        {/* Toolbar (Icons Only - Matches House 1 Fullscreen & Layers Controls) */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 cursor-pointer transition shadow-md flex items-center gap-1"
-            title={showDetails ? 'ዝርዝር ደብቅ' : 'ተጨማሪ ዝርዝር'}
+            onClick={() => {
+              setFullscreenTargetId('local');
+              toggleFullscreen();
+            }}
+            title={isFullscreen ? 'ከሙሉ ስክሪን ውጣ' : 'በሙሉ ስክሪን ክፈት (100% Edge-to-Edge Fullscreen)'}
+            className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 border border-amber-400 shadow-md cursor-pointer transition transform hover:scale-105"
           >
-            {showDetails ? <ChevronUp className="w-4 h-4 text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-400" />}
+            {isFullscreen ? <Minimize2 className="w-4 h-4 text-slate-950" /> : <Maximize2 className="w-4 h-4 text-slate-950" />}
           </button>
 
           <div className="flex items-center bg-slate-900 border border-slate-700/80 rounded-xl p-1 gap-1">
-            <button onClick={handleZoomOut} title="ዙም ቀንስ" className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-300 hover:text-white cursor-pointer">
-              <ZoomOut className="w-3.5 h-3.5" />
+            <button onClick={handleZoomOut} title="ዙም ቀንስ (-)" className="px-2 py-1 hover:bg-slate-800 rounded-lg text-white cursor-pointer flex items-center gap-0.5 font-black text-xs">
+              <ZoomOut className="w-3.5 h-3.5 text-amber-400" />
+              <span>-</span>
             </button>
             <span className="text-[10px] font-mono font-bold text-amber-400 px-1">{Math.round(zoomScale * 100)}%</span>
-            <button onClick={handleZoomIn} title="ዙም ጨምር" className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-300 hover:text-white cursor-pointer">
-              <ZoomIn className="w-3.5 h-3.5" />
+            <button onClick={handleZoomIn} title="ዙም ጨምር (+)" className="px-2 py-1 hover:bg-slate-800 rounded-lg text-white cursor-pointer flex items-center gap-0.5 font-black text-xs">
+              <ZoomIn className="w-3.5 h-3.5 text-amber-400" />
+              <span>+</span>
             </button>
-            <button onClick={handleResetZoom} title="100%" className="p-1 text-[10px] text-slate-400 hover:text-slate-200 cursor-pointer">
+            <button onClick={handleResetZoom} title="100%" className="p-1 text-[10px] text-slate-300 hover:text-white cursor-pointer">
               100%
             </button>
           </div>
@@ -467,15 +449,15 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             }`}
             title={isFullBodyMode ? 'መደበኛ ስክሪን' : 'ሙሉ አካልና ቁመት'}
           >
-            <Maximize2 className="w-4 h-4" />
+            <Layers className="w-4 h-4" />
           </button>
 
           <button
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'ከሙሉ ስክሪን ውጣ' : 'በሙሉ ስክሪን ክፈት'}
-            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition shadow-md"
+            onClick={() => setShowDetails(!showDetails)}
+            className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 cursor-pointer transition shadow-md flex items-center gap-1"
+            title={showDetails ? 'ዝርዝር ደብቅ' : 'ተጨማሪ ዝርዝር'}
           >
-            {isFullscreen ? <Minimize2 className="w-4 h-4 text-amber-400" /> : <Maximize2 className="w-4 h-4" />}
+            {showDetails ? <ChevronUp className="w-4 h-4 text-amber-400" /> : <ChevronDown className="w-4 h-4 text-amber-400" />}
           </button>
 
           <button
@@ -521,102 +503,68 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         </div>
       )}
 
-      {/* Live WebRTC Multi-Peer Video Grid Stage */}
-      <div className="transition-transform duration-200 origin-top overflow-hidden" style={{ transform: `scale(${zoomScale})` }}>
-        <div className={`grid gap-4 ${
+      {/* Live WebRTC Multi-Peer Large Fixed Video Player Frame (width: 90%, max-width: 1200px, height: 650px, overflow: hidden) */}
+      <div
+        className="mx-auto rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative"
+        style={{
+          width: '90%',
+          maxWidth: '1200px',
+          height: '650px',
+          overflow: 'hidden'
+        }}
+      >
+        <div className={`grid w-full h-full gap-2 ${
           isHouse4
-            ? 'grid-cols-1 sm:grid-cols-2 max-w-4xl mx-auto'
+            ? 'grid-cols-1 sm:grid-cols-2'
             : liveRemotePeers.length === 0
-            ? 'grid-cols-1 max-w-3xl mx-auto'
+            ? 'grid-cols-1'
             : 'grid-cols-1 sm:grid-cols-2'
         }`}>
-          {/* User's Own Live Video / Audio Card */}
+          {/* User's Own Live Video inside Fixed Container */}
           {userSeat !== null && (
-            <div className="bg-slate-950/80 border-2 border-amber-500 rounded-3xl p-3.5 flex flex-col justify-between shadow-2xl">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1">
-                  <Armchair className="w-3.5 h-3.5" />
-                  #{userSeat} ({t.stageMedia.yourSeat})
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {localStream && isVideoOn && onFlipCamera && (
-                    <button
-                      onClick={onFlipCamera}
-                      className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-2.5 py-1 rounded-xl border border-slate-700 flex items-center gap-1 cursor-pointer transition shadow-md"
-                      title="የፊት/የኋላ ካሜራ ቀይር"
-                    >
-                      <RefreshCw className="w-3 h-3 text-amber-400" />
-                      <span>{cameraFacing === 'user' ? 'የፊት' : 'የኋላ'}</span>
-                    </button>
-                  )}
+            <div className="relative w-full h-full overflow-hidden bg-black">
+              {isVideoOn && localStream ? (
+                <EdgeToEdgeVideo
+                  stream={localStream}
+                  muted={true}
+                  mirror={cameraFacing === 'user'}
+                  zoom={zoomScale}
+                />
+              ) : isVideoOn && !localStream ? (
+                <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4 gap-2 text-center">
+                  {cameraError && <p className="text-xs text-amber-300 max-w-xs">{cameraError}</p>}
+                  <button
+                    onClick={() => onRetryCamera?.()}
+                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
+                  >
+                    📹 ካሜራዬን አብራ
+                  </button>
                 </div>
-              </div>
-
-              <div className={`relative rounded-2xl overflow-hidden bg-black border border-slate-700 w-full ${
-                isFullBodyMode ? 'h-[440px] sm:h-[500px]' : 'h-[300px] sm:h-[350px]'
-              }`}>
-                {isVideoOn && localStream ? (
-                  <EdgeToEdgeVideo
-                    stream={localStream}
-                    muted={true}
-                    mirror={cameraFacing === 'user'}
-                  />
-                ) : isVideoOn && !localStream ? (
-                  <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4 gap-2 text-center">
-                    {cameraError && <p className="text-xs text-amber-300 max-w-xs">{cameraError}</p>}
-                    <button
-                      onClick={() => onRetryCamera?.()}
-                      className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
-                    >
-                      📹 ካሜራዬን አብራ
-                    </button>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
+                  <div className="relative mb-3">
+                    <img
+                      src={membership.avatarUrl || currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                      alt={currentUser?.fullName || membership.fullName}
+                      className={`w-36 h-36 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                        isMicOn && isSpeaking
+                          ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
+                          : 'border-slate-700'
+                      }`}
+                    />
+                    {isMicOn && isSpeaking && (
+                      <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
+                    )}
                   </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
-                    <div className="relative mb-3">
-                      <img
-                        src={membership.avatarUrl || currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                        alt={currentUser?.fullName || membership.fullName}
-                        className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
-                          isMicOn && isSpeaking
-                            ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
-                            : 'border-slate-700'
-                        }`}
-                      />
-                      {isMicOn && isSpeaking && (
-                        <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
-                      )}
-                    </div>
-                    <span className="text-white font-bold text-xs mb-2">ድምፅ ብቻ (Audio Only)</span>
-                    <button
-                      onClick={handleToggleVideo}
-                      className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
-                    >
-                      ካሜራ አብራ
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
-                <div>
-                  <h4 className="text-white font-black text-sm sm:text-base">{currentUser?.fullName || membership.fullName}</h4>
-                  <p className="text-xs text-white font-medium">{membership.roleInHouse}</p>
+                  <span className="text-white font-bold text-xs mb-2">ድምፅ ብቻ (Audio Only)</span>
+                  <button
+                    onClick={handleToggleVideo}
+                    className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
+                  >
+                    ካሜራ አብራ
+                  </button>
                 </div>
-                <div>
-                  {isMicOn ? (
-                    <span className="flex items-center gap-1.5 bg-amber-950/90 border border-amber-500/70 text-white text-xs px-2.5 py-1 rounded-xl font-black">
-                      <Mic className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                      <span>ድምፅ በርቷል</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 bg-red-950/90 border border-red-500/60 text-white text-xs px-2.5 py-1 rounded-xl font-bold">
-                      <MicOff className="w-3.5 h-3.5 text-red-400" />
-                      <span>ድምፅ ጠፍቷል</span>
-                    </span>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -624,80 +572,117 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
           {liveRemotePeers.map((peer) => (
             <div
               key={peer.id}
-              className="bg-slate-950/80 border-2 border-emerald-500/60 rounded-3xl p-3.5 flex flex-col justify-between shadow-2xl animate-fadeIn"
+              className="relative w-full h-full overflow-hidden bg-black border-l border-emerald-500/40"
             >
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-                <span className="flex items-center gap-1.5 bg-emerald-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md">
-                  <Armchair className="w-3.5 h-3.5" />
-                  #{peer.seatNumber || 2} · {peer.name}
-                </span>
-                <span className="text-sm">{peer.countryFlag || '🌍'}</span>
-              </div>
-
-              <div className={`relative rounded-2xl overflow-hidden bg-black border border-slate-700 w-full ${
-                isFullBodyMode ? 'h-[440px] sm:h-[500px]' : 'h-[300px] sm:h-[350px]'
-              }`}>
-                {peer.stream && peer.isVideoOn ? (
-                  <EdgeToEdgeVideo
-                    stream={peer.stream}
-                    muted={false}
-                    mirror={false}
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
-                    <div className="relative mb-3">
-                      <img
-                        src={peer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                        alt={peer.name}
-                        className={`w-28 h-28 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
-                          peer.isSpeaking
-                            ? 'border-emerald-400 ring-8 ring-emerald-400/40 scale-105'
-                            : 'border-slate-700'
-                        }`}
-                      />
-                      {peer.isSpeaking && (
-                        <span className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
-                      )}
-                    </div>
-                    <span className="text-white font-bold text-xs">ድምፅ ብቻ (Audio Only)</span>
+              {peer.stream && peer.isVideoOn ? (
+                <EdgeToEdgeVideo
+                  stream={peer.stream}
+                  muted={false}
+                  mirror={false}
+                  zoom={zoomScale}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
+                  <div className="relative mb-3">
+                    <img
+                      src={peer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                      alt={peer.name}
+                      className={`w-36 h-36 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                        peer.isSpeaking
+                          ? 'border-emerald-400 ring-8 ring-emerald-400/40 scale-105'
+                          : 'border-slate-700'
+                      }`}
+                    />
+                    {peer.isSpeaking && (
+                      <span className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
+                    )}
                   </div>
-                )}
-
-                {peer.stream && (
-                  <audio
-                    ref={(el) => {
-                      if (el && peer.stream && el.srcObject !== peer.stream) {
-                        el.srcObject = peer.stream;
-                        el.play().catch(() => {});
-                      }
-                    }}
-                    autoPlay
-                  />
-                )}
-              </div>
-
-              <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between">
-                <div>
-                  <h4 className="text-white font-black text-sm sm:text-base">{peer.name}</h4>
-                  <p className="text-xs text-white font-medium">{peer.role || 'ተሳታፊ'}</p>
+                  <span className="text-white font-bold text-xs">ድምፅ ብቻ (Audio Only)</span>
                 </div>
-                <div>
-                  {!peer.isMuted ? (
-                    <span className="flex items-center gap-1.5 bg-emerald-950/90 border border-emerald-500/70 text-white text-xs px-2.5 py-1 rounded-xl font-black">
-                      <Mic className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                      <span>ድምፅ</span>
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 bg-slate-900 text-white text-xs px-2.5 py-1 rounded-xl">
-                      <MicOff className="w-3.5 h-3.5 text-slate-500" />
-                    </span>
-                  )}
-                </div>
-              </div>
+              )}
+
+              {peer.stream && (
+                <audio
+                  ref={(el) => {
+                    if (el && peer.stream && el.srcObject !== peer.stream) {
+                      el.srcObject = peer.stream;
+                      el.play().catch(() => {});
+                    }
+                  }}
+                  autoPlay
+                />
+              )}
             </div>
           ))}
         </div>
       </div>
+
+      {/* Speaker Info & Camera Flip Strip OUTSIDE Fixed Video Frame */}
+      {userSeat !== null && (
+        <div
+          className="mx-auto flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-4 py-3"
+          style={{ width: '90%', maxWidth: '1200px' }}
+        >
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1">
+              <Armchair className="w-3.5 h-3.5" />
+              {userSeat} ({t.stageMedia.yourSeat})
+            </span>
+            <div>
+              <h4 className="text-white font-black text-sm sm:text-base">{currentUser?.fullName || membership.fullName}</h4>
+              <p className="text-xs text-slate-300 font-medium">{membership.roleInHouse}</p>
+            </div>
+            {isMicOn ? (
+              <span className="flex items-center gap-1.5 bg-amber-950/90 border border-amber-500/70 text-white text-xs px-2.5 py-1 rounded-xl font-black">
+                <Mic className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <span>ድምፅ በርቷል</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 bg-red-950/90 border border-red-500/60 text-white text-xs px-2.5 py-1 rounded-xl font-bold">
+                <MicOff className="w-3.5 h-3.5 text-red-400" />
+                <span>ድምፅ ጠፍቷል</span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {localStream && isVideoOn && onFlipCamera && (
+              <button
+                onClick={onFlipCamera}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1.5 cursor-pointer transition shadow-md"
+                title="የፊት/የኋላ ካሜራ ቀይር"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+                <span>{cameraFacing === 'user' ? 'የፊት' : 'የኋላ'}</span>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setFullscreenTargetId('local');
+                setIsFullscreen(true);
+              }}
+              title="በሙሉ ስክሪን ክፈት"
+              className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer transition shadow"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            {liveRemotePeers.map((peer) => (
+              <button
+                key={`fs-${peer.id}`}
+                onClick={() => {
+                  setFullscreenTargetId(peer.id);
+                  setIsFullscreen(true);
+                }}
+                className="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/50 text-xs font-black px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer transition"
+                title="በሙሉ ስክሪን ክፈት"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span>{peer.seatNumber || 2} {peer.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Numbered Chairs Grid — ALL chairs display a visible Armchair icon */}
       <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 space-y-3">
@@ -736,9 +721,8 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     : 'bg-slate-900/60 border-slate-800/80 hover:border-amber-500/50 text-slate-300 hover:text-white'
                 }`}
               >
-                <div className="flex items-center gap-1">
-                  <Armchair className={`w-3.5 h-3.5 ${isTakenByMe || isTakenByOther ? 'text-amber-400' : 'text-slate-400'}`} />
-                  <span className="text-[11px] font-mono font-bold text-amber-400">#{seatNo}</span>
+                <div className="flex items-center justify-center mb-0.5">
+                  <span className="text-[11px] font-mono font-bold text-amber-400">{seatNo}</span>
                 </div>
 
                 {avatarUrl ? (
@@ -757,8 +741,8 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div className="w-6 h-6 my-0.5 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-slate-400">
-                    <Armchair className="w-3.5 h-3.5 text-amber-400/80" />
+                  <div className="w-8 h-8 my-0.5 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-slate-400">
+                    <Armchair className="w-4 h-4 text-amber-400/90" />
                   </div>
                 )}
 
@@ -817,7 +801,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
               </button>
             </div>
 
-            {/* 100% Single Speaker Full Edge-to-Edge Stream (IMO-style zero black bars) */}
+            {/* 100% Single Speaker Full Edge-to-Edge Stream (Adjustable Zoom 30% - 250%) */}
             <div className="w-full h-full relative overflow-hidden bg-black">
               {showingRemote && activeRemotePeer ? (
                 activeRemotePeer.stream && activeRemotePeer.isVideoOn ? (
@@ -825,6 +809,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     stream={activeRemotePeer.stream}
                     muted={false}
                     mirror={false}
+                    zoom={fullscreenZoom}
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-6">
@@ -842,6 +827,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                   stream={localStream}
                   muted={true}
                   mirror={cameraFacing === 'user'}
+                  zoom={fullscreenZoom}
                 />
               ) : (
                 <div className="w-full h-full bg-slate-950 flex flex-col items-center justify-center p-4 gap-4">
@@ -863,6 +849,44 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Fullscreen Zoom Control Bar (30% Small <-> 250% Large) */}
+            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/20 shadow-2xl flex items-center gap-2 max-w-[92vw]">
+              <button
+                onClick={() => setFullscreenZoom((prev) => Math.max(0.3, +(prev - 0.15).toFixed(2)))}
+                title="ዙም ቀንስ"
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/25 text-white cursor-pointer transition"
+              >
+                <ZoomOut className="w-4 h-4 text-amber-400" />
+              </button>
+
+              <input
+                type="range"
+                min={0.3}
+                max={2.5}
+                step={0.05}
+                value={fullscreenZoom}
+                onChange={(e) => setFullscreenZoom(parseFloat(e.target.value))}
+                aria-label="Zoom"
+                className="w-24 sm:w-36 accent-amber-400 cursor-pointer h-1.5"
+              />
+
+              <button
+                onClick={() => setFullscreenZoom(1)}
+                title="100%"
+                className="text-xs font-mono font-black text-amber-300 hover:text-white px-1.5 py-0.5 rounded-full bg-white/10 min-w-[44px] text-center cursor-pointer transition"
+              >
+                {Math.round(fullscreenZoom * 100)}%
+              </button>
+
+              <button
+                onClick={() => setFullscreenZoom((prev) => Math.min(2.5, +(prev + 0.15).toFixed(2)))}
+                title="ዙም ጨምር"
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/25 text-white cursor-pointer transition"
+              >
+                <ZoomIn className="w-4 h-4 text-amber-400" />
+              </button>
             </div>
 
             {/* Floating Minimal Glass Controller (Icon Only - Always Inside 100dvh Bottom) */}

@@ -351,7 +351,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       liveBadge: 'በቀጥታ (Live)'
     },
     chairs: {
-      seatPrefix: 'ወንበር #',
+      seatPrefix: 'ወንበር ',
       occupiedChairs: 'የተያዙ ወንበሮች፡',
       openSeat: 'ክፍት ወንበር',
       takeSeat: 'ወንበር ያዙ',
@@ -560,7 +560,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       liveBadge: 'Kallattiin (Live)'
     },
     chairs: {
-      seatPrefix: 'Teessoo #',
+      seatPrefix: 'Teessoo ',
       occupiedChairs: 'Teessuma Qabaman:',
       openSeat: 'Teessoo Banaa',
       takeSeat: 'Teessoo Qabadhu',
@@ -768,7 +768,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       liveBadge: 'ቀጥታ (Live)'
     },
     chairs: {
-      seatPrefix: 'ኮረሻ #',
+      seatPrefix: 'ኮረሻ ',
       occupiedChairs: 'ዝተታሕዙ ኮረሻታት፡',
       openSeat: 'ክፉት ኮረሻ',
       takeSeat: 'ኮረሻ ሓዝ',
@@ -976,7 +976,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       liveBadge: 'Live'
     },
     chairs: {
-      seatPrefix: 'Seat #',
+      seatPrefix: 'Seat ',
       occupiedChairs: 'Occupied Seats:',
       openSeat: 'Open Seat',
       takeSeat: 'Take Seat',
@@ -1185,7 +1185,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       liveBadge: 'En Direct'
     },
     chairs: {
-      seatPrefix: 'Siège #',
+      seatPrefix: 'Siège ',
       occupiedChairs: 'Sièges occupés :',
       openSeat: 'Siège libre',
       takeSeat: 'Prendre un siège',
@@ -1393,7 +1393,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       liveBadge: '直播中'
     },
     chairs: {
-      seatPrefix: '座位 #',
+      seatPrefix: '座位 ',
       occupiedChairs: '已占用座位：',
       openSeat: '空座位',
       takeSeat: '入座',
@@ -1601,7 +1601,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       liveBadge: 'بث مباشر'
     },
     chairs: {
-      seatPrefix: 'المقعد #',
+      seatPrefix: 'المقعد ',
       occupiedChairs: 'المقاعد المحجوزة:',
       openSeat: 'مقعد شاغر',
       takeSeat: 'احجز مقعداً',
@@ -1809,7 +1809,7 @@ export const TRANSLATIONS: Record<AppLanguage, TranslationDictionary> = {
       liveBadge: 'Live'
     },
     chairs: {
-      seatPrefix: 'Sitzplatz #',
+      seatPrefix: 'Sitzplatz ',
       occupiedChairs: 'Belegte Plätze:',
       openSeat: 'Freier Sitz',
       takeSeat: 'Platz nehmen',

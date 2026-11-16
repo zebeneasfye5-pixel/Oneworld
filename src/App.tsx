@@ -13,11 +13,12 @@ import { Header } from './components/Header';
 import { Navigation, MainNavigationTarget } from './components/Navigation';
 import { MasterDrawer, HouseId } from './components/MasterDrawer';
 import type { UserProfile } from './components/AuthModal';
-import { HouseStageMedia, HouseMemberRecord } from './components/HouseStageMedia';
+import type { HouseMemberRecord } from './components/HouseStageMedia';
 import { announceLanguageSwitch } from './services/speechService';
 import { ENV_CONFIG, getApiUrl } from './config/env';
 
-// Lazy-loaded on-demand modals for ultra-fast initial page speed
+// Lazy-loaded on-demand views & modals for ultra-fast initial page speed
+const HouseStageMedia = lazy(() => import('./components/HouseStageMedia').then((m) => ({ default: m.HouseStageMedia })));
 const BuilderVaultModal = lazy(() => import('./components/BuilderVaultModal').then((m) => ({ default: m.BuilderVaultModal })));
 const AuthModal = lazy(() => import('./components/AuthModal').then((m) => ({ default: m.AuthModal })));
 const FoundingCharterModal = lazy(() => import('./components/FoundingCharterModal').then((m) => ({ default: m.FoundingCharterModal })));
@@ -28,7 +29,6 @@ const AdminAuditDashboard = lazy(() => import('./admin/AdminAuditDashboard').the
 // Primary Foreground Live Social Agora: House 1 (Rendered eagerly)
 import { RoomStage } from './components/RoomStage';
 import { useRealtimeRoom } from './services/realtimeMesh';
-import confetti from 'canvas-confetti';
 
 // Performance Architecture: React.lazy() for all 15 hidden specialized houses (h2-h16)
 const HouseFamilyKinship = lazy(() => import('./components/houses/HouseFamilyKinship').then((m) => ({ default: m.HouseFamilyKinship })));
@@ -53,11 +53,11 @@ const EqubAndLottery = lazy(() => import('./components/EqubAndLottery').then((m)
 const BankingWallet = lazy(() => import('./components/BankingWallet').then((m) => ({ default: m.BankingWallet })));
 
 const safeConfetti = (opts?: any) => {
-  try {
-    confetti(opts);
-  } catch {
-    // safe fallback on constrained mobile devices
-  }
+  import('canvas-confetti')
+    .then((m) => m.default?.(opts))
+    .catch(() => {
+      // safe fallback on constrained mobile devices
+    });
 };
 
 const getHouseMeta = (houseKey: string, lang: AppLanguage) => {

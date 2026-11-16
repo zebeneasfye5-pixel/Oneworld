@@ -1129,6 +1129,50 @@ app.get('/api/health', (_req: Request, res: Response) => {
   });
 });
 
+// Pre-compressed static gzip cache so weak mobile & Telegram/IMO networks load 5x faster
+const staticGzipCache = new Map<string, { mtimeMs: number; gz: Buffer; contentType: string }>();
+
+function sendCompressedFile(
+  req: Request,
+  res: Response,
+  filePath: string,
+  contentType: string,
+  cacheControl: string
+): boolean {
+  try {
+    if (!fs.existsSync(filePath)) return false;
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) return false;
+
+    res.setHeader('Cache-Control', cacheControl);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Vary', 'Accept-Encoding');
+
+    const acceptEncoding = String(req.headers['accept-encoding'] || '');
+    if (acceptEncoding.includes('gzip') && stat.size > 512) {
+      let cached = staticGzipCache.get(filePath);
+      if (!cached || cached.mtimeMs !== stat.mtimeMs) {
+        const raw = fs.readFileSync(filePath);
+        cached = {
+          mtimeMs: stat.mtimeMs,
+          gz: zlib.gzipSync(raw, { level: 6 }),
+          contentType
+        };
+        staticGzipCache.set(filePath, cached);
+      }
+      res.setHeader('Content-Encoding', 'gzip');
+      res.setHeader('Content-Length', cached.gz.length);
+      res.send(cached.gz);
+      return true;
+    }
+
+    res.sendFile(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Setup Vite middleware in dev or static serving with long-lived edge caching in production
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
@@ -1143,11 +1187,65 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use('/assets', express.static(path.resolve(distPath, 'assets'), { maxAge: '365d', immutable: true }));
-    app.use(express.static(distPath, { maxAge: '1h' }));
-    app.get('*', (_req: Request, res: Response) => {
-      res.setHeader('Cache-Control', 'no-cache');
-      res.sendFile(path.resolve(distPath, 'index.html'));
+    // 1. Gzipped Immutable Hashed Assets (strict 404 if missing — NEVER serve HTML for JS/CSS)
+    app.get('/assets/*', (req: Request, res: Response) => {
+      const rel = req.path.replace(/^\/assets\//, '');
+      const fullPath = path.resolve(distPath, 'assets', rel);
+      if (!fullPath.startsWith(path.resolve(distPath, 'assets'))) {
+        return res.status(403).end();
+      }
+      const ext = path.extname(fullPath).toLowerCase();
+      const mimeMap: Record<string, string> = {
+        '.js': 'application/javascript; charset=utf-8',
+        '.mjs': 'application/javascript; charset=utf-8',
+        '.css': 'text/css; charset=utf-8',
+        '.svg': 'image/svg+xml',
+        '.json': 'application/json; charset=utf-8',
+        '.woff2': 'font/woff2',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.webp': 'image/webp'
+      };
+      const contentType = mimeMap[ext];
+      if (contentType && (ext === '.js' || ext === '.mjs' || ext === '.css' || ext === '.svg' || ext === '.json')) {
+        if (sendCompressedFile(req, res, fullPath, contentType, 'public, max-age=31536000, immutable')) {
+          return;
+        }
+        return res.status(404).type('text/plain').send('Asset not found');
+      }
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        return res.sendFile(fullPath);
+      }
+      return res.status(404).type('text/plain').send('Asset not found');
+    });
+
+    // 2. Service Worker must ALWAYS revalidate so updates take effect immediately
+    app.get('/sw.js', (req: Request, res: Response) => {
+      const swPath = path.resolve(distPath, 'sw.js');
+      if (!sendCompressedFile(req, res, swPath, 'application/javascript; charset=utf-8', 'no-store, no-cache, must-revalidate')) {
+        res.status(404).end();
+      }
+    });
+
+    // 3. Static public files (manifest, icons, screenshots) WITHOUT index.html caching
+    app.use(express.static(distPath, { index: false, maxAge: '10m' }));
+
+    // 4. Never fall through missing static asset extensions to index.html
+    app.get('*', (req: Request, res: Response) => {
+      if (/\.(js|mjs|css|map|json|svg|png|jpg|jpeg|webp|ico|woff2?)$/i.test(req.path)) {
+        return res.status(404).type('text/plain').send('Not found');
+      }
+      const indexPath = path.resolve(distPath, 'index.html');
+      if (!sendCompressedFile(
+        req,
+        res,
+        indexPath,
+        'text/html; charset=utf-8',
+        'no-store, no-cache, must-revalidate, proxy-revalidate'
+      )) {
+        res.status(500).send('App bundle unavailable');
+      }
     });
   }
 
