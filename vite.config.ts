@@ -21,10 +21,12 @@ export default defineConfig(() => {
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
+    oxc: {
+      target: 'es2020',
+    },
     build: {
-      // Telegram, IMO, WhatsApp Android/iOS WebView + modern browsers compatibility
-      target: ['es2020', 'chrome87', 'safari14', 'firefox78'],
-      minify: 'esbuild' as const,
+      // Telegram, IMO, WhatsApp Android/iOS WebView + modern browsers via Vite 8 native Oxc
+      minify: true,
       cssMinify: true,
       cssCodeSplit: true,
       chunkSizeWarningLimit: 800,
