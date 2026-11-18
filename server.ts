@@ -617,11 +617,12 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
       avatarUrl
     } = req.body || {};
 
-    const cleanId = String(phoneNumber || '').trim();
-    const accountKey = cleanId.toLowerCase();
+    const cleanPhone = String(phoneNumber || '').trim();
+    const digitsOnly = cleanPhone.replace(/\D/g, '');
+    const accountKey = cleanPhone.replace(/[\s\-()]/g, '').toLowerCase();
 
-    if (!cleanId) {
-      return res.status(400).json({ error: 'እባክዎ ትክክለኛ ስልክ ቁጥር ወይም ኢሜል ያስገቡ!' });
+    if (!cleanPhone || cleanPhone.includes('@') || digitsOnly.length < 7 || digitsOnly.length > 15) {
+      return res.status(400).json({ error: 'እባክዎ ትክክለኛ ስልክ ቁጥር ብቻ ያስገቡ! (ምሳሌ፡ 0911... ወይም +2519...)' });
     }
     if (!password || String(password).length < 6) {
       return res.status(400).json({ error: 'የይለፍ ቃል ቢያንስ ከ6 አሀዝ ያላነሰ መሆን አለበት!' });
@@ -629,15 +630,15 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     if (!fullName || !String(fullName).trim()) {
       return res.status(400).json({ error: 'እባክዎ ሙሉ ስምዎን ያስገቡ!' });
     }
-    if (store.users[accountKey]) {
-      return res.status(409).json({ error: 'ይህ ስልክ ቁጥር ወይም ኢሜል ቀድሞ ተመዝግቧል። እባክዎ በ"መግቢያ (Sign In)" ይግቡ!' });
+    if (store.users[accountKey] || store.users[cleanPhone.toLowerCase()]) {
+      return res.status(409).json({ error: 'ይህ ስልክ ቁጥር ቀድሞ ተመዝግቧል። እባክዎ በ"መግቢያ (Sign In)" ይግቡ!' });
     }
 
     const { salt, hash } = hashPassword(String(password));
     const uniqueUserId = `USER-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
 
     const profile = {
-      phoneNumber: cleanId,
+      phoneNumber: cleanPhone,
       fullName: String(fullName).trim(),
       gender: gender || 'ወንድ (Male)',
       age: Number(age) || 26,
@@ -651,7 +652,7 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     };
 
     store.users[accountKey] = {
-      phoneNumber: cleanId,
+      phoneNumber: cleanPhone,
       passwordSalt: salt,
       passwordHash: hash,
       profile,
@@ -669,12 +670,12 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
 app.post('/api/auth/login', (req: Request, res: Response) => {
   try {
     const { phoneNumber, password } = req.body || {};
-    const cleanId = String(phoneNumber || '').trim();
-    const accountKey = cleanId.toLowerCase();
+    const cleanPhone = String(phoneNumber || '').trim();
+    const normalizedKey = cleanPhone.replace(/[\s\-()]/g, '').toLowerCase();
 
-    const userRecord = store.users[accountKey];
+    const userRecord = store.users[normalizedKey] || store.users[cleanPhone.toLowerCase()];
     if (!userRecord) {
-      return res.status(404).json({ error: 'ይህ ስልክ ቁጥር ወይም ኢሜል አልተመዘገበም! እባክዎ መጀመሪያ ይመዝገቡ።' });
+      return res.status(404).json({ error: 'ይህ ስልክ ቁጥር አልተመዘገበም! እባክዎ መጀመሪያ ይመዝገቡ።' });
     }
 
     if (!password || !verifyPassword(String(password), userRecord.passwordSalt, userRecord.passwordHash)) {

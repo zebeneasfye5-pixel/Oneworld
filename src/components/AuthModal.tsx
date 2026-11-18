@@ -3,7 +3,7 @@ import { User, Phone, Lock, X, Camera, LogIn, UserPlus, KeyRound, AlertTriangle,
 import { getApiUrl } from '../config/env';
 
 export interface UserProfile {
-  phoneNumber: string; // Phone or Email
+  phoneNumber: string; // Phone Number Only
   fullName: string;
   gender: string;
   age: number;
@@ -95,9 +95,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
-    const cleanId = identifier.trim();
-    if (!cleanId) {
-      setErrorMessage('እባክዎ ትክክለኛ ስልክ ቁጥር ወይም ኢሜል ያስገቡ!');
+    const cleanPhone = identifier.trim();
+    const digitsOnly = cleanPhone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.includes('@') || digitsOnly.length < 7 || digitsOnly.length > 15) {
+      setErrorMessage('እባክዎ ትክክለኛ ስልክ ቁጥር ብቻ ያስገቡ! (ምሳሌ፡ 0911... ወይም +2519...)');
       return;
     }
 
@@ -107,7 +108,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     const accounts = getStoredAccounts();
-    const accountKey = cleanId.toLowerCase();
+    const accountKey = cleanPhone.replace(/[\s\-()]/g, '').toLowerCase();
 
     if (authMode === 'signup') {
       if (password !== confirmPassword) {
@@ -125,7 +126,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            phoneNumber: cleanId,
+            phoneNumber: cleanPhone,
             password,
             fullName: fullName.trim(),
             gender,
@@ -146,7 +147,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         const profile: UserProfile = data.profile;
         saveStoredAccount({
-          phoneNumber: cleanId,
+          phoneNumber: cleanPhone,
           passwordHash: password,
           profile
         });
@@ -156,7 +157,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         // Offline resilience when server cannot be reached
         const uniqueUserId = `USER-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
         const fallbackProfile: UserProfile = {
-          phoneNumber: cleanId,
+          phoneNumber: cleanPhone,
           fullName: fullName.trim(),
           gender,
           age: Number(age) || 26,
@@ -168,7 +169,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           verifiedAt: new Date().toISOString().split('T')[0],
           isGuest: false
         };
-        saveStoredAccount({ phoneNumber: cleanId, passwordHash: password, profile: fallbackProfile });
+        saveStoredAccount({ phoneNumber: cleanPhone, passwordHash: password, profile: fallbackProfile });
         onSaveProfile(fallbackProfile);
         onClose();
       } finally {
@@ -181,11 +182,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         const res = await fetch(getApiUrl('/api/auth/login'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phoneNumber: cleanId, password })
+          body: JSON.stringify({ phoneNumber: cleanPhone, password })
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok && data?.profile) {
-          saveStoredAccount({ phoneNumber: cleanId, passwordHash: password, profile: data.profile });
+          saveStoredAccount({ phoneNumber: cleanPhone, passwordHash: password, profile: data.profile });
           onSaveProfile({ ...data.profile, isGuest: false });
           onClose();
           setIsSubmitting(false);
@@ -202,9 +203,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setIsSubmitting(false);
       }
 
-      const existing = accounts[accountKey];
+      const existing = accounts[accountKey] || accounts[cleanPhone.toLowerCase()];
       if (!existing) {
-        setErrorMessage('ይህ ስልክ ቁጥር ወይም ኢሜል አልተመዘገበም! እባክዎ መጀመሪያ "አዲስ መለያ ይፍጠሩ" የሚለውን ይምረጡ።');
+        setErrorMessage('ይህ ስልክ ቁጥር አልተመዘገበም! እባክዎ መጀመሪያ "አዲስ ምዝገባ (Sign Up)" የሚለውን ይምረጡ።');
         return;
       }
 
@@ -318,14 +319,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-300 mb-1">
-              ስልክ ቁጥር ወይም ኢሜል (Phone or Email) *
+              ስልክ ቁጥር (Phone Number) *
             </label>
             <div className="relative">
               <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
               <input
-                type="text"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 required
-                placeholder="09... / 07... ወይም email@example.com"
+                placeholder="09... / 07... / +2519..."
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
