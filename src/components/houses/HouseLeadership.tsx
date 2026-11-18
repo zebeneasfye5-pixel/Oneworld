@@ -106,7 +106,7 @@ export const HouseLeadership: React.FC = () => {
 
             <div className="space-y-3 mt-3 text-xs">
               <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">
-                <span className="font-bold text-indigo-400">ዶ/ር ዘበነ አስፋው (የምክክሩ ሰብሳቢ):</span>
+                <span className="font-bold text-indigo-400">የምክክሩ ሰብሳቢ (Council Chair):</span>
                 <p className="text-slate-300">"የቴክኖሎጂ እውቀትና የህዝብ አንድነት ለሀገራችን ዘላቂ ልማት መሰረት ናቸው።"</p>
               </div>
               <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-1">

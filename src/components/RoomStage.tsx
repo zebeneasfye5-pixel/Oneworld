@@ -397,9 +397,11 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       {getRoomTitle(currentRoom)}
                     </h2>
                   </div>
-                  <p className="text-sm text-white font-medium mt-1">
-                    {t.chairs.hostLabel} <strong className="text-white font-black">ዶ/ር ዘበነ አስፍዬ (Dr. Zebene Asfye - መድረክ መሪ)</strong>
-                  </p>
+                  {currentRoom.isMemberOwned && currentRoom.hostName && (
+                    <p className="text-sm text-white font-medium mt-1">
+                      {t.chairs.hostLabel} <strong className="text-white font-black">{currentRoom.hostName}</strong>
+                    </p>
+                  )}
                 </div>
 
                 {/* Stage Controls: Iconic Minimalist Bar (Zero Text Clutter) */}

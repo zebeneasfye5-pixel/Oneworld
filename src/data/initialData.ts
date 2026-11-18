@@ -33,7 +33,7 @@ export const INITIAL_ROOMS: Room[] = [
     categoryLabelAm: 'ሁለንተናዊ መልካም አስተሳሰብ',
     descriptionAm: 'የአለማችንን ህዝቦች በፍቅር፣ በጋራ መከባበርና በመልካም ስነምግባር የሚያስተሳስሩ እሴቶችን መገንባት።',
     descriptionEn: 'Fostering love, mutual respect, and ethical human values across all nations.',
-    hostName: 'ዘበነ አስፍዬ (Zebene Asfye)',
+    hostName: 'የጋራ መድረክ (Oneworld Agora)',
     hostAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
     activeSpeakers: 0,
     totalAudience: 0,
@@ -108,7 +108,7 @@ export const INITIAL_ROOMS: Room[] = [
     categoryLabelAm: 'የአባላት የጋራ ቤት',
     descriptionAm: 'በአባላት ሀላፊነት ስር የሚመዘገቡ ተሳታፊዎችን የማወያየት፣ የማሰልጠን እና እውቀት የማጋራት ማዕከል።',
     descriptionEn: 'Member-led localized seminar, team coaching, and real-time cross-border dialogue.',
-    hostName: 'ዘበነ አስፍዬ (Zebene Asfye)',
+    hostName: 'የአባላት የጋራ መድረክ (Member Hub)',
     hostAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
     activeSpeakers: 0,
     totalAudience: 0,
@@ -163,7 +163,7 @@ export const INITIAL_EQUB_POOLS: EqubPool[] = [
 
 export const INITIAL_LOTTERY: LotteryDraw = {
   id: 'lottery-global-1',
-  titleAm: 'የአለም አንድ ታላቅ የበጎ አድራጎት ሎተሪ (AlemAnd Grand Fortune)',
+  titleAm: 'የአለም አንድ ታላቅ የበጎ አድራጎት ሎተሪ (Grand Fortune)',
   ticketPrice: 50,
   currency: 'ETB',
   jackpotAmount: 500000,
