@@ -58,6 +58,18 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
     video.playsInline = true;
     video.play().catch(() => {});
     recalculateCover();
+
+    const handleTrackChange = () => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+      recalculateCover();
+    };
+    stream.addEventListener('addtrack', handleTrackChange);
+    return () => {
+      stream.removeEventListener('addtrack', handleTrackChange);
+    };
   }, [stream, muted, recalculateCover]);
 
   useEffect(() => {

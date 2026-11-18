@@ -324,6 +324,16 @@ wss.on('connection', (ws: WebSocket) => {
           const { roomId, user } = payload;
           if (!roomId || !user?.id) return;
 
+          // Prune any previous/stale socket for the exact same userId so reconnections never leave ghost seats
+          for (const [otherWs, otherClient] of Array.from(clients.entries())) {
+            if (otherWs !== ws && otherClient.userId === user.id) {
+              cleanupSocket(otherWs);
+              try {
+                otherWs.close();
+              } catch {}
+            }
+          }
+
           // Remove client from any previous room
           const existing = clients.get(ws);
           if (existing && existing.roomId) {
@@ -341,6 +351,36 @@ wss.on('connection', (ws: WebSocket) => {
             }
           }
 
+          // Collect seats currently held by other active participants in this room
+          const maxSeatsInRoom = roomId === 'h4' ? 2 : 24;
+          const occupiedSeats = new Set<number>();
+          const existingRoom = rooms.get(roomId);
+          if (existingRoom) {
+            for (const memberWs of existingRoom) {
+              if (memberWs !== ws) {
+                const s = clients.get(memberWs)?.userMeta?.seatNumber;
+                if (typeof s === 'number' && s >= 1) {
+                  occupiedSeats.add(s);
+                }
+              }
+            }
+          }
+
+          let assignedSeat: number | null =
+            typeof user.seatNumber === 'number' && user.seatNumber >= 1 && user.seatNumber <= maxSeatsInRoom
+              ? user.seatNumber
+              : null;
+
+          if (assignedSeat === null || occupiedSeats.has(assignedSeat)) {
+            assignedSeat = null;
+            for (let s = 1; s <= maxSeatsInRoom; s++) {
+              if (!occupiedSeats.has(s)) {
+                assignedSeat = s;
+                break;
+              }
+            }
+          }
+
           // Register in new room
           const clientData: SocketClient = {
             ws,
@@ -354,7 +394,7 @@ wss.on('connection', (ws: WebSocket) => {
               country: user.country || 'ኢትዮጵያ',
               countryFlag: user.countryFlag || '🇪🇹',
               role: user.role || 'ተሳታፊ',
-              seatNumber: user.seatNumber !== undefined ? user.seatNumber : 1,
+              seatNumber: assignedSeat,
               isMuted: !!user.isMuted,
               isVideoOn: user.isVideoOn !== false,
               isSpeaking: !!user.isSpeaking,
@@ -377,10 +417,11 @@ wss.on('connection', (ws: WebSocket) => {
             }
           }
 
-          // Send room-state including recent room message history
+          // Send room-state including assigned seat number & recent room message history
           ws.send(JSON.stringify({
             type: 'room-state',
             roomId,
+            yourSeatNumber: assignedSeat,
             peers: peersInRoom,
             messages: (store.messagesByRoom[roomId] || []).slice(-100),
             connectedUsers: clients.size
@@ -488,12 +529,61 @@ wss.on('connection', (ws: WebSocket) => {
             if (payload.isMuted !== undefined) client.userMeta.isMuted = payload.isMuted;
             if (payload.isVideoOn !== undefined) client.userMeta.isVideoOn = payload.isVideoOn;
             if (payload.isSpeaking !== undefined) client.userMeta.isSpeaking = payload.isSpeaking;
-            if (payload.seatNumber !== undefined) client.userMeta.seatNumber = payload.seatNumber;
+
+            if (payload.seatNumber !== undefined) {
+              if (payload.seatNumber === null) {
+                client.userMeta.seatNumber = null;
+              } else {
+                const requestedSeat = Number(payload.seatNumber);
+                const maxSeatsInRoom = client.roomId === 'h4' ? 2 : 24;
+                const roomSockets = rooms.get(client.roomId);
+                let holderName: string | null = null;
+                if (roomSockets) {
+                  for (const memberWs of roomSockets) {
+                    if (memberWs !== ws) {
+                      const otherMeta = clients.get(memberWs)?.userMeta;
+                      if (otherMeta && otherMeta.seatNumber === requestedSeat) {
+                        holderName = otherMeta.name || 'ሌላ ተሳታፊ';
+                        break;
+                      }
+                    }
+                  }
+                }
+                if (holderName || requestedSeat < 1 || requestedSeat > maxSeatsInRoom) {
+                  if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                      type: 'seat-denied',
+                      seatNumber: requestedSeat,
+                      occupiedBy: holderName || 'የተከለከለ ወንበር',
+                      currentSeat: client.userMeta.seatNumber
+                    }));
+                  }
+                  break;
+                }
+                client.userMeta.seatNumber = requestedSeat;
+              }
+            }
 
             broadcastToRoom(client.roomId, {
               type: 'peer-media-updated',
               peer: client.userMeta
             });
+          }
+          break;
+        }
+
+        case 'profile-update': {
+          const client = clients.get(ws);
+          if (client) {
+            if (payload.name) client.userMeta.name = String(payload.name);
+            if (payload.avatar) client.userMeta.avatar = String(payload.avatar);
+            if (payload.role) client.userMeta.role = String(payload.role);
+            if (client.roomId) {
+              broadcastToRoom(client.roomId, {
+                type: 'peer-media-updated',
+                peer: client.userMeta
+              });
+            }
           }
           break;
         }
@@ -686,6 +776,121 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[Auth Login Error]', err);
     return res.status(500).json({ error: 'መግቢያው ላይ ችግር ተፈጥሯል' });
+  }
+});
+
+app.put('/api/auth/profile', (req: Request, res: Response) => {
+  try {
+    const {
+      currentPhoneNumber,
+      idNumber,
+      phoneNumber,
+      fullName,
+      gender,
+      age,
+      nationality,
+      address,
+      roleTitle,
+      avatarUrl,
+      newPassword
+    } = req.body || {};
+
+    const cleanNewPhone = String(phoneNumber || '').trim();
+    const digitsOnly = cleanNewPhone.replace(/\D/g, '');
+    const newAccountKey = cleanNewPhone.replace(/[\s\-()]/g, '').toLowerCase();
+
+    if (!cleanNewPhone || cleanNewPhone.includes('@') || digitsOnly.length < 7 || digitsOnly.length > 15) {
+      return res.status(400).json({ error: 'እባክዎ ትክክለኛ ስልክ ቁጥር ብቻ ያስገቡ! (ምሳሌ፡ 0911... ወይም +2519...)' });
+    }
+    if (!fullName || !String(fullName).trim()) {
+      return res.status(400).json({ error: 'እባክዎ ሙሉ ስምዎን ያስገቡ!' });
+    }
+    if (newPassword && String(newPassword).length < 6) {
+      return res.status(400).json({ error: 'አዲሱ የይለፍ ቃል ቢያንስ ከ6 አሀዝ ያላነሰ መሆን አለበት!' });
+    }
+
+    const oldPhoneClean = String(currentPhoneNumber || cleanNewPhone).trim();
+    const oldAccountKey = oldPhoneClean.replace(/[\s\-()]/g, '').toLowerCase();
+
+    let foundKey: string | null = null;
+    if (store.users[oldAccountKey]) {
+      foundKey = oldAccountKey;
+    } else if (store.users[oldPhoneClean.toLowerCase()]) {
+      foundKey = oldPhoneClean.toLowerCase();
+    } else if (idNumber) {
+      for (const [k, u] of Object.entries(store.users)) {
+        if (u?.profile?.idNumber === idNumber) {
+          foundKey = k;
+          break;
+        }
+      }
+    }
+
+    if (newAccountKey !== foundKey && store.users[newAccountKey] && store.users[newAccountKey].profile?.idNumber !== idNumber) {
+      return res.status(409).json({ error: 'ይህ አዲስ ስልክ ቁጥር በሌላ ተጠቃሚ ቀድሞ ተይዟል!' });
+    }
+
+    const existingRecord = foundKey ? store.users[foundKey] : null;
+    const resolvedId = existingRecord?.profile?.idNumber || idNumber || `USER-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+
+    const updatedProfile = {
+      phoneNumber: cleanNewPhone,
+      fullName: String(fullName).trim(),
+      gender: gender || existingRecord?.profile?.gender || 'ወንድ (Male)',
+      age: Number(age) || existingRecord?.profile?.age || 26,
+      nationality: nationality || existingRecord?.profile?.nationality || 'ኢትዮጵያዊ (Ethiopian)',
+      address: String(address || existingRecord?.profile?.address || 'ኢትዮጵያ').trim(),
+      idNumber: resolvedId,
+      roleTitle: String(roleTitle || existingRecord?.profile?.roleTitle || 'የማህበረሰብ አባል').trim(),
+      avatarUrl: avatarUrl || existingRecord?.profile?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80',
+      verifiedAt: existingRecord?.profile?.verifiedAt || new Date().toISOString().split('T')[0],
+      isGuest: false
+    };
+
+    let passwordSalt = existingRecord?.passwordSalt || '';
+    let passwordHash = existingRecord?.passwordHash || '';
+    if (newPassword && String(newPassword).length >= 6) {
+      const hashed = hashPassword(String(newPassword));
+      passwordSalt = hashed.salt;
+      passwordHash = hashed.hash;
+    } else if (!passwordSalt || !passwordHash) {
+      const hashed = hashPassword(crypto.randomBytes(12).toString('hex'));
+      passwordSalt = hashed.salt;
+      passwordHash = hashed.hash;
+    }
+
+    if (foundKey && foundKey !== newAccountKey) {
+      delete store.users[foundKey];
+    }
+
+    store.users[newAccountKey] = {
+      phoneNumber: cleanNewPhone,
+      passwordSalt,
+      passwordHash,
+      profile: updatedProfile,
+      createdAt: existingRecord?.createdAt || new Date().toISOString()
+    };
+    schedulePersist();
+
+    // Update live WebSocket metadata if user is connected
+    for (const [, client] of clients.entries()) {
+      if (client.userId === updatedProfile.idNumber) {
+        client.userMeta.name = updatedProfile.fullName;
+        client.userMeta.avatar = updatedProfile.avatarUrl;
+        client.userMeta.role = updatedProfile.roleTitle;
+        if (client.roomId) {
+          broadcastToRoom(client.roomId, {
+            type: 'peer-media-updated',
+            peer: client.userMeta
+          }, client.ws);
+        }
+      }
+    }
+
+    return res.json({ status: 'ok', profile: updatedProfile });
+  } catch (err: any) {
+    console.error('[Auth Profile Update Error]', err);
+    return res.status(500).json({ error: 'ፕሮፋይሉን በማስተካከል ላይ ችግር ተፈጥሯል' });
   }
 });
 

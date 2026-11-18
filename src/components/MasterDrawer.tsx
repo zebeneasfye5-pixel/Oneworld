@@ -129,48 +129,48 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
       />
 
       {/* Left Drawer Panel */}
-      <div className="relative w-full max-w-sm sm:max-w-md bg-[#0d111d] border-r border-slate-800 h-full flex flex-col z-10 shadow-2xl overflow-hidden animate-slideRight">
+      <div className="relative w-[90vw] max-w-sm sm:max-w-md bg-[#0d111d] border-r border-slate-800 h-full flex flex-col z-10 shadow-2xl overflow-hidden animate-slideRight">
         {/* Drawer Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#0f1422] flex items-center justify-between">
+        <div className="p-3.5 sm:p-5 border-b border-slate-800 bg-[#0f1422] flex items-center justify-between gap-2">
           <OneWorldLogo size="sm" showText={true} />
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-slate-800/80 text-slate-400 hover:text-white cursor-pointer"
+            className="p-1.5 rounded-lg bg-slate-800/80 text-slate-400 hover:text-white cursor-pointer flex-shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* User Card & Auth */}
-        <div className="p-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-emerald-600 flex items-center justify-center text-slate-950 font-bold text-xs shadow-md">
+        {/* User Card & Auth / Profile Edit */}
+        <div className="p-3.5 sm:p-4 bg-slate-900/60 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-500 to-emerald-600 flex items-center justify-center text-slate-950 font-bold text-xs shadow-md flex-shrink-0">
               {user?.fullName.charAt(0) || '👤'}
             </div>
-            <div>
-              <div className="text-xs font-bold text-white truncate max-w-[150px]">
-                {user?.isGuest ? 'እንግዳ ተጠቃሚ (Guest)' : (user?.fullName || 'ተጠቃሚ')}
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-white break-words">
+                {user?.isGuest || !user ? 'እንግዳ ተጠቃሚ (Guest)' : user.fullName}
               </div>
-              <span className="text-[10px] text-amber-400 font-semibold block">
-                {user?.isGuest ? 'ያልተመዘገበ' : (user?.roleTitle || 'የማህበረሰብ አባል')}
+              <span className="text-[10px] text-amber-400 font-semibold block break-words">
+                {user?.isGuest || !user ? 'ያልተመዘገበ' : (user.roleTitle || 'የማህበረሰብ አባል')}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <button
               onClick={() => {
                 onClose();
                 onOpenAuth();
               }}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border cursor-pointer transition shadow-sm ${
-                user?.isGuest
+              className={`px-2.5 py-1.5 text-[11px] font-bold rounded-lg border cursor-pointer transition shadow-sm ${
+                user?.isGuest || !user
                   ? 'bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400'
-                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40'
               }`}
             >
-              {user?.isGuest ? 'ግባ / ተመዝገብ' : t.header.profile}
+              {user?.isGuest || !user ? 'ግባ / ተመዝገብ' : 'ፕሮፋይል አስተካክል'}
             </button>
             {user && !user.isGuest && onLogout && (
               <button
@@ -178,7 +178,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
                   onClose();
                   onLogout();
                 }}
-                className="px-2 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/60 text-[10px] font-bold rounded-lg cursor-pointer"
+                className="px-2.5 py-1.5 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/60 text-[10px] font-bold rounded-lg cursor-pointer"
                 title="ከመለያ ውጣ"
               >
                 ውጣ
@@ -195,15 +195,15 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
               onClose();
               if (onOpenWallet) onOpenWallet();
             }}
-            className="p-3 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/40 rounded-2xl flex items-center justify-between cursor-pointer hover:border-amber-400 transition-all shadow-md group"
+            className="p-3 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-500/40 rounded-2xl flex items-center justify-between gap-2 cursor-pointer hover:border-amber-400 transition-all shadow-md group"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shadow-md">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shadow-md flex-shrink-0">
                 <Wallet className="w-4 h-4" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
-                  {t.balance} (Wallet Balance)
+                  {t.balance}
                 </span>
                 <span className="text-sm font-black text-white group-hover:text-amber-300 transition-colors">
                   {balanceETB.toLocaleString()} ብር
@@ -211,16 +211,16 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded-xl text-xs text-amber-300 font-bold">
+            <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700 px-2 py-1 rounded-xl text-xs text-amber-300 font-bold flex-shrink-0">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>+{royaltyPoints}</span>
             </div>
           </div>
 
           {/* 8-Language Selector moved elegantly into Drawer */}
-          <div className="flex items-center justify-between p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl">
+          <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl">
             <div className="flex items-center gap-2">
-              <Globe className="w-4 h-4 text-amber-400" />
+              <Globe className="w-4 h-4 text-amber-400 flex-shrink-0" />
               <span className="text-xs font-bold text-slate-300">{t.header.selectLanguage}</span>
             </div>
             <select
@@ -238,7 +238,7 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
           </div>
         </div>
 
-        {/* Search Bar for 15 Houses */}
+        {/* Search Bar for 16 Houses */}
         <div className="p-3 border-b border-slate-800 bg-[#0d111d]">
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
@@ -252,14 +252,13 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
           </div>
         </div>
 
-        {/* 15 Houses List */}
+        {/* 16 Houses List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
             {t.drawer.housesHeading}
           </div>
 
           {filteredHouses.map((house) => {
-            const Icon = house.icon;
             const isSelected = activeHouse === house.id;
 
             return (
@@ -269,29 +268,29 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
                   onSelectHouse(house.id);
                   onClose();
                 }}
-                className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between cursor-pointer ${
+                className={`w-full p-2.5 rounded-xl border text-left transition-all flex items-center justify-between gap-2 cursor-pointer ${
                   isSelected
                     ? 'bg-amber-500/15 border-amber-500/60 shadow-md ring-1 ring-amber-500/30'
                     : 'bg-slate-900/40 border-slate-800/80 hover:bg-slate-800/60 hover:border-slate-700'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
+                <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5 ${
                     isSelected ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-300'
                   }`}>
                     {house.num}
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white truncate max-w-[200px]">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs font-bold text-white break-words leading-snug">
                       {house.title}
                     </h4>
-                    <p className="text-[10px] text-slate-400 line-clamp-1 max-w-[210px]">
+                    <p className="text-[10px] text-slate-400 line-clamp-2 break-words mt-0.5">
                       {house.desc}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <span className="text-[9px] font-bold text-slate-500 bg-slate-950/70 px-1.5 py-0.5 rounded border border-slate-800">
                     {house.tag}
                   </span>
@@ -304,19 +303,19 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
 
         {/* Bottom Drawer Actions */}
         <div className="p-3.5 border-t border-slate-800 bg-[#0f1422] space-y-2.5">
-          {/* Builder Sovereign Vault (Direct Sovereign Access - Founder Zebene Asfye) */}
+          {/* Builder Sovereign Vault */}
           <button
             onClick={() => {
               onClose();
               onOpenBuilderVault();
             }}
-            className="w-full flex items-center justify-between p-3 bg-amber-950/40 hover:bg-amber-950/60 border border-amber-600/50 rounded-2xl text-xs sm:text-sm font-black text-amber-300 cursor-pointer transition-colors shadow-sm"
+            className="w-full flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3 bg-amber-950/40 hover:bg-amber-950/60 border border-amber-600/50 rounded-2xl text-xs font-black text-amber-300 cursor-pointer transition-colors shadow-sm"
           >
-            <div className="flex items-center gap-2">
-              <Lock className="w-4 h-4 text-amber-400" />
-              <span>{t.announcements.vaultBtn}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <Lock className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <span className="break-words text-left">{t.announcements.vaultBtn}</span>
             </div>
-            <span className="text-xs font-mono font-bold bg-amber-900/60 text-amber-300 px-2 py-0.5 rounded-lg border border-amber-500/30">
+            <span className="text-xs font-mono font-bold bg-amber-900/60 text-amber-300 px-2 py-0.5 rounded-lg border border-amber-500/30 flex-shrink-0">
               ቀጥታ መግቢያ
             </span>
           </button>
@@ -327,10 +326,10 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
               onClose();
               onOpenCharter();
             }}
-            className="w-full flex items-center gap-2 p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs sm:text-sm font-extrabold text-slate-200 cursor-pointer transition-colors"
+            className="w-full flex items-center gap-2 p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs font-extrabold text-slate-200 cursor-pointer transition-colors"
           >
-            <BookOpen className="w-4 h-4 text-amber-400" />
-            <span>{t.announcements.charterBtn}</span>
+            <BookOpen className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span className="break-words text-left">{t.announcements.charterBtn}</span>
           </button>
 
           {/* Admin Audit Dashboard */}
@@ -340,13 +339,13 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
                 onClose();
                 onOpenAdminAudit();
               }}
-              className="w-full flex items-center justify-between p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs sm:text-sm font-extrabold text-slate-200 cursor-pointer transition-colors"
+              className="w-full flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-2xl text-xs font-extrabold text-slate-200 cursor-pointer transition-colors"
             >
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                <span>የኦዲትና አስተዳደር ማዕከል (Audit)</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="break-words text-left">የኦዲትና አስተዳደር ማዕከል (Audit)</span>
               </div>
-              <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-700">
+              <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-700 flex-shrink-0">
                 80/10/10
               </span>
             </button>
@@ -356,18 +355,18 @@ export const MasterDrawer: React.FC<MasterDrawerProps> = ({
           {isInstallable && (
             <button
               onClick={onInstallPwa}
-              className="w-full flex items-center justify-center gap-2 p-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white font-black rounded-2xl text-xs sm:text-sm shadow-md cursor-pointer transition-colors"
+              className="w-full flex items-center justify-center gap-2 p-2.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 text-white font-black rounded-2xl text-xs shadow-md cursor-pointer transition-colors"
             >
-              <Smartphone className="w-4 h-4" />
+              <Smartphone className="w-4 h-4 flex-shrink-0" />
               <span>{t.installApp}</span>
             </button>
           )}
 
           {/* Offline Ready Indicator */}
-          <div className="flex items-center justify-between text-xs font-bold text-slate-400 pt-1">
+          <div className="flex flex-wrap items-center justify-between gap-1 text-xs font-bold text-slate-400 pt-1">
             <span className="flex items-center gap-1.5 text-emerald-400">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              {t.announcements.offlineReadyNotice}
+              <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{t.announcements.offlineReadyNotice}</span>
             </span>
             <span className="text-amber-400">ዘበነ አስፍዬ (Zebene Asfye)</span>
           </div>

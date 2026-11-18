@@ -313,6 +313,9 @@ export default function App() {
     onGiftReceived: (gift, senderName) => {
       showToast(`🎁 ${gift.nameAm} ከ ${senderName} ተልኮልዎታል!`);
       safeConfetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
+    },
+    onSeatDenied: (takenSeat, occupiedBy) => {
+      showToast(`⚠️ ወንበር ${takenSeat} በ ${occupiedBy} ተይዟል! እባክዎ ሌላ ክፍት ወንበር ይምረጡ።`);
     }
   });
 
@@ -353,8 +356,10 @@ export default function App() {
       showToast('እባክዎ ወንበር ከመያዝዎ በፊት መጀመሪያ ወደ መለያዎ ይግቡ ወይም ይመዝገቡ!');
       return;
     }
-    realtime.claimSeatRealtime(seatNumber);
-    showToast(`${t.chairs.seatPrefix}${seatNumber}: ${t.announcements.seatClaimed}`);
+    const claimed = realtime.claimSeatRealtime(seatNumber);
+    if (claimed) {
+      showToast(`${t.chairs.seatPrefix}${seatNumber}: ${t.announcements.seatClaimed}`);
+    }
   };
 
   const handleLeaveSeat = () => {
@@ -440,12 +445,17 @@ export default function App() {
   };
 
   const handleSaveProfile = (profile: UserProfile) => {
+    const wasEditing = !!(currentUser && !currentUser.isGuest && currentUser.idNumber === profile.idNumber);
     const updated = { ...profile, isGuest: false };
     setCurrentUser(updated);
     try {
       localStorage.setItem('oneworld_auth_user', JSON.stringify(updated));
     } catch {}
-    showToast(`🎉 እንኳን ደህና መጡ ${profile.fullName}! መለያዎ ጸድቋል`);
+    showToast(
+      wasEditing
+        ? `✅ ፕሮፋይልዎ (${profile.fullName}) በተሳካ ሁኔታ ተስተካክሏል!`
+        : `🎉 እንኳን ደህና መጡ ${profile.fullName}! መለያዎ ጸድቋል`
+    );
   };
 
   const handleLogout = () => {
@@ -494,9 +504,9 @@ export default function App() {
     <div className="min-h-screen bg-[#0c0f17] text-white flex flex-col font-sans font-extrabold selection:bg-amber-500 selection:text-slate-950">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 bg-emerald-950/95 border border-emerald-500/60 text-emerald-200 text-xs font-bold rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce">
-          <span>✨</span>
-          <span>{toastMessage}</span>
+        <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:max-w-md z-50 p-3.5 sm:p-4 bg-emerald-950/95 border border-emerald-500/60 text-emerald-200 text-xs font-bold rounded-2xl shadow-2xl backdrop-blur-md flex items-center gap-2 animate-bounce">
+          <span className="flex-shrink-0">✨</span>
+          <span className="break-words">{toastMessage}</span>
         </div>
       )}
 

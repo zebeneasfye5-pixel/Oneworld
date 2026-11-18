@@ -90,7 +90,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   onToggleVideo,
   onFlipCamera,
   onRetryCamera,
-  userSeat = 1,
+  userSeat = null,
   onClaimSeat,
   onLeaveSeat
 }) => {
@@ -230,7 +230,16 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     };
 
     onRegisterHouseMember(record);
-    onClaimSeat?.(1);
+    const totalSeats = isHouse4 ? 2 : 24;
+    const takenSeats = new Set(liveRemotePeers.map((p) => p.seatNumber).filter((s): s is number => typeof s === 'number'));
+    let nextOpenSeat = 1;
+    for (let s = 1; s <= totalSeats; s++) {
+      if (!takenSeats.has(s)) {
+        nextOpenSeat = s;
+        break;
+      }
+    }
+    onClaimSeat?.(nextOpenSeat);
     onShowToast(`🎉 ${houseTitle} · ${t.stageMedia.registerBtn}`);
   };
 
@@ -377,24 +386,24 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
       className="bg-[#0f1422] border border-slate-800 rounded-3xl p-4 md:p-6 shadow-2xl mb-8 space-y-6"
     >
       {/* Top Header Bar with Back Arrow Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0">
           {onGoBack && (
             <button
               onClick={onGoBack}
               title="ወደ ዋናው አዳራሽ ተመለስ"
-              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 hover:border-amber-400 flex items-center gap-1.5 font-black text-xs cursor-pointer transition shadow-md group"
+              className="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 border border-amber-500/30 hover:border-amber-400 flex items-center gap-1.5 font-black text-xs cursor-pointer transition shadow-md group flex-shrink-0"
             >
               <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
               <span>ተመለስ</span>
             </button>
           )}
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-2xl">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-xl sm:text-2xl flex-shrink-0">
             🏛️
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base md:text-lg font-black text-white">{houseTitle}</h2>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base md:text-lg font-black text-white break-words">{houseTitle}</h2>
               <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 <Radio className="w-2.5 h-2.5 text-emerald-400 animate-pulse" />
                 {t.stageMedia.active}
@@ -406,7 +415,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5 break-words">
               ID: <span className="text-amber-400 font-mono font-bold">{membership.memberId}</span> · {membership.roleInHouse} · {membership.profession || 'ባለሙያ'}
             </p>
           </div>
@@ -503,26 +512,26 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         </div>
       )}
 
-      {/* Live WebRTC Multi-Peer Large Fixed Video Player Frame (width: 90%, max-width: 1200px, height: 650px, overflow: hidden) */}
+      {/* Live WebRTC Multi-Peer Compact Fixed Video Player Frame */}
       <div
-        className="mx-auto rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative"
+        className="mx-auto rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative w-full sm:w-[90%] h-[250px] sm:h-[360px]"
         style={{
-          width: '90%',
-          maxWidth: '1200px',
-          height: '650px',
+          maxWidth: '780px',
           overflow: 'hidden'
         }}
       >
-        <div className={`grid w-full h-full gap-2 ${
-          isHouse4
-            ? 'grid-cols-1 sm:grid-cols-2'
-            : liveRemotePeers.length === 0
-            ? 'grid-cols-1'
-            : 'grid-cols-1 sm:grid-cols-2'
+        <div className={`grid w-full h-full gap-1.5 ${
+          (userSeat !== null ? 1 : 0) + liveRemotePeers.length <= 1
+            ? 'grid-cols-1 grid-rows-1'
+            : (userSeat !== null ? 1 : 0) + liveRemotePeers.length === 2
+            ? 'grid-cols-2 grid-rows-1'
+            : (userSeat !== null ? 1 : 0) + liveRemotePeers.length <= 4
+            ? 'grid-cols-2 grid-rows-2'
+            : 'grid-cols-2 sm:grid-cols-3 auto-rows-fr'
         }`}>
           {/* User's Own Live Video inside Fixed Container */}
           {userSeat !== null && (
-            <div className="relative w-full h-full overflow-hidden bg-black">
+            <div className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black">
               {isVideoOn && localStream ? (
                 <EdgeToEdgeVideo
                   stream={localStream}
@@ -531,22 +540,22 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                   zoom={zoomScale}
                 />
               ) : isVideoOn && !localStream ? (
-                <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4 gap-2 text-center">
+                <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-3 gap-2 text-center">
                   {cameraError && <p className="text-xs text-amber-300 max-w-xs">{cameraError}</p>}
                   <button
                     onClick={() => onRetryCamera?.()}
-                    className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
                   >
                     📹 ካሜራዬን አብራ
                   </button>
                 </div>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
-                  <div className="relative mb-3">
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-3">
+                  <div className="relative mb-2">
                     <img
                       src={membership.avatarUrl || currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
                       alt={currentUser?.fullName || membership.fullName}
-                      className={`w-36 h-36 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                      className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
                         isMicOn && isSpeaking
                           ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
                           : 'border-slate-700'
@@ -556,14 +565,18 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                       <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
                     )}
                   </div>
-                  <span className="text-white font-bold text-xs mb-2">ድምፅ ብቻ (Audio Only)</span>
                   <button
                     onClick={handleToggleVideo}
-                    className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
+                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
                   >
                     ካሜራ አብራ
                   </button>
                 </div>
+              )}
+              {liveRemotePeers.length > 0 && (
+                <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-amber-500/50 text-[11px] font-black text-amber-300 pointer-events-none">
+                  {userSeat} · {currentUser?.fullName?.split(' ')[0] || membership.fullName.split(' ')[0]}
+                </span>
               )}
             </div>
           )}
@@ -572,22 +585,22 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
           {liveRemotePeers.map((peer) => (
             <div
               key={peer.id}
-              className="relative w-full h-full overflow-hidden bg-black border-l border-emerald-500/40"
+              className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black border-l border-emerald-500/40"
             >
-              {peer.stream && peer.isVideoOn ? (
+              {peer.stream && (peer.isVideoOn || peer.stream.getVideoTracks().length > 0) ? (
                 <EdgeToEdgeVideo
                   stream={peer.stream}
-                  muted={false}
+                  muted={true}
                   mirror={false}
                   zoom={zoomScale}
                 />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
-                  <div className="relative mb-3">
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-3">
+                  <div className="relative mb-2">
                     <img
                       src={peer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
                       alt={peer.name}
-                      className={`w-36 h-36 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                      className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
                         peer.isSpeaking
                           ? 'border-emerald-400 ring-8 ring-emerald-400/40 scale-105'
                           : 'border-slate-700'
@@ -597,9 +610,13 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                       <span className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
                     )}
                   </div>
-                  <span className="text-white font-bold text-xs">ድምፅ ብቻ (Audio Only)</span>
+                  <span className="text-white font-bold text-xs">{peer.name}</span>
                 </div>
               )}
+
+              <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none">
+                {peer.seatNumber ? `${peer.seatNumber} · ` : ''}{peer.name}
+              </span>
 
               {peer.stream && (
                 <audio
@@ -620,8 +637,8 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
       {/* Speaker Info & Camera Flip Strip OUTSIDE Fixed Video Frame */}
       {userSeat !== null && (
         <div
-          className="mx-auto flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-4 py-3"
-          style={{ width: '90%', maxWidth: '1200px' }}
+          className="mx-auto w-full sm:w-[90%] flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-3.5 sm:px-4 py-3"
+          style={{ maxWidth: '780px' }}
         >
           <div className="flex items-center gap-3 flex-wrap">
             <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1">
@@ -685,25 +702,25 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
       )}
 
       {/* Numbered Chairs Grid — ALL chairs display a visible Armchair icon */}
-      <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4 text-amber-400" />
-            <h3 className="text-xs font-bold text-white">
+      <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <Users className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <h3 className="text-xs font-bold text-white break-words">
               {t.stageMedia.seatsTitle} {isHouse4 ? '(የሚስጥር ቤት፡ 2 ወንበሮች ብቻ)' : ''}
             </h3>
           </div>
-          <span className="text-[11px] text-slate-400">
+          <span className="text-[11px] text-slate-400 break-words">
             {isHouse4 ? 'ከ2 ሰው በላይ መግባት አይቻልም' : t.stageMedia.gateDesc}
           </span>
         </div>
 
-        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-12 gap-2 max-h-40 overflow-y-auto pr-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-64 overflow-y-auto pr-1">
           {Array.from({ length: isHouse4 ? 2 : 24 }).map((_, idx) => {
             const seatNo = idx + 1;
-            const isTakenByMe = userSeat === seatNo;
-            const occupant = liveRemotePeers.find((p) => p.seatNumber === seatNo);
+            const occupant = liveRemotePeers.find((p) => p.seatNumber === seatNo && p.id !== currentUser?.idNumber);
             const isTakenByOther = !!occupant;
+            const isTakenByMe = !isTakenByOther && userSeat === seatNo;
             const avatarUrl = isTakenByMe
               ? (membership.avatarUrl || currentUser?.avatarUrl)
               : occupant?.avatar;
@@ -713,16 +730,25 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
               <button
                 key={seatNo}
                 onClick={() => handleSeatClick(seatNo)}
+                title={
+                  isTakenByMe
+                    ? `${seatNo} · ${currentUser?.fullName || membership.fullName}`
+                    : isTakenByOther && occupant
+                    ? `${seatNo} · ${occupant.name}`
+                    : `${seatNo}`
+                }
                 className={`py-2 px-1 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 text-center cursor-pointer ${
                   isTakenByMe
                     ? 'bg-amber-950/40 border-amber-500 text-amber-200 ring-2 ring-amber-500/50 shadow-md'
                     : isTakenByOther
-                    ? 'bg-slate-900 border-slate-700 text-slate-300'
+                    ? 'bg-emerald-950/35 border-emerald-500/80 text-emerald-200 shadow-md'
                     : 'bg-slate-900/60 border-slate-800/80 hover:border-amber-500/50 text-slate-300 hover:text-white'
                 }`}
               >
                 <div className="flex items-center justify-center mb-0.5">
-                  <span className="text-[11px] font-mono font-bold text-amber-400">{seatNo}</span>
+                  <span className={`text-[11px] font-mono font-bold ${
+                    isTakenByMe ? 'text-amber-300' : isTakenByOther ? 'text-emerald-300' : 'text-amber-400'
+                  }`}>{seatNo}</span>
                 </div>
 
                 {avatarUrl ? (
@@ -733,6 +759,8 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                       className={`w-7 h-7 rounded-full object-cover border transition-transform ${
                         isSpeakingNow
                           ? 'border-amber-400 ring-2 ring-amber-400 scale-105'
+                          : isTakenByOther
+                          ? 'border-emerald-400'
                           : 'border-slate-700'
                       }`}
                     />
@@ -747,11 +775,11 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                 )}
 
                 {isTakenByMe ? (
-                  <span className="text-[8px] text-amber-300 font-bold truncate max-w-[46px]">
+                  <span className="text-[10px] text-amber-300 font-bold break-words w-full px-0.5">
                     {currentUser?.fullName?.split(' ')[0] || 'እርስዎ'}
                   </span>
                 ) : isTakenByOther && occupant ? (
-                  <span className="text-[8px] text-slate-400 font-bold truncate max-w-[46px]">
+                  <span className="text-[10px] text-emerald-300 font-bold break-words w-full px-0.5">
                     {occupant.name.split(' ')[0]}
                   </span>
                 ) : null}

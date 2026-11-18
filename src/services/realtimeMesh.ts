@@ -31,6 +31,7 @@ interface UseRealtimeRoomOptions {
   onRoomHistory?: (roomId: string, messages: LiveSpeechMessage[]) => void;
   onRoomCreated?: (room: Room) => void;
   onGiftReceived?: (gift: VirtualGift, senderName: string) => void;
+  onSeatDenied?: (seatNumber: number, occupiedBy: string) => void;
 }
 
 const DEFAULT_ICE_CONFIG: RTCConfiguration = {
@@ -64,7 +65,8 @@ export function useRealtimeRoom({
   onMessageUpdated,
   onRoomHistory,
   onRoomCreated,
-  onGiftReceived
+  onGiftReceived,
+  onSeatDenied
 }: UseRealtimeRoomOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [onlineCount, setOnlineCount] = useState<number>(1);
@@ -76,10 +78,11 @@ export function useRealtimeRoom({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [remotePeers, setRemotePeers] = useState<Map<string, RemotePeerData>>(new Map());
-  const [seatNumber, setSeatNumber] = useState<number | null>(1);
+  const [seatNumber, setSeatNumber] = useState<number | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const iceCandidateQueueRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const iceConfigRef = useRef<RTCConfiguration>(DEFAULT_ICE_CONFIG);
   const localStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -95,19 +98,23 @@ export function useRealtimeRoom({
   seatNumberRef.current = seatNumber;
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
+  const remotePeersRef = useRef(remotePeers);
+  remotePeersRef.current = remotePeers;
   const callbacksRef = useRef({
     onMessageReceived,
     onMessageUpdated,
     onRoomHistory,
     onRoomCreated,
-    onGiftReceived
+    onGiftReceived,
+    onSeatDenied
   });
   callbacksRef.current = {
     onMessageReceived,
     onMessageUpdated,
     onRoomHistory,
     onRoomCreated,
-    onGiftReceived
+    onGiftReceived,
+    onSeatDenied
   };
 
   // Load TURN + STUN config from backend so mobile carrier CGNAT & Telegram/IMO WebViews connect reliably
@@ -187,17 +194,44 @@ export function useRealtimeRoom({
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-      // Update tracks on all active peer connections cleanly
-      peerConnectionsRef.current.forEach((pc) => {
+      // Update tracks on all active peer connections and renegotiate if new tracks were added
+      peerConnectionsRef.current.forEach((pc, targetPeerId) => {
         const senders = pc.getSenders();
+        let addedNewTrack = false;
         stream!.getTracks().forEach((track) => {
           const existingSender = senders.find((s) => s.track?.kind === track.kind);
           if (existingSender) {
             existingSender.replaceTrack(track).catch(() => {});
           } else {
             pc.addTrack(track, stream!);
+            addedNewTrack = true;
           }
         });
+
+        if (addedNewTrack && pc.signalingState === 'stable' && socketRef.current?.readyState === WebSocket.OPEN) {
+          const user = currentUserRef.current;
+          pc.createOffer()
+            .then((offer) => pc.setLocalDescription(offer))
+            .then(() => {
+              if (socketRef.current?.readyState === WebSocket.OPEN) {
+                socketRef.current.send(JSON.stringify({
+                  type: 'webrtc-offer',
+                  targetPeerId,
+                  sdp: pc.localDescription,
+                  caller: {
+                    id: user.id,
+                    name: user.fullName,
+                    avatar: user.avatarUrl,
+                    role: user.roleTitle,
+                    isMuted: isMicMutedRef.current,
+                    isVideoOn: !isVideoOffRef.current,
+                    seatNumber: seatNumberRef.current
+                  }
+                }));
+              }
+            })
+            .catch(() => {});
+        }
       });
     }
 
@@ -273,8 +307,27 @@ export function useRealtimeRoom({
     };
   }, [enabled, acquireMedia]);
 
-  // Create Peer Connection helper with Adaptive Bitrate & TURN support
-  const createPeerConnection = useCallback((targetPeerId: string, initiator: boolean) => {
+  // Flush queued ICE candidates once remote description is ready
+  const flushIceCandidates = useCallback(async (peerId: string, pc: RTCPeerConnection) => {
+    const queued = iceCandidateQueueRef.current.get(peerId);
+    if (!queued || queued.length === 0) return;
+    iceCandidateQueueRef.current.delete(peerId);
+    for (const candidate of queued) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch {}
+    }
+  }, []);
+
+  // Create Peer Connection helper with Adaptive Bitrate, Renegotiation & TURN support
+  const createPeerConnection = useCallback((targetPeerId: string, initiator: boolean, reuseExisting = false) => {
+    if (reuseExisting && peerConnectionsRef.current.has(targetPeerId)) {
+      const existingPc = peerConnectionsRef.current.get(targetPeerId)!;
+      if (existingPc.signalingState !== 'closed' && existingPc.connectionState !== 'failed') {
+        return existingPc;
+      }
+    }
+
     if (peerConnectionsRef.current.has(targetPeerId)) {
       peerConnectionsRef.current.get(targetPeerId)?.close();
       peerConnectionsRef.current.delete(targetPeerId);
@@ -285,7 +338,7 @@ export function useRealtimeRoom({
 
     const lowBandwidth = isConstrainedNetwork();
 
-    if (localStreamRef.current) {
+    if (localStreamRef.current && localStreamRef.current.getTracks().length > 0) {
       localStreamRef.current.getTracks().forEach((track) => {
         const sender = pc.addTrack(track, localStreamRef.current!);
         if (track.kind === 'video') {
@@ -299,6 +352,12 @@ export function useRealtimeRoom({
           } catch {}
         }
       });
+    } else if (initiator) {
+      // Ensure SDP offer always negotiates audio+video receive transceivers even before local camera resolves
+      try {
+        pc.addTransceiver('audio', { direction: 'sendrecv' });
+        pc.addTransceiver('video', { direction: 'sendrecv' });
+      } catch {}
     }
 
     pc.onicecandidate = (event) => {
@@ -312,17 +371,40 @@ export function useRealtimeRoom({
     };
 
     pc.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      if (remoteStream) {
-        setRemotePeers((prev) => {
-          const next = new Map(prev);
-          const peer = next.get(targetPeerId);
-          if (peer) {
-            next.set(targetPeerId, { ...peer, stream: remoteStream });
-          }
-          return next;
-        });
-      }
+      const incomingStream = event.streams?.[0];
+      setRemotePeers((prev) => {
+        const next = new Map(prev);
+        const peer = next.get(targetPeerId);
+        let streamToUse: MediaStream;
+
+        if (incomingStream) {
+          streamToUse = new MediaStream(incomingStream.getTracks());
+        } else if (peer?.stream) {
+          const tracks = [...peer.stream.getTracks().filter((t) => t.id !== event.track.id), event.track];
+          streamToUse = new MediaStream(tracks);
+        } else {
+          streamToUse = new MediaStream([event.track]);
+        }
+
+        if (peer) {
+          next.set(targetPeerId, {
+            ...peer,
+            stream: streamToUse,
+            isVideoOn: streamToUse.getVideoTracks().length > 0 ? peer.isVideoOn : peer.isVideoOn
+          });
+        } else {
+          next.set(targetPeerId, {
+            id: targetPeerId,
+            name: 'ተሳታፊ',
+            avatar: '',
+            isMuted: false,
+            isVideoOn: streamToUse.getVideoTracks().length > 0,
+            isSpeaking: false,
+            stream: streamToUse
+          });
+        }
+        return next;
+      });
     };
 
     if (initiator) {
@@ -432,6 +514,9 @@ export function useRealtimeRoom({
                 if (typeof data.connectedUsers === 'number') {
                   setOnlineCount(Math.max(1, data.connectedUsers));
                 }
+                if (data.yourSeatNumber !== undefined) {
+                  setSeatNumber(data.yourSeatNumber);
+                }
                 if (Array.isArray(data.messages) && callbacksRef.current.onRoomHistory) {
                   callbacksRef.current.onRoomHistory(data.roomId || roomId, data.messages);
                 }
@@ -462,7 +547,9 @@ export function useRealtimeRoom({
                 if (!p || p.id === currentUserRef.current.id) return;
                 setRemotePeers((prev) => {
                   const next = new Map(prev);
+                  const existing = next.get(p.id);
                   next.set(p.id, {
+                    ...existing,
                     id: p.id,
                     name: p.name,
                     avatar: p.avatar,
@@ -502,8 +589,16 @@ export function useRealtimeRoom({
                   });
                 }
 
-                const pc = createPeerConnection(callerId, false);
+                // Reuse existing connection during mid-call track renegotiation
+                const pc = createPeerConnection(callerId, false, true);
+                if (pc.signalingState === 'have-local-offer') {
+                  // Glare handling: polite peer rolls back local offer
+                  const isPolite = currentUserRef.current.id < callerId;
+                  if (!isPolite) break;
+                  await pc.setLocalDescription({ type: 'rollback' } as any).catch(() => {});
+                }
                 await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                await flushIceCandidates(callerId, pc);
                 const answer = await pc.createAnswer();
                 await pc.setLocalDescription(answer);
 
@@ -521,8 +616,9 @@ export function useRealtimeRoom({
               case 'webrtc-answer': {
                 const { responderId, sdp } = data;
                 const pc = peerConnectionsRef.current.get(responderId);
-                if (pc) {
+                if (pc && pc.signalingState === 'have-local-offer') {
                   await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+                  await flushIceCandidates(responderId, pc);
                 }
                 break;
               }
@@ -530,10 +626,29 @@ export function useRealtimeRoom({
               case 'ice-candidate': {
                 const { senderId, candidate } = data;
                 const pc = peerConnectionsRef.current.get(senderId);
-                if (pc && candidate) {
-                  try {
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                  } catch {}
+                if (candidate) {
+                  if (pc && pc.remoteDescription) {
+                    try {
+                      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch {}
+                  } else {
+                    const list = iceCandidateQueueRef.current.get(senderId) || [];
+                    list.push(candidate);
+                    iceCandidateQueueRef.current.set(senderId, list);
+                  }
+                }
+                break;
+              }
+
+              case 'seat-denied': {
+                if (data.currentSeat !== undefined) {
+                  setSeatNumber(data.currentSeat);
+                }
+                if (callbacksRef.current.onSeatDenied) {
+                  callbacksRef.current.onSeatDenied(
+                    Number(data.seatNumber),
+                    String(data.occupiedBy || 'ሌላ ተሳታፊ')
+                  );
                 }
                 break;
               }
@@ -547,10 +662,26 @@ export function useRealtimeRoom({
                   if (existing) {
                     next.set(p.id, {
                       ...existing,
+                      name: p.name ?? existing.name,
+                      avatar: p.avatar ?? existing.avatar,
+                      role: p.role ?? existing.role,
                       isMuted: p.isMuted,
                       isVideoOn: p.isVideoOn,
                       isSpeaking: p.isSpeaking,
                       seatNumber: p.seatNumber !== undefined ? p.seatNumber : existing.seatNumber
+                    });
+                  } else if (p.id !== currentUserRef.current.id) {
+                    next.set(p.id, {
+                      id: p.id,
+                      name: p.name || 'ተሳታፊ',
+                      avatar: p.avatar || '',
+                      country: p.country,
+                      countryFlag: p.countryFlag,
+                      role: p.role,
+                      seatNumber: p.seatNumber,
+                      isMuted: !!p.isMuted,
+                      isVideoOn: !!p.isVideoOn,
+                      isSpeaking: !!p.isSpeaking
                     });
                   }
                   return next;
@@ -563,6 +694,7 @@ export function useRealtimeRoom({
                 if (peerId) {
                   peerConnectionsRef.current.get(peerId)?.close();
                   peerConnectionsRef.current.delete(peerId);
+                  iceCandidateQueueRef.current.delete(peerId);
                   setRemotePeers((prev) => {
                     const next = new Map(prev);
                     next.delete(peerId);
@@ -653,8 +785,22 @@ export function useRealtimeRoom({
       }
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
+      iceCandidateQueueRef.current.clear();
+      setRemotePeers(new Map());
+      setSeatNumber(null);
     };
-  }, [enabled, roomId, currentUser.id, createPeerConnection]);
+  }, [enabled, roomId, currentUser.id, createPeerConnection, flushIceCandidates]);
+
+  // Broadcast live profile edits (name, avatar, role) to everyone in the room immediately
+  useEffect(() => {
+    if (!enabled || socketRef.current?.readyState !== WebSocket.OPEN) return;
+    socketRef.current.send(JSON.stringify({
+      type: 'profile-update',
+      name: currentUser.fullName,
+      avatar: currentUser.avatarUrl,
+      role: currentUser.roleTitle
+    }));
+  }, [enabled, currentUser.fullName, currentUser.avatarUrl, currentUser.roleTitle]);
 
   // Toggle Microphone (works even if camera/mic stream initializes lazily)
   const toggleMic = useCallback(async () => {
@@ -732,8 +878,16 @@ export function useRealtimeRoom({
     }
   }, [roomId]);
 
-  // Claim Seat Realtime
-  const claimSeatRealtime = useCallback((seatNum: number) => {
+  // Claim Seat Realtime (rejects locally if another user already occupies that seat)
+  const claimSeatRealtime = useCallback((seatNum: number): boolean => {
+    for (const rp of remotePeersRef.current.values()) {
+      if (rp.seatNumber === seatNum) {
+        if (callbacksRef.current.onSeatDenied) {
+          callbacksRef.current.onSeatDenied(seatNum, rp.name);
+        }
+        return false;
+      }
+    }
     setSeatNumber(seatNum);
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({
@@ -741,6 +895,7 @@ export function useRealtimeRoom({
         seatNumber: seatNum
       }));
     }
+    return true;
   }, []);
 
   // Leave Seat Realtime

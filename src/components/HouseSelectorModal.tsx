@@ -61,32 +61,32 @@ export const HouseSelectorModal: React.FC<HouseSelectorModalProps> = ({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
-      <div className="bg-[#0f1422] border-2 border-amber-500/50 rounded-3xl w-full max-w-4xl p-6 md:p-8 shadow-2xl relative flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2.5 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
+      <div className="bg-[#0f1422] border-2 border-amber-500/50 rounded-3xl w-full max-w-4xl p-4 sm:p-6 md:p-8 shadow-2xl relative flex flex-col max-h-[90dvh] my-2 sm:my-0">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-lg bg-slate-900 cursor-pointer transition-colors"
+          className="absolute top-3.5 right-3.5 text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-900 cursor-pointer transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Header */}
-        <div className="flex items-center gap-3.5 pb-4 mb-4 border-b border-slate-800">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-2xl flex-shrink-0 shadow-lg shadow-amber-500/10">
+        <div className="flex items-center gap-3 pb-4 mb-4 border-b border-slate-800 pr-8">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-2xl flex-shrink-0 shadow-lg shadow-amber-500/10">
             🏛️
           </div>
-          <div>
-            <h3 className="text-base md:text-lg font-black text-white">
+          <div className="min-w-0">
+            <h3 className="text-base md:text-lg font-black text-white break-words">
               የOneworld 16ቱ ሉዓላዊ ቤቶች ማዕከል (16 Sovereign Houses Hub)
             </h3>
-            <p className="text-xs text-slate-300 mt-0.5">
+            <p className="text-xs text-slate-300 mt-0.5 break-words">
               ለመግባት የሚፈልጉትን ቤት ይምረጡ — እያንዳንዱ ቤት ራሱን የቻለ የቪዲዮ መድረክና አባልነት አለው
             </p>
           </div>
         </div>
 
         {/* 16 Houses Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto pr-2 scrollbar-none flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto pr-1 flex-1">
           {houseList.map((h) => {
             const Icon = h.icon;
             const isSelected = activeHouse === h.id;
@@ -98,7 +98,7 @@ export const HouseSelectorModal: React.FC<HouseSelectorModalProps> = ({
                   onSelectHouse(h.id);
                   onClose();
                 }}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3.5 ${
+                className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
                   isSelected
                     ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg shadow-amber-500/20 ring-2 ring-amber-400'
                     : 'bg-slate-950/80 border-slate-800 hover:border-amber-500/50 hover:bg-slate-900'
@@ -112,17 +112,17 @@ export const HouseSelectorModal: React.FC<HouseSelectorModalProps> = ({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className={`text-xs font-mono font-black uppercase tracking-wider ${
+                    <span className={`text-xs font-mono font-black uppercase tracking-wider break-words ${
                       isSelected ? 'text-slate-950 font-black' : 'text-amber-400 font-bold'
                     }`}>
-                      #{h.num} · {h.tag}
+                      {h.num} · {h.tag}
                     </span>
-                    <ChevronRight className={`w-4 h-4 ${isSelected ? 'text-slate-950 font-black' : 'text-slate-400'}`} />
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-slate-950 font-black' : 'text-slate-400'}`} />
                   </div>
-                  <h4 className={`text-sm sm:text-base font-black truncate ${isSelected ? 'text-slate-950' : 'text-white'}`}>
+                  <h4 className={`text-sm sm:text-base font-black break-words ${isSelected ? 'text-slate-950' : 'text-white'}`}>
                     {h.title}
                   </h4>
-                  <p className={`text-xs sm:text-sm line-clamp-1 mt-0.5 ${isSelected ? 'text-slate-900 font-bold' : 'text-slate-300 font-medium'}`}>
+                  <p className={`text-xs sm:text-sm line-clamp-2 break-words mt-0.5 ${isSelected ? 'text-slate-900 font-bold' : 'text-slate-300 font-medium'}`}>
                     {h.desc}
                   </p>
                 </div>

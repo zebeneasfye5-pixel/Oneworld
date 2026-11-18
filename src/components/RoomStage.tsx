@@ -356,18 +356,27 @@ export const RoomStage: React.FC<RoomStageProps> = ({
     ? rooms
     : rooms.filter((r) => r.category === activeTabCategory);
 
-  // Generate 24 numbered seats
+  // Generate 24 numbered seats with explicit collision-free occupant resolution
   const totalChairs = 24;
   const chairs = Array.from({ length: totalChairs }, (_, i) => {
     const seatNum = i + 1;
-    const occupant = occupants.find((o) => o.seatNumber === seatNum);
+    const remoteOccupant = occupants.find(
+      (o) => o.seatNumber === seatNum && o.id !== currentUser?.idNumber && o.id !== 'user-self'
+    );
+    const isUserSeat = !remoteOccupant && userSeatedNumber === seatNum;
+    const selfOccupant = occupants.find(
+      (o) => o.seatNumber === seatNum && (o.id === currentUser?.idNumber || o.id === 'user-self')
+    );
+    const occupant = remoteOccupant || (isUserSeat ? selfOccupant : occupants.find((o) => o.seatNumber === seatNum));
     return {
       seatNum,
       occupant,
       isOccupied: !!occupant,
-      isUserSeat: userSeatedNumber === seatNum
+      isOccupiedByOther: !!remoteOccupant,
+      isUserSeat
     };
   });
+  const firstOpenSeatNum = chairs.find((c) => !c.isOccupied && !c.isUserSeat)?.seatNum || 1;
 
   // Zoom handlers (Inner <video> only: 40% to 250%)
   const handleZoomIn = () => setZoomScale((prev) => Math.min(2.5, +(prev + 0.15).toFixed(2)));
@@ -487,23 +496,25 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               )}
             </div>
 
-            {/* Large Fixed Video Player Frame (width: 90%, max-width: 1200px, height: 650px, overflow: hidden) */}
+            {/* Compact Fixed Video Player Frame (full width on tiny phones, 90% / max 780px on wider screens, strictly fixed height + overflow: hidden) */}
             <div
-              className="mx-auto mb-5 rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative"
+              className="mx-auto mb-5 rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative w-full sm:w-[90%] h-[250px] sm:h-[360px]"
               style={{
-                width: '90%',
-                maxWidth: '1200px',
-                height: '650px',
+                maxWidth: '780px',
                 overflow: 'hidden'
               }}
             >
-              <div className={`grid w-full h-full gap-2 ${
+              <div className={`grid w-full h-full gap-1.5 ${
                 remotePeersList.length === 0
-                  ? 'grid-cols-1'
-                  : 'grid-cols-1 md:grid-cols-2'
+                  ? 'grid-cols-1 grid-rows-1'
+                  : remotePeersList.length === 1
+                  ? 'grid-cols-2 grid-rows-1'
+                  : remotePeersList.length <= 3
+                  ? 'grid-cols-2 grid-rows-2'
+                  : 'grid-cols-2 sm:grid-cols-3 auto-rows-fr'
               }`}>
                 {/* Local Authenticated User Video inside Fixed Container */}
-                <div className="relative w-full h-full overflow-hidden bg-black">
+                <div className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black">
                   {isVideoOn && isUsingRealWebcam && cameraActive && localStream ? (
                     <EdgeToEdgeVideo
                       stream={localStream}
@@ -518,18 +529,18 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       )}
                       <button
                         onClick={() => onRetryCamera?.()}
-                        className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
+                        className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
                       >
                         📹 ካሜራዬን አብራ
                       </button>
                     </div>
                   ) : !isVideoOn ? (
-                    <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4">
-                      <div className="relative mb-3">
+                    <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-3">
+                      <div className="relative mb-2">
                         <img
                           src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
                           alt={currentUser?.fullName || 'እርስዎ'}
-                          className={`w-36 h-36 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                          className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
                             isMicOn && isSpeaking
                               ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
                               : 'border-slate-700'
@@ -539,10 +550,9 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                           <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
                         )}
                       </div>
-                      <span className="text-white font-bold text-xs mb-2">ድምፅ ብቻ (Audio Only)</span>
                       <button
                         onClick={() => toggleVideo()}
-                        className="px-4 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
+                        className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
                       >
                         ካሜራ አብራ
                       </button>
@@ -556,28 +566,33 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       }}
                     />
                   )}
+                  {remotePeersList.length > 0 && (
+                    <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-amber-500/50 text-[11px] font-black text-amber-300 pointer-events-none">
+                      {userSeatedNumber ? `${userSeatedNumber} · ` : ''}{currentUser?.fullName?.split(' ')[0] || 'እርስዎ'}
+                    </span>
+                  )}
                 </div>
 
                 {/* Live Remote Peers Connected Across Other Phones / Browsers */}
                 {remotePeersList.map((peer) => (
                   <div
                     key={peer.id}
-                    className="relative w-full h-full overflow-hidden bg-black border-l border-emerald-500/40"
+                    className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black border-l border-emerald-500/40"
                   >
-                    {peer.stream && peer.isVideoOn ? (
+                    {peer.stream && (peer.isVideoOn || peer.stream.getVideoTracks().length > 0) ? (
                       <EdgeToEdgeVideo
                         stream={peer.stream}
-                        muted={false}
+                        muted={true}
                         mirror={false}
                         zoom={zoomScale}
                       />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-4">
-                        <div className="relative mb-3">
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-3">
+                        <div className="relative mb-2">
                           <img
                             src={peer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
                             alt={peer.name}
-                            className={`w-36 h-36 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                            className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
                               peer.isSpeaking
                                 ? 'border-emerald-400 ring-8 ring-emerald-400/40 scale-105'
                                 : 'border-slate-700'
@@ -587,9 +602,13 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                             <span className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
                           )}
                         </div>
-                        <span className="text-white font-bold text-xs">ድምፅ ብቻ (Audio Only)</span>
+                        <span className="text-white font-bold text-xs">{peer.name}</span>
                       </div>
                     )}
+
+                    <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none">
+                      {peer.seatNumber ? `${peer.seatNumber} · ` : ''}{peer.name}
+                    </span>
 
                     {peer.stream && (
                       <audio
@@ -608,7 +627,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
             </div>
 
             {/* Speaker Info & Camera Flip Strip OUTSIDE Fixed Video Frame */}
-            <div className="mx-auto mb-5 flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-4 py-3" style={{ width: '90%', maxWidth: '1200px' }}>
+            <div className="mx-auto mb-5 w-full sm:w-[90%] flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-3.5 sm:px-4 py-3" style={{ maxWidth: '780px' }}>
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1">
                   <Armchair className="w-3.5 h-3.5" />
@@ -682,7 +701,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
             </div>
 
             {/* Live Reactions Bar */}
-            <div className="mx-auto mb-5 relative" style={{ width: '90%', maxWidth: '1200px' }}>
+            <div className="mx-auto mb-5 relative w-full sm:w-[90%]" style={{ maxWidth: '780px' }}>
               {/* Floating Real-Time Live Reaction Emojis Animation Layer */}
               <div className="relative w-full h-0 pointer-events-none overflow-visible">
                 {floatingReactions.map((r) => (
@@ -696,12 +715,12 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 ))}
               </div>
 
-              {/* Live Interactive Reaction Bar (World-Class Social Media Innovation) */}
-              <div className="mt-3 py-2 px-3 bg-[#0a0d14]/90 border border-amber-500/30 rounded-2xl flex items-center justify-between gap-2 overflow-x-auto no-scrollbar shadow-lg">
-                <span className="text-[11px] sm:text-xs font-black text-amber-400 whitespace-nowrap pl-1">
-                  ⚡ የቀጥታ ስሜት መግለጫ (Live Reactions)፦
+              {/* Live Interactive Reaction Bar — wraps cleanly on small phones so every reaction stays visible */}
+              <div className="mt-3 py-2 px-3 bg-[#0a0d14]/90 border border-amber-500/30 rounded-2xl flex flex-wrap items-center justify-between gap-2 shadow-lg">
+                <span className="text-xs font-black text-amber-400 pl-1">
+                  ⚡ የቀጥታ ስሜት (Reactions)፦
                 </span>
-                <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   {[
                     { emoji: '❤️', label: 'ፍቅር' },
                     { emoji: '🔥', label: 'እሳት' },
@@ -960,11 +979,11 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   </button>
                 ) : (
                   <button
-                    onClick={() => onClaimSeat(1)}
+                    onClick={() => onClaimSeat(firstOpenSeatNum)}
                     className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 font-black rounded-2xl text-sm transition-all shadow-md shadow-amber-950 cursor-pointer"
                   >
                     <Armchair className="w-4 h-4" />
-                    <span>{t.roomStage.takeASeat}</span>
+                    <span>{t.roomStage.takeASeat} ({firstOpenSeatNum})</span>
                   </button>
                 )}
 
@@ -990,42 +1009,49 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         <div className="lg:col-span-2 space-y-6">
           {/* Numbered Chairs Section — EVERY Chair displays an Armchair icon */}
           <div className="bg-[#0f1422] border border-slate-800 rounded-3xl p-5 shadow-xl">
-            <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Armchair className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-black text-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-800">
+              <div className="flex items-center gap-2 min-w-0">
+                <Armchair className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                <h3 className="text-base font-black text-white break-words">
                   {t.roomStage.numberedChairs}
                 </h3>
               </div>
-              <span className="text-xs sm:text-sm font-extrabold text-slate-200">
+              <span className="text-xs sm:text-sm font-extrabold text-slate-200 flex-shrink-0">
                 {t.chairs.occupiedChairs} <strong className="text-amber-400 font-black">{occupants.length}</strong> / 24
               </span>
             </div>
 
-            {/* Chairs Grid */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {chairs.map(({ seatNum, occupant, isOccupied, isUserSeat }) => (
+            {/* Chairs Grid — 2 columns on tiny phones, 4 on tablet, 6 on desktop; occupied chairs display the seated user directly */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5 sm:gap-3">
+              {chairs.map(({ seatNum, occupant, isOccupied, isOccupiedByOther, isUserSeat }) => (
                 <div
                   key={seatNum}
                   onClick={() => {
-                    if (!isOccupied) {
+                    if (!isOccupied && !isUserSeat) {
                       onClaimSeat(seatNum);
-                    } else if (occupant && occupant.id !== 'user-self' && occupant.id !== currentUser?.idNumber) {
+                    } else if (isOccupiedByOther && occupant) {
                       setSelectedRecipient(occupant);
                       setIsGiftModalOpen(true);
                     }
                   }}
+                  title={
+                    isOccupied && occupant
+                      ? `${seatNum} · ${occupant.name}`
+                      : `${seatNum}`
+                  }
                   className={`relative p-3 rounded-2xl border flex flex-col items-center text-center transition-all cursor-pointer ${
                     isUserSeat
                       ? 'bg-amber-950/40 border-amber-500 shadow-lg shadow-amber-950/40 ring-2 ring-amber-500/60'
                       : isOccupied
-                      ? 'bg-slate-900/90 border-slate-700 hover:border-amber-500/60'
+                      ? 'bg-emerald-950/35 border-emerald-500/80 hover:border-emerald-400 shadow-md'
                       : 'bg-[#0a0d14] border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-900/50'
                   }`}
                 >
-                  {/* Clean Seat Number Only (No # symbol, No duplicate top chair icon) */}
-                  <div className="w-full flex items-center justify-center mb-1.5">
-                    <span className="text-xs font-black text-amber-400 font-mono">
+                  {/* Clean Seat Number */}
+                  <div className="w-full flex items-center justify-center mb-1">
+                    <span className={`text-xs font-black font-mono ${
+                      isUserSeat ? 'text-amber-300' : isOccupied ? 'text-emerald-300' : 'text-amber-400'
+                    }`}>
                       {seatNum}
                     </span>
                   </div>
@@ -1040,8 +1066,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                             isUserSeat && isMicOn && isSpeaking
                               ? 'border-amber-400 ring-4 ring-amber-400/50 scale-110'
                               : occupant.isSpeaking
-                              ? 'border-amber-400 ring-4 ring-amber-400/50 scale-105'
-                              : 'border-amber-500/50'
+                              ? 'border-emerald-400 ring-4 ring-emerald-400/50 scale-105'
+                              : isUserSeat
+                              ? 'border-amber-500/70'
+                              : 'border-emerald-500/70'
                           }`}
                         />
                         <span className="absolute -bottom-1 -right-1 text-sm">
@@ -1081,7 +1109,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         </div>
 
         {/* Right Col: Instant Multilingual Speech Translation Stream & Chat */}
-        <div className="bg-[#0f1422] border-2 border-amber-500/30 rounded-3xl flex flex-col h-[760px] shadow-2xl">
+        <div className="bg-[#0f1422] border-2 border-amber-500/30 rounded-3xl flex flex-col h-[460px] sm:h-[620px] lg:h-[760px] shadow-2xl">
           {/* Header */}
           <div className="p-4 border-b border-slate-800 bg-[#0a0d14] rounded-t-3xl flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1181,10 +1209,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 </button>
               </div>
 
-              <div className="flex items-center justify-between text-xs font-bold text-amber-300 px-1">
+              <div className="flex flex-wrap items-center justify-between gap-1 text-xs font-bold text-amber-300 px-1">
                 <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  በGemini AI የላቀ አውቶማቲክ ትርጉም የሚሰራ
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                  <span>በGemini AI የላቀ አውቶማቲክ ትርጉም የሚሰራ</span>
                 </span>
                 <span className="text-slate-300">ወደ 8 የአለም ቋንቋዎች በቀጥታ ይሰራጫል</span>
               </div>
@@ -1195,22 +1223,22 @@ export const RoomStage: React.FC<RoomStageProps> = ({
 
       {/* 2. Sub-Halls Collapsible Section (Placed cleanly beneath stage to protect viewport) */}
       <div className="bg-[#0f1422] border-2 border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-xl flex-shrink-0">
               🏛️
             </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-black text-amber-400">
+            <div className="min-w-0">
+              <h3 className="text-base sm:text-lg font-black text-amber-400 break-words">
                 ተጓዳኝ ንዑስ አዳራሾች ({filteredRooms.length})
               </h3>
-              <p className="text-xs text-slate-300 font-medium">
+              <p className="text-xs text-slate-300 font-medium break-words">
                 የተለያዩ ርዕሰ-ጉዳይ ያላቸው የቀጥታ ውይይት ክፍሎች
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setIsCreateRoomModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black shadow cursor-pointer transition"
@@ -1231,13 +1259,13 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         {/* Collapsible Sub-Rooms Drawer */}
         {isSubRoomsOpen && (
           <div className="mt-4 pt-4 border-t border-slate-800 space-y-4 animate-fadeIn">
-            {/* Category Filter */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {/* Category Filter — wraps cleanly on small phones */}
+            <div className="flex flex-wrap items-center gap-2 pb-1">
               {(['all', 'philosophy', 'tech', 'politics', 'charity', 'community'] as const).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveTabCategory(cat)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition-colors cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-colors cursor-pointer ${
                     activeTabCategory === cat
                       ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400'
                       : 'text-white hover:text-amber-300 bg-slate-900 border border-slate-700'
