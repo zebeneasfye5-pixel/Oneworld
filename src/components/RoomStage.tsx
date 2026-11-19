@@ -123,10 +123,31 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   const [isFullBodyMode, setIsFullBodyMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenZoom, setFullscreenZoom] = useState<number>(0.85);
-  const [fullscreenTargetId, setFullscreenTargetId] = useState<string>('local');
+  const [fullscreenTargetId, setFullscreenTargetId] = useState<'local' | string | null>(null);
   const [showStageDetails, setShowStageDetails] = useState(false);
   const [isSubRoomsOpen, setIsSubRoomsOpen] = useState(false);
   const [floatingReactions, setFloatingReactions] = useState<Array<{ id: number; emoji: string; left: number }>>([]);
+
+  // Single primary speaker for main frame & fullscreen; second stream only renders in bottom-right PiP during fullscreen
+  const primaryTargetId: 'local' | string =
+    fullscreenTargetId === 'local'
+      ? 'local'
+      : fullscreenTargetId && remotePeersList.some((p) => p.id === fullscreenTargetId)
+      ? fullscreenTargetId
+      : remotePeersList[0]?.id || 'local';
+  const primaryRemotePeer =
+    primaryTargetId !== 'local'
+      ? remotePeersList.find((p) => p.id === primaryTargetId)
+      : undefined;
+  const secondaryPipTargetId: 'local' | string | null = primaryRemotePeer
+    ? 'local'
+    : remotePeersList.length > 0
+    ? remotePeersList[0].id
+    : null;
+  const secondaryRemotePeer =
+    secondaryPipTargetId && secondaryPipTargetId !== 'local'
+      ? remotePeersList.find((p) => p.id === secondaryPipTargetId)
+      : undefined;
 
   const triggerReaction = (emoji: string) => {
     const id = Date.now() + Math.random();
@@ -409,10 +430,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* Dedicated Full Screen Button (Icon Only) */}
                   <button
-                    onClick={() => {
-                      setFullscreenTargetId('local');
-                      toggleFullscreen();
-                    }}
+                    onClick={() => toggleFullscreen()}
                     className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 border border-amber-400 shadow-md cursor-pointer transition transform hover:scale-105"
                     title={isFullscreen ? 'ከሙሉ ስክሪን ውጣ' : 'በሙሉ ስክሪን ክፈት (100% Edge-to-Edge Fullscreen)'}
                   >
@@ -499,92 +517,25 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               )}
             </div>
 
-            {/* Compact Fixed Video Player Frame (full width on tiny phones, 90% / max 780px on wider screens, strictly fixed height + overflow: hidden) */}
+            {/* Always-active remote peer audio playback regardless of spotlight view */}
+            {remotePeersList.map((peer) => (
+              <RemoteAudioPlayer key={`audio-${peer.id}`} stream={peer.stream} />
+            ))}
+
+            {/* Large Primary Single-Image Fixed Video Player Frame */}
             <div
-              className="mx-auto mb-5 rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative w-full sm:w-[90%] h-[250px] sm:h-[360px]"
+              className="mx-auto mb-5 rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative w-full sm:w-[92%] h-[340px] sm:h-[460px] md:h-[520px]"
               style={{
-                maxWidth: '780px',
+                maxWidth: '960px',
                 overflow: 'hidden'
               }}
             >
-              <div className={`grid w-full h-full gap-1.5 ${
-                remotePeersList.length === 0
-                  ? 'grid-cols-1 grid-rows-1'
-                  : remotePeersList.length === 1
-                  ? 'grid-cols-2 grid-rows-1'
-                  : remotePeersList.length <= 3
-                  ? 'grid-cols-2 grid-rows-2'
-                  : 'grid-cols-2 sm:grid-cols-3 auto-rows-fr'
-              }`}>
-                {/* Local Authenticated User Video inside Fixed Container */}
-                <div className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black">
-                  {isVideoOn && isUsingRealWebcam && cameraActive && localStream ? (
-                    <EdgeToEdgeVideo
-                      stream={localStream}
-                      muted={true}
-                      mirror={cameraFacing === 'user'}
-                      zoom={zoomScale}
-                    />
-                  ) : isVideoOn && isUsingRealWebcam && !cameraActive ? (
-                    <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4 gap-2 text-center">
-                      {cameraError && (
-                        <p className="text-xs text-amber-300 max-w-xs leading-relaxed">{cameraError}</p>
-                      )}
-                      <button
-                        onClick={() => onRetryCamera?.()}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
-                      >
-                        📹 ካሜራዬን አብራ
-                      </button>
-                    </div>
-                  ) : !isVideoOn ? (
-                    <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-3">
-                      <div className="relative mb-2">
-                        <img
-                          src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                          alt={currentUser?.fullName || 'እርስዎ'}
-                          className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
-                            isMicOn && isSpeaking
-                              ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
-                              : 'border-slate-700'
-                          }`}
-                        />
-                        {isMicOn && isSpeaking && (
-                          <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
-                        )}
-                      </div>
-                      <button
-                        onClick={() => toggleVideo()}
-                        className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
-                      >
-                        ካሜራ አብራ
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      className="w-full h-full bg-cover bg-center transition-transform duration-200"
-                      style={{
-                        backgroundImage: `url('${currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=800&q=80'}')`,
-                        transform: `scale(${zoomScale})`
-                      }}
-                    />
-                  )}
-                  {remotePeersList.length > 0 && (
-                    <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-amber-500/50 text-[11px] font-black text-amber-300 pointer-events-none">
-                      {userSeatedNumber ? `${userSeatedNumber} · ` : ''}{currentUser?.fullName?.split(' ')[0] || 'እርስዎ'}
-                    </span>
-                  )}
-                </div>
-
-                {/* Live Remote Peers Connected Across Other Phones / Browsers */}
-                {remotePeersList.map((peer) => (
-                  <div
-                    key={peer.id}
-                    className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black border-l border-emerald-500/40"
-                  >
-                    {peer.stream && (peer.isVideoOn || peer.stream.getVideoTracks().length > 0) ? (
+              <div className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black">
+                {primaryRemotePeer ? (
+                  <>
+                    {primaryRemotePeer.stream && (primaryRemotePeer.isVideoOn || primaryRemotePeer.stream.getVideoTracks().length > 0) ? (
                       <EdgeToEdgeVideo
-                        stream={peer.stream}
+                        stream={primaryRemotePeer.stream}
                         muted={true}
                         mirror={false}
                         zoom={zoomScale}
@@ -593,34 +544,90 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-3">
                         <div className="relative mb-2">
                           <img
-                            src={peer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                            alt={peer.name}
+                            src={primaryRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                            alt={primaryRemotePeer.name}
                             className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
-                              peer.isSpeaking
+                              primaryRemotePeer.isSpeaking
                                 ? 'border-emerald-400 ring-8 ring-emerald-400/40 scale-105'
                                 : 'border-slate-700'
                             }`}
                           />
-                          {peer.isSpeaking && (
+                          {primaryRemotePeer.isSpeaking && (
                             <span className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
                           )}
                         </div>
-                        <span className="text-white font-bold text-xs">{peer.name}</span>
+                        <span className="text-white font-bold text-xs">{primaryRemotePeer.name}</span>
                       </div>
                     )}
-
                     <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none">
-                      {peer.seatNumber ? `${peer.seatNumber} · ` : ''}{peer.name}
+                      {primaryRemotePeer.seatNumber ? `${primaryRemotePeer.seatNumber} · ` : ''}{primaryRemotePeer.name}
                     </span>
-
-                    <RemoteAudioPlayer stream={peer.stream} />
-                  </div>
-                ))}
+                  </>
+                ) : (
+                  <>
+                    {isVideoOn && isUsingRealWebcam && cameraActive && localStream ? (
+                      <EdgeToEdgeVideo
+                        stream={localStream}
+                        muted={true}
+                        mirror={cameraFacing === 'user'}
+                        zoom={zoomScale}
+                      />
+                    ) : isVideoOn && isUsingRealWebcam && !cameraActive ? (
+                      <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-4 gap-2 text-center">
+                        {cameraError && (
+                          <p className="text-xs text-amber-300 max-w-xs leading-relaxed">{cameraError}</p>
+                        )}
+                        <button
+                          onClick={() => onRetryCamera?.()}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg cursor-pointer transition"
+                        >
+                          📹 ካሜራዬን አብራ
+                        </button>
+                      </div>
+                    ) : !isVideoOn ? (
+                      <div className="w-full h-full bg-[#0a0d14] flex flex-col items-center justify-center p-3">
+                        <div className="relative mb-2">
+                          <img
+                            src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                            alt={currentUser?.fullName || 'እርስዎ'}
+                            className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                              isMicOn && isSpeaking
+                                ? 'border-amber-400 ring-8 ring-amber-400/40 scale-105'
+                                : 'border-slate-700'
+                            }`}
+                          />
+                          {isMicOn && isSpeaking && (
+                            <span className="absolute inset-0 rounded-full border-2 border-amber-400 animate-ping pointer-events-none" />
+                          )}
+                        </div>
+                        <button
+                          onClick={() => toggleVideo()}
+                          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs cursor-pointer shadow-md transition"
+                        >
+                          ካሜራ አብራ
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        className="w-full h-full bg-cover bg-center transition-transform duration-200"
+                        style={{
+                          backgroundImage: `url('${currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=800&q=80'}')`,
+                          transform: `scale(${zoomScale})`
+                        }}
+                      />
+                    )}
+                    {remotePeersList.length > 0 && (
+                      <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-amber-500/50 text-[11px] font-black text-amber-300 pointer-events-none">
+                        {userSeatedNumber ? `${userSeatedNumber} · ` : ''}{currentUser?.fullName?.split(' ')[0] || 'እርስዎ'}
+                      </span>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
             {/* Speaker Info & Camera Flip Strip OUTSIDE Fixed Video Frame */}
-            <div className="mx-auto mb-5 w-full sm:w-[90%] flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-3.5 sm:px-4 py-3" style={{ maxWidth: '780px' }}>
+            <div className="mx-auto mb-5 w-full sm:w-[92%] flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-3.5 sm:px-4 py-3" style={{ maxWidth: '960px' }}>
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1">
                   <Armchair className="w-3.5 h-3.5" />
@@ -668,7 +675,6 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 </button>
                 <button
                   onClick={() => {
-                    setFullscreenTargetId('local');
                     setIsFullscreen(true);
                   }}
                   title="በሙሉ ስክሪን ክፈት"
@@ -694,7 +700,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
             </div>
 
             {/* Live Reactions Bar */}
-            <div className="mx-auto mb-5 relative w-full sm:w-[90%]" style={{ maxWidth: '780px' }}>
+            <div className="mx-auto mb-5 relative w-full sm:w-[92%]" style={{ maxWidth: '960px' }}>
               {/* Floating Real-Time Live Reaction Emojis Animation Layer */}
               <div className="relative w-full h-0 pointer-events-none overflow-visible">
                 {floatingReactions.map((r) => (
@@ -736,13 +742,9 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               </div>
             </div>
 
-            {/* 100% FULL-SCREEN SINGLE-SPEAKER CINEMA THEATER (Portal + 100dvh + object-cover Edge-to-Edge) */}
+            {/* 100% FULL-SCREEN SINGLE-SPEAKER CINEMA THEATER (Second image appears ONLY here as a small bottom-right PiP) */}
             {isFullscreen && typeof document !== 'undefined' && createPortal((() => {
-              const activeRemotePeer = fullscreenTargetId !== 'local'
-                ? remotePeersList.find((p) => p.id === fullscreenTargetId) || remotePeersList[0]
-                : undefined;
-              const showingRemote = !!(fullscreenTargetId !== 'local' && activeRemotePeer);
-              const nextSwapId = showingRemote ? 'local' : (remotePeersList[0]?.id || 'local');
+              const showingRemote = !!primaryRemotePeer;
 
               return (
                 <div
@@ -778,21 +780,21 @@ export const RoomStage: React.FC<RoomStageProps> = ({
 
                   {/* 100% Single Speaker Full Edge-to-Edge Stream (Adjustable Zoom 30% - 250%) */}
                   <div className="w-full h-full relative overflow-hidden bg-black">
-                    {showingRemote && activeRemotePeer ? (
-                      activeRemotePeer.stream && activeRemotePeer.isVideoOn ? (
+                    {showingRemote && primaryRemotePeer ? (
+                      primaryRemotePeer.stream && (primaryRemotePeer.isVideoOn || primaryRemotePeer.stream.getVideoTracks().length > 0) ? (
                         <EdgeToEdgeVideo
-                          stream={activeRemotePeer.stream}
-                          muted={false}
+                          stream={primaryRemotePeer.stream}
+                          muted={true}
                           mirror={false}
                           zoom={fullscreenZoom}
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-6">
                           <img
-                            src={activeRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'}
-                            alt={activeRemotePeer.name}
+                            src={primaryRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'}
+                            alt={primaryRemotePeer.name}
                             className={`w-44 h-44 rounded-full object-cover border-4 shadow-2xl ${
-                              activeRemotePeer.isSpeaking ? 'border-emerald-400 ring-8 ring-emerald-400/40' : 'border-slate-700'
+                              primaryRemotePeer.isSpeaking ? 'border-emerald-400 ring-8 ring-emerald-400/40' : 'border-slate-700'
                             }`}
                           />
                         </div>
@@ -825,6 +827,57 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       </div>
                     )}
                   </div>
+
+                  {/* Secondary Video PiP — rendered ONLY in Fullscreen at bottom-right corner; click to swap */}
+                  {secondaryPipTargetId && (
+                    <button
+                      type="button"
+                      onClick={() => setFullscreenTargetId(secondaryPipTargetId)}
+                      title="ምስሉን ቀይር (Swap)"
+                      className="absolute bottom-36 right-3 sm:bottom-6 sm:right-6 z-50 w-24 h-32 sm:w-32 sm:h-44 rounded-2xl overflow-hidden border-2 border-amber-400/80 bg-slate-950 shadow-2xl cursor-pointer hover:scale-105 transition-transform"
+                    >
+                      {secondaryPipTargetId === 'local' ? (
+                        isVideoOn && isUsingRealWebcam && cameraActive && localStream ? (
+                          <EdgeToEdgeVideo
+                            stream={localStream}
+                            muted={true}
+                            mirror={cameraFacing === 'user'}
+                            zoom={1}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-slate-950">
+                            <img
+                              src={currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80'}
+                              alt={currentUser?.fullName || 'እርስዎ'}
+                              className="w-14 h-14 rounded-full object-cover border-2 border-amber-400"
+                            />
+                          </div>
+                        )
+                      ) : secondaryRemotePeer ? (
+                        secondaryRemotePeer.stream && (secondaryRemotePeer.isVideoOn || secondaryRemotePeer.stream.getVideoTracks().length > 0) ? (
+                          <EdgeToEdgeVideo
+                            stream={secondaryRemotePeer.stream}
+                            muted={true}
+                            mirror={false}
+                            zoom={1}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-slate-950">
+                            <img
+                              src={secondaryRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80'}
+                              alt={secondaryRemotePeer.name}
+                              className="w-14 h-14 rounded-full object-cover border-2 border-emerald-400"
+                            />
+                          </div>
+                        )
+                      ) : null}
+                      <span className="absolute bottom-1 left-1 right-1 truncate px-1.5 py-0.5 rounded bg-black/75 text-[10px] font-black text-amber-300 text-center pointer-events-none">
+                        {secondaryPipTargetId === 'local'
+                          ? (currentUser?.fullName?.split(' ')[0] || 'እርስዎ')
+                          : (secondaryRemotePeer?.name?.split(' ')[0] || '')}
+                      </span>
+                    </button>
+                  )}
 
                   {/* Fullscreen Zoom Control Bar (30% Small <-> 250% Large) */}
                   <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/20 shadow-2xl flex items-center gap-2 max-w-[92vw]">
@@ -898,9 +951,9 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       <RefreshCw className="w-5 h-5" />
                     </button>
 
-                    {remotePeersList.length > 0 && (
+                    {secondaryPipTargetId && (
                       <button
-                        onClick={() => setFullscreenTargetId(nextSwapId)}
+                        onClick={() => setFullscreenTargetId(secondaryPipTargetId)}
                         title="ተናጋሪ ቀይር"
                         className="p-3.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all cursor-pointer"
                       >
@@ -1014,89 +1067,133 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               </span>
             </div>
 
-            {/* Chairs Grid — 2 columns on tiny phones, 4 on tablet, 6 on desktop; occupied chairs display the seated user directly */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5 sm:gap-3">
-              {chairs.map(({ seatNum, occupant, isOccupied, isOccupiedByOther, isUserSeat }) => (
-                <div
-                  key={seatNum}
-                  onClick={() => {
-                    if (!isOccupied && !isUserSeat) {
-                      onClaimSeat(seatNum);
-                    } else if (isOccupiedByOther && occupant) {
-                      setSelectedRecipient(occupant);
-                      setIsGiftModalOpen(true);
-                    }
-                  }}
-                  title={
-                    isOccupied && occupant
-                      ? `${seatNum} · ${occupant.name}`
-                      : `${seatNum}`
-                  }
-                  className={`relative p-3 rounded-2xl border flex flex-col items-center text-center transition-all cursor-pointer ${
-                    isUserSeat
-                      ? 'bg-amber-950/40 border-amber-500 shadow-lg shadow-amber-950/40 ring-2 ring-amber-500/60'
-                      : isOccupied
-                      ? 'bg-emerald-950/35 border-emerald-500/80 hover:border-emerald-400 shadow-md'
-                      : 'bg-[#0a0d14] border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-900/50'
-                  }`}
-                >
-                  {/* Clean Seat Number */}
-                  <div className="w-full flex items-center justify-center mb-1">
-                    <span className={`text-xs font-black font-mono ${
-                      isUserSeat ? 'text-amber-300' : isOccupied ? 'text-emerald-300' : 'text-amber-400'
-                    }`}>
-                      {seatNum}
-                    </span>
-                  </div>
+            {/* Chairs Grid — All 24 chairs enlarged with live video feeds directly inside each chair */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-3.5">
+              {chairs.map(({ seatNum, occupant, isOccupied, isOccupiedByOther, isUserSeat }) => {
+                const remotePeer = isOccupiedByOther && occupant
+                  ? remotePeersList.find((p) => p.id === occupant.id || p.seatNumber === seatNum)
+                  : undefined;
+                const chairStream = isUserSeat
+                  ? (isVideoOn && isUsingRealWebcam && cameraActive ? localStream : null)
+                  : (remotePeer?.stream && (remotePeer.isVideoOn || remotePeer.stream.getVideoTracks().length > 0) ? remotePeer.stream : null);
 
-                  {isOccupied && occupant ? (
-                    <>
-                      <div className="relative mt-1 mb-1.5">
-                        <img
-                          src={isUserSeat ? (currentUser?.avatarUrl || occupant.avatar) : occupant.avatar}
-                          alt={isUserSeat ? (currentUser?.fullName || occupant.name) : occupant.name}
-                          className={`w-11 h-11 rounded-full object-cover border-2 shadow-md transition-transform duration-200 ${
-                            isUserSeat && isMicOn && isSpeaking
-                              ? 'border-amber-400 ring-4 ring-amber-400/50 scale-110'
-                              : occupant.isSpeaking
-                              ? 'border-emerald-400 ring-4 ring-emerald-400/50 scale-105'
+                return (
+                  <div
+                    key={seatNum}
+                    onClick={() => {
+                      if (!isOccupied && !isUserSeat) {
+                        onClaimSeat(seatNum);
+                      } else if (isUserSeat) {
+                        setFullscreenTargetId('local');
+                      } else if (isOccupiedByOther && occupant) {
+                        setFullscreenTargetId(occupant.id);
+                      }
+                    }}
+                    title={
+                      isOccupied && occupant
+                        ? `${seatNum} · ${occupant.name}`
+                        : `${seatNum}`
+                    }
+                    className={`relative p-2.5 sm:p-3 rounded-2xl border flex flex-col items-center justify-between text-center transition-all cursor-pointer min-h-[148px] sm:min-h-[168px] ${
+                      isUserSeat
+                        ? 'bg-amber-950/40 border-amber-500 shadow-lg shadow-amber-950/40 ring-2 ring-amber-500/60'
+                        : isOccupied
+                        ? 'bg-emerald-950/35 border-emerald-500/80 hover:border-emerald-400 shadow-md'
+                        : 'bg-[#0a0d14] border-dashed border-slate-800 hover:border-amber-500/50 hover:bg-slate-900/50'
+                    }`}
+                  >
+                    {/* Clean Seat Number & Gift Action for Peers */}
+                    <div className="w-full flex items-center justify-between px-1 mb-1.5">
+                      <span className={`text-xs sm:text-sm font-black font-mono ${
+                        isUserSeat ? 'text-amber-300' : isOccupied ? 'text-emerald-300' : 'text-amber-400'
+                      }`}>
+                        {seatNum}
+                      </span>
+                      {isOccupiedByOther && occupant && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRecipient(occupant);
+                            setIsGiftModalOpen(true);
+                          }}
+                          title={t.roomStage.sendGift}
+                          className="p-0.5 rounded text-amber-400 hover:text-amber-300 cursor-pointer"
+                        >
+                          <Gift className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {isOccupied && occupant ? (
+                      <>
+                        {chairStream ? (
+                          <div className={`relative w-full h-28 sm:h-32 rounded-xl overflow-hidden bg-black border-2 mb-1.5 ${
+                            (isUserSeat && isMicOn && isSpeaking) || occupant.isSpeaking
+                              ? 'border-amber-400 ring-2 ring-amber-400/60'
                               : isUserSeat
                               ? 'border-amber-500/70'
                               : 'border-emerald-500/70'
-                          }`}
-                        />
-                        <span className="absolute -bottom-1 -right-1 text-sm">
-                          {occupant.countryFlag}
+                          }`}>
+                            <EdgeToEdgeVideo
+                              stream={chairStream}
+                              muted={true}
+                              mirror={isUserSeat && cameraFacing === 'user'}
+                              zoom={1}
+                            />
+                            {((isUserSeat && isMicOn && isSpeaking) || occupant.isSpeaking) && (
+                              <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping pointer-events-none" />
+                            )}
+                          </div>
+                        ) : (
+                          <div className="relative my-2">
+                            <img
+                              src={isUserSeat ? (currentUser?.avatarUrl || occupant.avatar) : occupant.avatar}
+                              alt={isUserSeat ? (currentUser?.fullName || occupant.name) : occupant.name}
+                              className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 shadow-md transition-transform duration-200 ${
+                                isUserSeat && isMicOn && isSpeaking
+                                  ? 'border-amber-400 ring-4 ring-amber-400/50 scale-110'
+                                  : occupant.isSpeaking
+                                  ? 'border-emerald-400 ring-4 ring-emerald-400/50 scale-105'
+                                  : isUserSeat
+                                  ? 'border-amber-500/70'
+                                  : 'border-emerald-500/70'
+                              }`}
+                            />
+                            <span className="absolute -bottom-1 -right-1 text-sm">
+                              {occupant.countryFlag}
+                            </span>
+                            {((isUserSeat && isMicOn && isSpeaking) || occupant.isSpeaking) && (
+                              <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 animate-ping" />
+                            )}
+                          </div>
+                        )}
+                        <span className="text-xs font-black text-white truncate w-full">
+                          {isUserSeat ? (currentUser?.fullName || occupant.name) : occupant.name}
                         </span>
-                        {((isUserSeat && isMicOn && isSpeaking) || occupant.isSpeaking) && (
-                          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 animate-ping" />
-                        )}
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {(isUserSeat ? isMicOn : !occupant.isMuted) ? (
+                            <Mic className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                          ) : (
+                            <MicOff className="w-3.5 h-3.5 text-red-400" />
+                          )}
+                          {(isUserSeat ? isVideoOn : occupant.isVideoOn) ? (
+                            <Video className="w-3.5 h-3.5 text-amber-400" />
+                          ) : (
+                            <VideoOff className="w-3.5 h-3.5 text-slate-500" />
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center py-4">
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full border border-dashed border-slate-700 hover:border-amber-400 flex items-center justify-center text-amber-400 transition">
+                          <Armchair className="w-6 h-6 text-amber-400" />
+                        </div>
                       </div>
-                      <span className="text-xs sm:text-sm font-black text-white truncate w-full">
-                        {isUserSeat ? (currentUser?.fullName || occupant.name) : occupant.name}
-                      </span>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        {(isUserSeat ? isMicOn : !occupant.isMuted) ? (
-                          <Mic className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                        ) : (
-                          <MicOff className="w-3.5 h-3.5 text-red-400" />
-                        )}
-                        {(isUserSeat ? isVideoOn : occupant.isVideoOn) ? (
-                          <Video className="w-3.5 h-3.5 text-amber-400" />
-                        ) : (
-                          <VideoOff className="w-3.5 h-3.5 text-slate-500" />
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="py-2 flex flex-col items-center justify-center">
-                      <div className="w-10 h-10 rounded-full border border-dashed border-slate-700 hover:border-amber-400 flex items-center justify-center text-amber-400 transition">
-                        <Armchair className="w-5 h-5 text-amber-400" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

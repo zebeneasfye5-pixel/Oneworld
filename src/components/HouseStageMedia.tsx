@@ -112,7 +112,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   const [zoomScale, setZoomScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [fullscreenZoom, setFullscreenZoom] = useState<number>(0.85);
-  const [fullscreenTargetId, setFullscreenTargetId] = useState<'local' | string>('local');
+  const [fullscreenTargetId, setFullscreenTargetId] = useState<'local' | string | null>(null);
   const [isFullBodyMode, setIsFullBodyMode] = useState(false);
 
   // Lock body scroll cleanly when fullscreen cinema portal is active
@@ -142,6 +142,26 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
   const isHouse4 = houseId === 'h4';
   const liveRemotePeers = remotePeers ? Array.from(remotePeers.values()) : [];
+
+  const primaryTargetId: 'local' | string =
+    fullscreenTargetId === 'local'
+      ? 'local'
+      : fullscreenTargetId && liveRemotePeers.some((p) => p.id === fullscreenTargetId)
+      ? fullscreenTargetId
+      : liveRemotePeers[0]?.id || 'local';
+  const primaryRemotePeer =
+    primaryTargetId !== 'local'
+      ? liveRemotePeers.find((p) => p.id === primaryTargetId)
+      : undefined;
+  const secondaryPipTargetId: 'local' | string | null = primaryRemotePeer
+    ? 'local'
+    : liveRemotePeers.length > 0
+    ? liveRemotePeers[0].id
+    : null;
+  const secondaryRemotePeer =
+    secondaryPipTargetId && secondaryPipTargetId !== 'local'
+      ? liveRemotePeers.find((p) => p.id === secondaryPipTargetId)
+      : undefined;
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -195,13 +215,12 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     const isTakenByMe = userSeat === seatNo;
     const occupant = liveRemotePeers.find((p) => p.seatNumber === seatNo);
     if (isTakenByMe) {
-      onLeaveSeat?.();
-      onShowToast(t.stageMedia.leaveSeat);
+      setFullscreenTargetId('local');
     } else if (!occupant) {
       onClaimSeat?.(seatNo);
       onShowToast(`${t.chairs.seatPrefix}${seatNo}: ${t.stageMedia.takeSeat}`);
     } else {
-      onShowToast(`ወንበር ${seatNo}: በ ${occupant.name} ተይዟል`);
+      setFullscreenTargetId(occupant.id);
     }
   };
 
@@ -425,10 +444,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         {/* Toolbar (Icons Only - Matches House 1 Fullscreen & Layers Controls) */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => {
-              setFullscreenTargetId('local');
-              toggleFullscreen();
-            }}
+            onClick={() => toggleFullscreen()}
             title={isFullscreen ? 'ከሙሉ ስክሪን ውጣ' : 'በሙሉ ስክሪን ክፈት (100% Edge-to-Edge Fullscreen)'}
             className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 text-slate-950 border border-amber-400 shadow-md cursor-pointer transition transform hover:scale-105"
           >
@@ -496,7 +512,10 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
           {userSeat !== null && (
             <button
-              onClick={() => handleSeatClick(userSeat)}
+              onClick={() => {
+                onLeaveSeat?.();
+                onShowToast(t.stageMedia.leaveSeat);
+              }}
               title={t.stageMedia.leaveSeat}
               className="p-2.5 rounded-xl text-xs font-bold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 cursor-pointer transition shadow-md"
             >
@@ -513,26 +532,54 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         </div>
       )}
 
-      {/* Live WebRTC Multi-Peer Compact Fixed Video Player Frame */}
+      {/* Always-active remote peer audio playback regardless of spotlight view */}
+      {liveRemotePeers.map((peer) => (
+        <RemoteAudioPlayer key={`audio-${peer.id}`} stream={peer.stream} />
+      ))}
+
+      {/* Live Single-Image Enlarged Fixed Video Player Frame */}
       <div
-        className="mx-auto rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative w-full sm:w-[90%] h-[250px] sm:h-[360px]"
+        className="mx-auto rounded-3xl border-2 border-amber-500/60 bg-black shadow-2xl relative w-full sm:w-[92%] h-[340px] sm:h-[460px] md:h-[520px]"
         style={{
-          maxWidth: '780px',
+          maxWidth: '960px',
           overflow: 'hidden'
         }}
       >
-        <div className={`grid w-full h-full gap-1.5 ${
-          (userSeat !== null ? 1 : 0) + liveRemotePeers.length <= 1
-            ? 'grid-cols-1 grid-rows-1'
-            : (userSeat !== null ? 1 : 0) + liveRemotePeers.length === 2
-            ? 'grid-cols-2 grid-rows-1'
-            : (userSeat !== null ? 1 : 0) + liveRemotePeers.length <= 4
-            ? 'grid-cols-2 grid-rows-2'
-            : 'grid-cols-2 sm:grid-cols-3 auto-rows-fr'
-        }`}>
-          {/* User's Own Live Video inside Fixed Container */}
-          {userSeat !== null && (
-            <div className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black">
+        <div className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black">
+          {primaryRemotePeer ? (
+            <>
+              {primaryRemotePeer.stream && (primaryRemotePeer.isVideoOn || primaryRemotePeer.stream.getVideoTracks().length > 0) ? (
+                <EdgeToEdgeVideo
+                  stream={primaryRemotePeer.stream}
+                  muted={true}
+                  mirror={false}
+                  zoom={zoomScale}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-3">
+                  <div className="relative mb-2">
+                    <img
+                      src={primaryRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
+                      alt={primaryRemotePeer.name}
+                      className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
+                        primaryRemotePeer.isSpeaking
+                          ? 'border-emerald-400 ring-8 ring-emerald-400/40 scale-105'
+                          : 'border-slate-700'
+                      }`}
+                    />
+                    {primaryRemotePeer.isSpeaking && (
+                      <span className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
+                    )}
+                  </div>
+                  <span className="text-white font-bold text-xs">{primaryRemotePeer.name}</span>
+                </div>
+              )}
+              <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none">
+                {primaryRemotePeer.seatNumber ? `${primaryRemotePeer.seatNumber} · ` : ''}{primaryRemotePeer.name}
+              </span>
+            </>
+          ) : (
+            <>
               {isVideoOn && localStream ? (
                 <EdgeToEdgeVideo
                   stream={localStream}
@@ -574,62 +621,21 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                   </button>
                 </div>
               )}
-              {liveRemotePeers.length > 0 && (
+              {liveRemotePeers.length > 0 && userSeat !== null && (
                 <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-amber-500/50 text-[11px] font-black text-amber-300 pointer-events-none">
                   {userSeat} · {currentUser?.fullName?.split(' ')[0] || membership.fullName.split(' ')[0]}
                 </span>
               )}
-            </div>
+            </>
           )}
-
-          {/* Real Remote WebRTC Peers in this House */}
-          {liveRemotePeers.map((peer) => (
-            <div
-              key={peer.id}
-              className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black border-l border-emerald-500/40"
-            >
-              {peer.stream && (peer.isVideoOn || peer.stream.getVideoTracks().length > 0) ? (
-                <EdgeToEdgeVideo
-                  stream={peer.stream}
-                  muted={true}
-                  mirror={false}
-                  zoom={zoomScale}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-3">
-                  <div className="relative mb-2">
-                    <img
-                      src={peer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=300&q=80'}
-                      alt={peer.name}
-                      className={`w-24 h-24 rounded-full object-cover border-4 transition-all duration-300 shadow-2xl ${
-                        peer.isSpeaking
-                          ? 'border-emerald-400 ring-8 ring-emerald-400/40 scale-105'
-                          : 'border-slate-700'
-                      }`}
-                    />
-                    {peer.isSpeaking && (
-                      <span className="absolute inset-0 rounded-full border-2 border-emerald-400 animate-ping pointer-events-none" />
-                    )}
-                  </div>
-                  <span className="text-white font-bold text-xs">{peer.name}</span>
-                </div>
-              )}
-
-              <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none">
-                {peer.seatNumber ? `${peer.seatNumber} · ` : ''}{peer.name}
-              </span>
-
-              <RemoteAudioPlayer stream={peer.stream} />
-            </div>
-          ))}
         </div>
       </div>
 
       {/* Speaker Info & Camera Flip Strip OUTSIDE Fixed Video Frame */}
       {userSeat !== null && (
         <div
-          className="mx-auto w-full sm:w-[90%] flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-3.5 sm:px-4 py-3"
-          style={{ maxWidth: '780px' }}
+          className="mx-auto w-full sm:w-[92%] flex flex-wrap items-center justify-between gap-3 bg-slate-950/90 border border-slate-800 rounded-2xl px-3.5 sm:px-4 py-3"
+          style={{ maxWidth: '960px' }}
         >
           <div className="flex items-center gap-3 flex-wrap">
             <span className="bg-amber-500 text-slate-950 font-black text-xs px-2.5 py-1 rounded-xl shadow-md flex items-center gap-1">
@@ -666,7 +672,6 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
             )}
             <button
               onClick={() => {
-                setFullscreenTargetId('local');
                 setIsFullscreen(true);
               }}
               title="በሙሉ ስክሪን ክፈት"
@@ -706,7 +711,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 max-h-64 overflow-y-auto pr-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 max-h-[540px] overflow-y-auto pr-1">
           {Array.from({ length: isHouse4 ? 2 : 24 }).map((_, idx) => {
             const seatNo = idx + 1;
             const occupant = liveRemotePeers.find((p) => p.seatNumber === seatNo && p.id !== currentUser?.idNumber);
@@ -716,6 +721,9 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
               ? (membership.avatarUrl || currentUser?.avatarUrl)
               : occupant?.avatar;
             const isSpeakingNow = isTakenByMe ? (isMicOn && isSpeaking) : occupant?.isSpeaking;
+            const chairStream = isTakenByMe
+              ? (isVideoOn && localStream ? localStream : null)
+              : (occupant?.stream && (occupant.isVideoOn || occupant.stream.getVideoTracks().length > 0) ? occupant.stream : null);
 
             return (
               <button
@@ -728,7 +736,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     ? `${seatNo} · ${occupant.name}`
                     : `${seatNo}`
                 }
-                className={`py-2 px-1 rounded-xl border flex flex-col items-center justify-center transition active:scale-95 text-center cursor-pointer ${
+                className={`p-2.5 rounded-2xl border flex flex-col items-center justify-between transition active:scale-95 text-center cursor-pointer min-h-[144px] sm:min-h-[164px] ${
                   isTakenByMe
                     ? 'bg-amber-950/40 border-amber-500 text-amber-200 ring-2 ring-amber-500/50 shadow-md'
                     : isTakenByOther
@@ -736,18 +744,36 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                     : 'bg-slate-900/60 border-slate-800/80 hover:border-amber-500/50 text-slate-300 hover:text-white'
                 }`}
               >
-                <div className="flex items-center justify-center mb-0.5">
-                  <span className={`text-[11px] font-mono font-bold ${
+                <div className="flex items-center justify-center mb-1">
+                  <span className={`text-xs sm:text-sm font-mono font-bold ${
                     isTakenByMe ? 'text-amber-300' : isTakenByOther ? 'text-emerald-300' : 'text-amber-400'
                   }`}>{seatNo}</span>
                 </div>
 
-                {avatarUrl ? (
-                  <div className="relative my-0.5">
+                {chairStream ? (
+                  <div className={`relative w-full h-24 sm:h-28 rounded-xl overflow-hidden bg-black border-2 my-0.5 ${
+                    isSpeakingNow
+                      ? 'border-amber-400 ring-2 ring-amber-400/60'
+                      : isTakenByOther
+                      ? 'border-emerald-400'
+                      : 'border-amber-500/60'
+                  }`}>
+                    <EdgeToEdgeVideo
+                      stream={chairStream}
+                      muted={true}
+                      mirror={isTakenByMe && cameraFacing === 'user'}
+                      zoom={1}
+                    />
+                    {isSpeakingNow && (
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping pointer-events-none" />
+                    )}
+                  </div>
+                ) : avatarUrl ? (
+                  <div className="relative my-2">
                     <img
                       src={avatarUrl}
                       alt={`Seat ${seatNo}`}
-                      className={`w-7 h-7 rounded-full object-cover border transition-transform ${
+                      className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 transition-transform ${
                         isSpeakingNow
                           ? 'border-amber-400 ring-2 ring-amber-400 scale-105'
                           : isTakenByOther
@@ -756,21 +782,23 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                       }`}
                     />
                     {isSpeakingNow && (
-                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                     )}
                   </div>
                 ) : (
-                  <div className="w-8 h-8 my-0.5 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-slate-400">
-                    <Armchair className="w-4 h-4 text-amber-400/90" />
+                  <div className="flex-1 flex items-center justify-center py-3">
+                    <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full border border-dashed border-slate-700 flex items-center justify-center text-slate-400">
+                      <Armchair className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400/90" />
+                    </div>
                   </div>
                 )}
 
                 {isTakenByMe ? (
-                  <span className="text-[10px] text-amber-300 font-bold break-words w-full px-0.5">
+                  <span className="text-[11px] text-amber-300 font-bold break-words w-full px-0.5 mt-1">
                     {currentUser?.fullName?.split(' ')[0] || 'እርስዎ'}
                   </span>
                 ) : isTakenByOther && occupant ? (
-                  <span className="text-[10px] text-emerald-300 font-bold break-words w-full px-0.5">
+                  <span className="text-[11px] text-emerald-300 font-bold break-words w-full px-0.5 mt-1">
                     {occupant.name.split(' ')[0]}
                   </span>
                 ) : null}
@@ -780,13 +808,9 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
         </div>
       </div>
 
-      {/* 100% FULL-SCREEN SINGLE-SPEAKER CINEMA THEATER (Portal + 100dvh + object-cover Edge-to-Edge) */}
+      {/* 100% FULL-SCREEN SINGLE-SPEAKER CINEMA THEATER (Second image appears ONLY here in bottom-right PiP) */}
       {isFullscreen && typeof document !== 'undefined' && createPortal((() => {
-        const activeRemotePeer = fullscreenTargetId !== 'local'
-          ? liveRemotePeers.find((p) => p.id === fullscreenTargetId) || liveRemotePeers[0]
-          : undefined;
-        const showingRemote = !!(fullscreenTargetId !== 'local' && activeRemotePeer);
-        const nextSwapId = showingRemote ? 'local' : (liveRemotePeers[0]?.id || 'local');
+        const showingRemote = !!primaryRemotePeer;
 
         return (
           <div
@@ -822,21 +846,21 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
 
             {/* 100% Single Speaker Full Edge-to-Edge Stream (Adjustable Zoom 30% - 250%) */}
             <div className="w-full h-full relative overflow-hidden bg-black">
-              {showingRemote && activeRemotePeer ? (
-                activeRemotePeer.stream && activeRemotePeer.isVideoOn ? (
+              {showingRemote && primaryRemotePeer ? (
+                primaryRemotePeer.stream && (primaryRemotePeer.isVideoOn || primaryRemotePeer.stream.getVideoTracks().length > 0) ? (
                   <EdgeToEdgeVideo
-                    stream={activeRemotePeer.stream}
-                    muted={false}
+                    stream={primaryRemotePeer.stream}
+                    muted={true}
                     mirror={false}
                     zoom={fullscreenZoom}
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center bg-slate-950 p-6">
                     <img
-                      src={activeRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'}
-                      alt={activeRemotePeer.name}
+                      src={primaryRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80'}
+                      alt={primaryRemotePeer.name}
                       className={`w-44 h-44 rounded-full object-cover border-4 shadow-2xl ${
-                        activeRemotePeer.isSpeaking ? 'border-emerald-400 ring-8 ring-emerald-400/40' : 'border-slate-700'
+                        primaryRemotePeer.isSpeaking ? 'border-emerald-400 ring-8 ring-emerald-400/40' : 'border-slate-700'
                       }`}
                     />
                   </div>
@@ -869,6 +893,57 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Secondary Video PiP — rendered ONLY in Fullscreen at bottom-right corner; click to swap */}
+            {secondaryPipTargetId && (
+              <button
+                type="button"
+                onClick={() => setFullscreenTargetId(secondaryPipTargetId)}
+                title="ምስሉን ቀይር (Swap)"
+                className="absolute bottom-36 right-3 sm:bottom-6 sm:right-6 z-50 w-24 h-32 sm:w-32 sm:h-44 rounded-2xl overflow-hidden border-2 border-amber-400/80 bg-slate-950 shadow-2xl cursor-pointer hover:scale-105 transition-transform"
+              >
+                {secondaryPipTargetId === 'local' ? (
+                  isVideoOn && localStream ? (
+                    <EdgeToEdgeVideo
+                      stream={localStream}
+                      muted={true}
+                      mirror={cameraFacing === 'user'}
+                      zoom={1}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-950">
+                      <img
+                        src={membership.avatarUrl || currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80'}
+                        alt={currentUser?.fullName || membership.fullName}
+                        className="w-14 h-14 rounded-full object-cover border-2 border-amber-400"
+                      />
+                    </div>
+                  )
+                ) : secondaryRemotePeer ? (
+                  secondaryRemotePeer.stream && (secondaryRemotePeer.isVideoOn || secondaryRemotePeer.stream.getVideoTracks().length > 0) ? (
+                    <EdgeToEdgeVideo
+                      stream={secondaryRemotePeer.stream}
+                      muted={true}
+                      mirror={false}
+                      zoom={1}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-950">
+                      <img
+                        src={secondaryRemotePeer.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80'}
+                        alt={secondaryRemotePeer.name}
+                        className="w-14 h-14 rounded-full object-cover border-2 border-emerald-400"
+                      />
+                    </div>
+                  )
+                ) : null}
+                <span className="absolute bottom-1 left-1 right-1 truncate px-1.5 py-0.5 rounded bg-black/75 text-[10px] font-black text-amber-300 text-center pointer-events-none">
+                  {secondaryPipTargetId === 'local'
+                    ? (currentUser?.fullName?.split(' ')[0] || membership.fullName.split(' ')[0] || 'እርስዎ')
+                    : (secondaryRemotePeer?.name?.split(' ')[0] || '')}
+                </span>
+              </button>
+            )}
 
             {/* Fullscreen Zoom Control Bar (30% Small <-> 250% Large) */}
             <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-50 bg-black/80 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/20 shadow-2xl flex items-center gap-2 max-w-[92vw]">
@@ -944,9 +1019,9 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                 </button>
               )}
 
-              {liveRemotePeers.length > 0 && (
+              {secondaryPipTargetId && (
                 <button
-                  onClick={() => setFullscreenTargetId(nextSwapId)}
+                  onClick={() => setFullscreenTargetId(secondaryPipTargetId)}
                   title="ተናጋሪ ቀይር"
                   className="p-3.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all cursor-pointer"
                 >
