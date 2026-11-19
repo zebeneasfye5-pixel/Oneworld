@@ -223,3 +223,95 @@ label:not(.text-transparent) {
     transform: translateY(-240px) scale(0.7);
   }
 }
+
+/* Formal 2-Page Marriage Contract Document Styling (Screen & Print) */
+.marriage-paper {
+  background-color: #ffffff;
+  color: #0f172a;
+  text-shadow: none;
+}
+
+.marriage-paper h1,
+.marriage-paper h2,
+.marriage-paper h3,
+.marriage-paper h4,
+.marriage-paper button,
+.marriage-paper strong,
+.marriage-paper label {
+  text-shadow: none !important;
+}
+
+.marriage-paper h2 {
+  font-size: 1.28rem !important;
+  line-height: 1.3 !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.marriage-paper h3 {
+  font-size: 0.96rem !important;
+  line-height: 1.35 !important;
+  margin-bottom: 0.25rem !important;
+}
+
+.marriage-paper h4 {
+  font-size: 0.86rem !important;
+  line-height: 1.3 !important;
+  margin-bottom: 0.2rem !important;
+}
+
+.marriage-paper p {
+  font-size: 0.82rem !important;
+  line-height: 1.52 !important;
+  font-weight: 500 !important;
+  margin-bottom: 0.35rem;
+  padding-block: 0;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 9mm 11mm;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 10.5pt !important;
+    line-height: 1.4 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body.has-marriage-contract > #root {
+    display: none !important;
+  }
+
+  body.has-marriage-contract > #wedding-print-portal {
+    display: block !important;
+  }
+
+  .marriage-page {
+    width: 100% !important;
+    height: 272mm !important;
+    max-height: 274mm !important;
+    padding: 7mm 9mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .marriage-page-1 {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .marriage-page-2 {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+}
