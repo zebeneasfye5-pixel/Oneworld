@@ -16,6 +16,13 @@ import type { UserProfile } from './components/AuthModal';
 import type { HouseMemberRecord } from './components/HouseStageMedia';
 import { announceLanguageSwitch } from './services/speechService';
 import { ENV_CONFIG, getApiUrl } from './config/env';
+import { useScreenWakeLock } from './services/wakeLock';
+import {
+  loadSyncAuth,
+  savePersistentAuth,
+  restorePersistentAuthAsync,
+  clearPersistentAuth
+} from './services/authStorage';
 
 // Lazy-loaded on-demand views & modals for ultra-fast initial page speed
 const HouseStageMedia = lazy(() => import('./components/HouseStageMedia').then((m) => ({ default: m.HouseStageMedia })));
@@ -177,19 +184,32 @@ export default function App() {
     }
   };
 
-  // User Profile: Check localStorage for verified logged-in account (Strict Authentication Gate)
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('oneworld_auth_user');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && !parsed.isGuest && parsed.phoneNumber) {
-          return parsed;
+  // Prevent mobile phone screen from dimming or sleeping while Oneworld is open
+  useScreenWakeLock(true);
+
+  // Persistent Authenticated Session: never re-asks password unless user explicitly logs out
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => loadSyncAuth());
+  const [isRestoringSession, setIsRestoringSession] = useState<boolean>(() => !loadSyncAuth());
+
+  useEffect(() => {
+    if (currentUser) {
+      setIsRestoringSession(false);
+      return;
+    }
+    let cancelled = false;
+    restorePersistentAuthAsync()
+      .then((restored) => {
+        if (!cancelled && restored) {
+          setCurrentUser(restored);
         }
-      }
-    } catch {}
-    return null;
-  });
+      })
+      .finally(() => {
+        if (!cancelled) setIsRestoringSession(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Financial Balances with 100% Offline LocalStorage Persistence (Zero fake pre-loaded numbers)
   const [balanceETB, setBalanceETB] = useState<number>(() => {
@@ -444,13 +464,11 @@ export default function App() {
     return true;
   };
 
-  const handleSaveProfile = (profile: UserProfile) => {
+  const handleSaveProfile = (profile: UserProfile, sessionToken?: string) => {
     const wasEditing = !!(currentUser && !currentUser.isGuest && currentUser.idNumber === profile.idNumber);
     const updated = { ...profile, isGuest: false };
     setCurrentUser(updated);
-    try {
-      localStorage.setItem('oneworld_auth_user', JSON.stringify(updated));
-    } catch {}
+    savePersistentAuth(updated, sessionToken);
     showToast(
       wasEditing
         ? `✅ ፕሮፋይልዎ (${profile.fullName}) በተሳካ ሁኔታ ተስተካክሏል!`
@@ -459,11 +477,7 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    try {
-      localStorage.removeItem('oneworld_auth_user');
-      localStorage.removeItem('oneworld_house_memberships');
-      localStorage.removeItem('oneworld_user_seat');
-    } catch {}
+    clearPersistentAuth();
     setCurrentUser(null);
     setHouseMemberships({});
     setIsAuthOpen(true);
@@ -602,10 +616,10 @@ export default function App() {
           />
         )}
 
-        {/* Mandatory Authentication Gate: If user has no account, this blocks access until sign up or login */}
-        {(!currentUser || isAuthOpen) && (
+        {/* Persistent Authentication Gate: only prompts if unauthenticated and restoration check completed */}
+        {((!currentUser && !isRestoringSession) || isAuthOpen) && (
           <AuthModal
-            isOpen={!currentUser || isAuthOpen}
+            isOpen={(!currentUser && !isRestoringSession) || isAuthOpen}
             onClose={() => {
               if (currentUser) setIsAuthOpen(false);
             }}

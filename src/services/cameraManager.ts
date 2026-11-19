@@ -14,7 +14,7 @@ class CameraManager {
   private streamListeners: Set<(stream: MediaStream | null) => void> = new Set();
 
   constructor() {
-    this.armAutoStartOnFirstInteraction();
+    // Hardware stream acquisition is coordinated exclusively by useRealtimeRoom to avoid duplicate camera locks
   }
 
   // Register command listener (e.g. for fullscreen, full-body, flip by command)

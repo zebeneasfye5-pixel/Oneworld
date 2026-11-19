@@ -61,9 +61,16 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// Enable CORS for Vercel frontend, Telegram/IMO WebViews, and external origins
+// Enable CORS with credentials support for Vercel frontend, Telegram/IMO WebViews, and external origins
 app.use((req: Request, res: Response, next: NextFunction) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Vary', 'Origin');
+  } else {
+    res.header('Access-Control-Allow-Origin', '*');
+  }
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   if (req.method === 'OPTIONS') {
@@ -111,8 +118,16 @@ interface StoredAuditTx {
   status: 'SETTLED' | 'PROCESSING';
 }
 
+interface StoredSession {
+  token: string;
+  userKey: string;
+  profile: StoredUser['profile'];
+  createdAt: string;
+}
+
 interface PersistentStore {
   users: Record<string, StoredUser>;
+  sessions: Record<string, StoredSession>;
   houseMemberships: Record<string, Record<string, any>>;
   messagesByRoom: Record<string, any[]>;
   customRooms: any[];
@@ -122,6 +137,7 @@ interface PersistentStore {
 function loadStore(): PersistentStore {
   const empty: PersistentStore = {
     users: {},
+    sessions: {},
     houseMemberships: {},
     messagesByRoom: {},
     customRooms: [],
@@ -136,6 +152,7 @@ function loadStore(): PersistentStore {
       const parsed = JSON.parse(raw);
       return {
         users: parsed.users || {},
+        sessions: parsed.sessions || {},
         houseMemberships: parsed.houseMemberships || {},
         messagesByRoom: parsed.messagesByRoom || {},
         customRooms: Array.isArray(parsed.customRooms) ? parsed.customRooms : [],
@@ -175,6 +192,45 @@ function hashPassword(password: string, salt?: string) {
 function verifyPassword(password: string, salt: string, expectedHash: string) {
   const { hash } = hashPassword(password, salt);
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(expectedHash, 'hex'));
+}
+
+function extractSessionToken(req: Request): string | null {
+  const authHeader = String(req.headers.authorization || '');
+  if (authHeader.startsWith('Bearer ')) {
+    const token = authHeader.slice(7).trim();
+    if (token) return token;
+  }
+  const cookieHeader = String(req.headers.cookie || '');
+  const match = cookieHeader.match(/(?:^|;\s*)ow_sid=([^;]+)/);
+  if (match && match[1]) {
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+function issueSession(res: Response, userKey: string, profile: StoredUser['profile']): string {
+  const token = crypto.randomBytes(32).toString('hex');
+  store.sessions[token] = {
+    token,
+    userKey,
+    profile: { ...profile, isGuest: false },
+    createdAt: new Date().toISOString()
+  };
+  schedulePersist();
+  const isSecure = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+  const cookieParts = [
+    `ow_sid=${encodeURIComponent(token)}`,
+    'Path=/',
+    'Max-Age=31536000',
+    'HttpOnly',
+    isSecure ? 'SameSite=None; Secure' : 'SameSite=Lax'
+  ];
+  res.setHeader('Set-Cookie', cookieParts.join('; '));
+  return token;
 }
 
 // ---------------------------------------------------------------------------
@@ -748,9 +804,10 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
       profile,
       createdAt: new Date().toISOString()
     };
+    const sessionToken = issueSession(res, accountKey, profile);
     schedulePersist();
 
-    return res.status(201).json({ status: 'ok', profile });
+    return res.status(201).json({ status: 'ok', profile, sessionToken });
   } catch (err: any) {
     console.error('[Auth Register Error]', err);
     return res.status(500).json({ error: 'ምዝገባው ላይ ችግር ተፈጥሯል' });
@@ -772,10 +829,43 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
       return res.status(401).json({ error: 'የተሳሳተ የይለፍ ቃል ነው! እባክዎ ትክክለኛ የይለፍ ቃል ያስገቡ።' });
     }
 
-    return res.json({ status: 'ok', profile: { ...userRecord.profile, isGuest: false } });
+    const sessionToken = issueSession(res, normalizedKey, userRecord.profile);
+    return res.json({ status: 'ok', profile: { ...userRecord.profile, isGuest: false }, sessionToken });
   } catch (err: any) {
     console.error('[Auth Login Error]', err);
     return res.status(500).json({ error: 'መግቢያው ላይ ችግር ተፈጥሯል' });
+  }
+});
+
+app.get('/api/auth/session', (req: Request, res: Response) => {
+  try {
+    const token = extractSessionToken(req);
+    if (!token || !store.sessions[token]) {
+      return res.status(401).json({ status: 'unauthenticated' });
+    }
+    const sess = store.sessions[token];
+    const latestUser = store.users[sess.userKey]?.profile || sess.profile;
+    return res.json({
+      status: 'ok',
+      profile: { ...latestUser, isGuest: false },
+      sessionToken: token
+    });
+  } catch {
+    return res.status(401).json({ status: 'unauthenticated' });
+  }
+});
+
+app.post('/api/auth/logout', (req: Request, res: Response) => {
+  try {
+    const token = extractSessionToken(req);
+    if (token && store.sessions[token]) {
+      delete store.sessions[token];
+      schedulePersist();
+    }
+    res.setHeader('Set-Cookie', 'ow_sid=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax');
+    return res.json({ status: 'ok' });
+  } catch {
+    return res.json({ status: 'ok' });
   }
 });
 
@@ -887,7 +977,8 @@ app.put('/api/auth/profile', (req: Request, res: Response) => {
       }
     }
 
-    return res.json({ status: 'ok', profile: updatedProfile });
+    const sessionToken = issueSession(res, newAccountKey, updatedProfile);
+    return res.json({ status: 'ok', profile: updatedProfile, sessionToken });
   } catch (err: any) {
     console.error('[Auth Profile Update Error]', err);
     return res.status(500).json({ error: 'ፕሮፋይሉን በማስተካከል ላይ ችግር ተፈጥሯል' });

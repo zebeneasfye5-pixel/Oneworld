@@ -44,6 +44,7 @@ import { PersonalRoomModal } from './PersonalRoomModal';
 import { TRANSLATIONS, AppLanguage } from '../i18n/translations';
 import { RemotePeerData } from '../services/realtimeMesh';
 import { EdgeToEdgeVideo } from './EdgeToEdgeVideo';
+import { RemoteAudioPlayer } from './RemoteAudioPlayer';
 
 interface RoomStageProps {
   rooms: Room[];
@@ -612,17 +613,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                       {peer.seatNumber ? `${peer.seatNumber} · ` : ''}{peer.name}
                     </span>
 
-                    {peer.stream && (
-                      <audio
-                        ref={(el) => {
-                          if (el && peer.stream && el.srcObject !== peer.stream) {
-                            el.srcObject = peer.stream;
-                            el.play().catch(() => {});
-                          }
-                        }}
-                        autoPlay
-                      />
-                    )}
+                    <RemoteAudioPlayer stream={peer.stream} />
                   </div>
                 ))}
               </div>

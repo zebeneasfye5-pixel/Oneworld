@@ -42,7 +42,7 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile | null;
-  onSaveProfile: (profile: UserProfile) => void;
+  onSaveProfile: (profile: UserProfile, sessionToken?: string) => void;
   onLogout?: () => void;
   canDismiss?: boolean;
 }
@@ -189,6 +189,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       try {
         const res = await fetch(getApiUrl('/api/auth/profile'), {
           method: 'PUT',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             currentPhoneNumber: currentUser.phoneNumber,
@@ -223,7 +224,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           },
           currentUser.phoneNumber
         );
-        onSaveProfile(savedProfile);
+        onSaveProfile(savedProfile, data?.sessionToken);
         onClose();
       } catch {
         // Offline resilience
@@ -266,6 +267,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       try {
         const res = await fetch(getApiUrl('/api/auth/register'), {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             phoneNumber: cleanPhone,
@@ -293,7 +295,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           passwordHash: password,
           profile
         });
-        onSaveProfile(profile);
+        onSaveProfile(profile, data?.sessionToken);
         onClose();
       } catch {
         const uniqueUserId = `USER-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -324,13 +326,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const res = await fetch(getApiUrl('/api/auth/login'), {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phoneNumber: cleanPhone, password })
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.profile) {
         saveStoredAccount({ phoneNumber: cleanPhone, passwordHash: password, profile: data.profile });
-        onSaveProfile({ ...data.profile, isGuest: false });
+        onSaveProfile({ ...data.profile, isGuest: false }, data?.sessionToken);
         onClose();
         setIsSubmitting(false);
         return;

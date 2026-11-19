@@ -26,6 +26,7 @@ import { UserProfile } from './AuthModal';
 import { AppLanguage, TRANSLATIONS } from '../i18n/translations';
 import { RemotePeerData } from '../services/realtimeMesh';
 import { EdgeToEdgeVideo } from './EdgeToEdgeVideo';
+import { RemoteAudioPlayer } from './RemoteAudioPlayer';
 
 export interface HouseMemberRecord {
   houseId: string;
@@ -618,17 +619,7 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                 {peer.seatNumber ? `${peer.seatNumber} · ` : ''}{peer.name}
               </span>
 
-              {peer.stream && (
-                <audio
-                  ref={(el) => {
-                    if (el && peer.stream && el.srcObject !== peer.stream) {
-                      el.srcObject = peer.stream;
-                      el.play().catch(() => {});
-                    }
-                  }}
-                  autoPlay
-                />
-              )}
+              <RemoteAudioPlayer stream={peer.stream} />
             </div>
           ))}
         </div>
