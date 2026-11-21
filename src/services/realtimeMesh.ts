@@ -173,10 +173,36 @@ export function useRealtimeRoom({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const speakingTimerRef = useRef<number | null>(null);
 
-  // Server Media Relay Tracking (P2P first; automatic 2.2s failover to WS relay for restricted mobile/carrier NATs)
+  // Unique per-tab/per-device peer identity so two phones with the same account never kick each other out
+  const tabIdRef = useRef<string>('');
+  if (!tabIdRef.current) {
+    try {
+      const existing = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('ow_tab_id') : null;
+      if (existing) {
+        tabIdRef.current = existing;
+      } else {
+        const created = Math.random().toString(36).slice(2, 8);
+        tabIdRef.current = created;
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem('ow_tab_id', created);
+        }
+      }
+    } catch {
+      tabIdRef.current = Math.random().toString(36).slice(2, 8);
+    }
+  }
+  const selfPeerId =
+    currentUser.id && currentUser.id !== 'pending-auth'
+      ? `${currentUser.id}__${tabIdRef.current}`
+      : `guest__${tabIdRef.current}`;
+
+  // Server Media Relay Tracking (P2P first; automatic 1.4s failover & RTP verification for restricted mobile NATs)
   const p2pWatchdogTimersRef = useRef<Map<string, number>>(new Map());
   const relayIncomingPeersRef = useRef<Set<string>>(new Set());
   const relayOutgoingTargetsRef = useRef<Set<string>>(new Set());
+  const verifiedP2PAudioPeersRef = useRef<Set<string>>(new Set());
+  const verifiedP2PVideoPeersRef = useRef<Set<string>>(new Set());
+  const lastRtpCountersRef = useRef<Map<string, { audioBytes: number; videoFrames: number }>>(new Map());
   const stopRelayAudioCaptureRef = useRef<(() => void) | null>(null);
   const relayVideoTimerRef = useRef<number | null>(null);
 
@@ -189,6 +215,8 @@ export function useRealtimeRoom({
   seatNumberRef.current = seatNumber;
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
+  const selfPeerIdRef = useRef(selfPeerId);
+  selfPeerIdRef.current = selfPeerId;
   const remotePeersRef = useRef(remotePeers);
   remotePeersRef.current = remotePeers;
   const callbacksRef = useRef({
@@ -288,7 +316,7 @@ export function useRealtimeRoom({
               targetPeerId,
               sdp: pc.localDescription,
               caller: {
-                id: user.id,
+                id: selfPeerIdRef.current,
                 name: user.fullName,
                 avatar: user.avatarUrl,
                 role: user.roleTitle,
@@ -451,9 +479,9 @@ export function useRealtimeRoom({
     return mergedStream;
   }, [ensureRelayAudioCapture, syncTracksToPeer]);
 
-  // Adaptive lightweight Video Relay Sender (runs ONLY when >= 1 peer needs Server Relay)
+  // Adaptive lightweight Video Relay Sender (mounted in DOM so Android Chrome & iOS Safari decode frames!)
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || typeof document === 'undefined') return;
 
     const canvas = document.createElement('canvas');
     canvas.width = 240;
@@ -462,8 +490,16 @@ export function useRealtimeRoom({
     const hiddenVideo = document.createElement('video');
     hiddenVideo.muted = true;
     hiddenVideo.playsInline = true;
+    hiddenVideo.autoplay = true;
+    hiddenVideo.setAttribute('playsinline', 'true');
+    hiddenVideo.style.cssText =
+      'position:fixed;top:-10px;left:-10px;width:2px;height:2px;opacity:0.001;pointer-events:none;z-index:-1;';
+    document.body.appendChild(hiddenVideo);
 
-    relayVideoTimerRef.current = window.setInterval(() => {
+    let captureTrackId = '';
+    let imageCaptureInstance: any = null;
+
+    relayVideoTimerRef.current = window.setInterval(async () => {
       if (
         relayOutgoingTargetsRef.current.size === 0 ||
         isVideoOffRef.current ||
@@ -476,6 +512,35 @@ export function useRealtimeRoom({
       const videoTrack = localStreamRef.current.getVideoTracks().find((t) => t.readyState === 'live' && t.enabled);
       if (!videoTrack) return;
 
+      let sent = false;
+      try {
+        const ImageCaptureCtor = (window as any).ImageCapture;
+        if (ImageCaptureCtor) {
+          if (captureTrackId !== videoTrack.id) {
+            captureTrackId = videoTrack.id;
+            imageCaptureInstance = new ImageCaptureCtor(videoTrack);
+          }
+          if (imageCaptureInstance?.grabFrame) {
+            const bitmap = await imageCaptureInstance.grabFrame();
+            ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+            bitmap.close?.();
+            const frame = canvas.toDataURL('image/jpeg', 0.5);
+            if (frame && frame.length < 48000 && socketRef.current?.readyState === WebSocket.OPEN) {
+              socketRef.current.send(JSON.stringify({
+                type: 'relay-media-video',
+                frame,
+                targetPeerIds: Array.from(relayOutgoingTargetsRef.current)
+              }));
+              sent = true;
+            }
+          }
+        }
+      } catch {
+        // fallback cleanly to DOM-mounted video capture below
+      }
+
+      if (sent) return;
+
       if (hiddenVideo.srcObject !== localStreamRef.current) {
         hiddenVideo.srcObject = localStreamRef.current;
         hiddenVideo.play().catch(() => {});
@@ -483,8 +548,8 @@ export function useRealtimeRoom({
       if (hiddenVideo.readyState >= 2 && hiddenVideo.videoWidth > 0) {
         try {
           ctx.drawImage(hiddenVideo, 0, 0, canvas.width, canvas.height);
-          const frame = canvas.toDataURL('image/jpeg', 0.52);
-          if (frame && frame.length < 45000) {
+          const frame = canvas.toDataURL('image/jpeg', 0.5);
+          if (frame && frame.length < 48000 && socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({
               type: 'relay-media-video',
               frame,
@@ -501,6 +566,7 @@ export function useRealtimeRoom({
         relayVideoTimerRef.current = null;
       }
       hiddenVideo.srcObject = null;
+      hiddenVideo.remove();
     };
   }, [enabled]);
 
@@ -652,17 +718,15 @@ export function useRealtimeRoom({
       } catch {}
     }
 
-    // 2.2-second P2P watchdog: guarantees instant media over Server Relay if carrier CGNAT/firewall blocks UDP
+    // 1.4-second P2P watchdog: guarantees instant media over Server Relay unless real P2P RTP packets flow
     const watchdog = window.setTimeout(() => {
       if (
         pc.signalingState !== 'closed' &&
-        pc.connectionState !== 'connected' &&
-        pc.iceConnectionState !== 'connected' &&
-        pc.iceConnectionState !== 'completed'
+        (!verifiedP2PAudioPeersRef.current.has(targetPeerId) || !verifiedP2PVideoPeersRef.current.has(targetPeerId))
       ) {
         activateRelayForPeer(targetPeerId);
       }
-    }, 2200);
+    }, 1400);
     p2pWatchdogTimersRef.current.set(targetPeerId, watchdog);
 
     pc.onsignalingstatechange = () => {
@@ -682,12 +746,12 @@ export function useRealtimeRoom({
     };
 
     const handleConnectionStateUpdate = () => {
-      const connected =
+      const iceReady =
         pc.connectionState === 'connected' ||
         pc.iceConnectionState === 'connected' ||
         pc.iceConnectionState === 'completed';
 
-      if (connected) {
+      if (iceReady && verifiedP2PAudioPeersRef.current.has(targetPeerId) && verifiedP2PVideoPeersRef.current.has(targetPeerId)) {
         const wd = p2pWatchdogTimersRef.current.get(targetPeerId);
         if (wd) {
           window.clearTimeout(wd);
@@ -732,7 +796,7 @@ export function useRealtimeRoom({
                   targetPeerId,
                   sdp: pc.localDescription,
                   caller: {
-                    id: user.id,
+                    id: selfPeerIdRef.current,
                     name: user.fullName,
                     avatar: user.avatarUrl,
                     role: user.roleTitle,
@@ -760,7 +824,7 @@ export function useRealtimeRoom({
                       targetPeerId,
                       sdp: pc.localDescription,
                       caller: {
-                        id: user.id,
+                        id: selfPeerIdRef.current,
                         name: user.fullName,
                         avatar: user.avatarUrl,
                         role: user.roleTitle,
@@ -841,7 +905,7 @@ export function useRealtimeRoom({
               targetPeerId,
               sdp: pc.localDescription,
               caller: {
-                id: user.id,
+                id: selfPeerIdRef.current,
                 name: user.fullName,
                 avatar: user.avatarUrl,
                 role: user.roleTitle,
@@ -857,6 +921,61 @@ export function useRealtimeRoom({
 
     return pc;
   }, [activateRelayForPeer, syncTracksToPeer]);
+
+  // Continuous WebRTC RTP Byte/Frame Verification (every 1.2s):
+  // Proves actual remote audio & video packets are arriving before stopping Server Media Relay
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = window.setInterval(async () => {
+      for (const [peerId, pc] of peerConnectionsRef.current.entries()) {
+        if (pc.signalingState === 'closed') continue;
+        try {
+          const stats = await pc.getStats();
+          let audioBytes = 0;
+          let videoFrames = 0;
+          stats.forEach((report: any) => {
+            if (report.type === 'inbound-rtp') {
+              if (report.kind === 'audio' || report.mediaType === 'audio') {
+                audioBytes += Number(report.bytesReceived || 0);
+              } else if (report.kind === 'video' || report.mediaType === 'video') {
+                videoFrames += Number(report.framesDecoded || 0);
+              }
+            }
+          });
+          const prev = lastRtpCountersRef.current.get(peerId) || { audioBytes: 0, videoFrames: 0 };
+          const audioFlowing = audioBytes > prev.audioBytes && audioBytes > 0;
+          const videoFlowing = videoFrames > prev.videoFrames && videoFrames > 0;
+          lastRtpCountersRef.current.set(peerId, { audioBytes, videoFrames });
+
+          if (audioFlowing) verifiedP2PAudioPeersRef.current.add(peerId);
+          else verifiedP2PAudioPeersRef.current.delete(peerId);
+
+          if (videoFlowing) verifiedP2PVideoPeersRef.current.add(peerId);
+          else verifiedP2PVideoPeersRef.current.delete(peerId);
+
+          if (audioFlowing && videoFlowing) {
+            if (relayIncomingPeersRef.current.has(peerId)) {
+              relayIncomingPeersRef.current.delete(peerId);
+              relayOutgoingTargetsRef.current.delete(peerId);
+              if (socketRef.current?.readyState === WebSocket.OPEN) {
+                socketRef.current.send(JSON.stringify({ type: 'stop-relay', targetPeerId: peerId }));
+              }
+            }
+            setRemotePeers((curr) => {
+              const ex = curr.get(peerId);
+              if (ex && ex.connectionMode !== 'p2p') {
+                const next = new Map(curr);
+                next.set(peerId, { ...ex, connectionMode: 'p2p', relayVideoFrame: undefined });
+                return next;
+              }
+              return curr;
+            });
+          }
+        } catch {}
+      }
+    }, 1200);
+    return () => window.clearInterval(timer);
+  }, [enabled]);
 
   // Connect to WebSocket Signaling + Media Relay Server
   useEffect(() => {
@@ -899,7 +1018,7 @@ export function useRealtimeRoom({
             type: 'join-room',
             roomId,
             user: {
-              id: user.id,
+              id: selfPeerIdRef.current,
               name: user.fullName,
               avatar: user.avatarUrl,
               role: user.roleTitle,
@@ -968,7 +1087,7 @@ export function useRealtimeRoom({
 
               case 'user-joined': {
                 const p = data.peer;
-                if (!p || p.id === currentUserRef.current.id) return;
+                if (!p || p.id === selfPeerIdRef.current) return;
                 setRemotePeers((prev) => {
                   const next = new Map(prev);
                   const existing = next.get(p.id);
@@ -988,7 +1107,7 @@ export function useRealtimeRoom({
                   });
                   return next;
                 });
-                // Start passive connection monitor in case joiner's offer takes > 2.2s
+                // Start passive connection monitor in case joiner's offer takes > 1.4s
                 if (!peerConnectionsRef.current.has(p.id)) {
                   createPeerConnection(p.id, false);
                 }
@@ -997,7 +1116,7 @@ export function useRealtimeRoom({
 
               case 'peer-media-ready': {
                 const { peerId, peer } = data;
-                if (!peerId || peerId === currentUserRef.current.id) break;
+                if (!peerId || peerId === selfPeerIdRef.current) break;
                 if (peer) {
                   setRemotePeers((prev) => {
                     const next = new Map(prev);
@@ -1025,11 +1144,8 @@ export function useRealtimeRoom({
 
               case 'relay-stopped': {
                 const { fromPeerId } = data;
-                if (fromPeerId) {
-                  const pc = peerConnectionsRef.current.get(String(fromPeerId));
-                  if (pc && (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected')) {
-                    relayOutgoingTargetsRef.current.delete(String(fromPeerId));
-                  }
+                if (fromPeerId && verifiedP2PAudioPeersRef.current.has(String(fromPeerId)) && verifiedP2PVideoPeersRef.current.has(String(fromPeerId))) {
+                  relayOutgoingTargetsRef.current.delete(String(fromPeerId));
                 }
                 break;
               }
@@ -1037,12 +1153,7 @@ export function useRealtimeRoom({
               case 'relay-media-audio': {
                 const { peerId, pcm16, sampleRate } = data;
                 if (!peerId || !pcm16) break;
-                const pc = peerConnectionsRef.current.get(peerId);
-                const hasLiveP2PAudio =
-                  pc &&
-                  (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected') &&
-                  remotePeersRef.current.get(peerId)?.stream?.getAudioTracks().some((t) => t.readyState === 'live');
-                if (!hasLiveP2PAudio) {
+                if (!verifiedP2PAudioPeersRef.current.has(peerId)) {
                   playRelayedPcmChunk(peerId, pcm16, sampleRate || 16000);
                 }
                 break;
@@ -1054,17 +1165,12 @@ export function useRealtimeRoom({
                 setRemotePeers((prev) => {
                   const next = new Map(prev);
                   const existing = next.get(peerId);
-                  if (existing) {
-                    const hasP2PVideo =
-                      existing.connectionMode === 'p2p' &&
-                      existing.stream?.getVideoTracks().some((t) => t.readyState === 'live');
-                    if (!hasP2PVideo) {
-                      next.set(peerId, {
-                        ...existing,
-                        relayVideoFrame: frame,
-                        connectionMode: existing.connectionMode === 'p2p' ? 'p2p' : 'relay'
-                      });
-                    }
+                  if (existing && !verifiedP2PVideoPeersRef.current.has(peerId)) {
+                    next.set(peerId, {
+                      ...existing,
+                      relayVideoFrame: frame,
+                      connectionMode: existing.connectionMode === 'p2p' ? 'p2p' : 'relay'
+                    });
                   }
                   return next;
                 });
@@ -1097,7 +1203,7 @@ export function useRealtimeRoom({
 
                 const pc = createPeerConnection(callerId, false, true);
                 if (pc.signalingState === 'have-local-offer') {
-                  const isPolite = currentUserRef.current.id < callerId;
+                  const isPolite = selfPeerIdRef.current < callerId;
                   const isRecovering = pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed';
                   if (!isPolite && !isRecovering) break;
                   await pc.setLocalDescription({ type: 'rollback' } as any).catch(() => {});
@@ -1113,7 +1219,7 @@ export function useRealtimeRoom({
                     type: 'webrtc-answer',
                     targetPeerId: callerId,
                     sdp: pc.localDescription,
-                    responderId: currentUserRef.current.id
+                    responderId: selfPeerIdRef.current
                   }));
                 }
                 break;
@@ -1177,7 +1283,7 @@ export function useRealtimeRoom({
                       relayVideoFrame: p.isVideoOn === false ? undefined : existing.relayVideoFrame,
                       seatNumber: p.seatNumber !== undefined ? p.seatNumber : existing.seatNumber
                     });
-                  } else if (p.id !== currentUserRef.current.id) {
+                  } else if (p.id !== selfPeerIdRef.current) {
                     next.set(p.id, {
                       id: p.id,
                       name: p.name || 'ተሳታፊ',
@@ -1207,6 +1313,9 @@ export function useRealtimeRoom({
                   }
                   relayIncomingPeersRef.current.delete(peerId);
                   relayOutgoingTargetsRef.current.delete(peerId);
+                  verifiedP2PAudioPeersRef.current.delete(peerId);
+                  verifiedP2PVideoPeersRef.current.delete(peerId);
+                  lastRtpCountersRef.current.delete(peerId);
                   clearPeerRelayCursor(peerId);
                   peerConnectionsRef.current.get(peerId)?.close();
                   peerConnectionsRef.current.delete(peerId);

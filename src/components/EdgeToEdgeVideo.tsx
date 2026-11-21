@@ -25,6 +25,7 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(null);
+  const [hasDecodedVideoFrame, setHasDecodedVideoFrame] = useState(false);
 
   const hasLiveVideoStream = !!(
     stream &&
@@ -44,17 +45,20 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
     const vH = video.videoHeight;
 
     if (vW > 0 && vH > 0) {
+      setHasDecodedVideoFrame(true);
       const coverScale = Math.max(cW / vW, cH / vH);
       setBoxSize({
         w: Math.ceil(vW * coverScale) + 2,
         h: Math.ceil(vH * coverScale) + 2,
       });
     } else {
+      setHasDecodedVideoFrame(false);
       setBoxSize(null);
     }
   }, []);
 
   useEffect(() => {
+    setHasDecodedVideoFrame(false);
     const video = videoRef.current;
     if (!video || !stream) return;
 
@@ -137,39 +141,45 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
         transform: fallbackTransform,
       };
 
+  const showRelayOverlay = !!fallbackFrame && (!hasLiveVideoStream || !hasDecodedVideoFrame);
+
   return (
     <div
       ref={containerRef}
       className={`relative w-full h-full overflow-hidden bg-black ${className}`}
     >
-      {hasLiveVideoStream ? (
+      {hasLiveVideoStream && (
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={muted}
           onLoadedMetadata={recalculateCover}
+          onLoadedData={recalculateCover}
           onResize={recalculateCover}
           onPlaying={recalculateCover}
           style={videoStyle}
         />
-      ) : fallbackFrame ? (
+      )}
+      {showRelayOverlay && (
         <img
-          src={fallbackFrame}
+          src={fallbackFrame!}
           alt="Live Video Relay"
-          className="w-full h-full object-cover object-center select-none"
+          className="relative z-[1] w-full h-full object-cover object-center select-none"
           style={{
             transform: fallbackTransform,
             transition: 'transform 200ms ease-out',
           }}
         />
-      ) : (
+      )}
+      {!hasLiveVideoStream && !showRelayOverlay && (
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted={muted}
           onLoadedMetadata={recalculateCover}
+          onLoadedData={recalculateCover}
           onResize={recalculateCover}
           onPlaying={recalculateCover}
           style={videoStyle}

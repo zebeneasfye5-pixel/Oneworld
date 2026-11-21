@@ -159,12 +159,12 @@ export function startRelayAudioCapture(
 
       if (sampleAccumulator.length >= SEND_FRAME_SAMPLES) {
         const frame = new Int16Array(sampleAccumulator.splice(0, SEND_FRAME_SAMPLES));
-        // Skip dead silence to save mobile bandwidth
+        // Skip only near-zero dead silence to preserve soft mobile voices
         let energy = 0;
         for (let i = 0; i < frame.length; i += 4) {
           energy += Math.abs(frame[i]);
         }
-        if (energy / (frame.length / 4) > 32) {
+        if (energy / (frame.length / 4) > 6) {
           onChunk(int16ToBase64(frame), 16000);
         }
       }

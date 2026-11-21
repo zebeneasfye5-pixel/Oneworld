@@ -290,7 +290,7 @@ server.on('upgrade', (request, socket, head) => {
   }
 });
 
-// Keep mobile / Telegram / IMO WebView sockets alive & prune dropped peers every 20s
+// Keep mobile / Telegram / IMO WebView & H+ sockets alive & prune dropped peers every 35s (70s grace)
 const heartbeatInterval = setInterval(() => {
   let pruned = false;
   for (const [ws, client] of clients.entries()) {
@@ -312,7 +312,7 @@ const heartbeatInterval = setInterval(() => {
   if (pruned) {
     broadcastOnlineCount();
   }
-}, 20000);
+}, 35000);
 
 wss.on('close', () => {
   clearInterval(heartbeatInterval);
