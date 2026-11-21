@@ -1,6 +1,6 @@
 import React from 'react';
 import { AppLanguage, APP_LANGUAGES, TRANSLATIONS } from '../i18n/translations';
-import { Globe, Wallet, ShieldCheck, Sparkles, Users, Menu, Lock, User, Smartphone } from 'lucide-react';
+import { Globe, Wallet, ShieldCheck, Users, Menu, User, Smartphone } from 'lucide-react';
 import { UserProfile } from './AuthModal';
 import { OneWorldLogo } from './OneWorldLogo';
 
@@ -24,16 +24,12 @@ export const Header: React.FC<HeaderProps> = ({
   currentLang,
   onLanguageChange,
   balanceETB,
-  balanceUSD,
-  royaltyPoints,
   onlineCount = 1,
   onOpenWallet,
   onOpenDrawer,
-  onOpenBuilderVault,
   onOpenAuth,
   user,
-  onInstallPwa,
-  isInstallable
+  onInstallPwa
 }) => {
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.am;
 
@@ -74,8 +70,25 @@ export const Header: React.FC<HeaderProps> = ({
           <span>{t.reserveRule}</span>
         </div>
 
-        {/* Right side controls: Wrap gracefully on narrow phone screens so nothing clips */}
+        {/* Right side controls: Quick Language Selector + PWA Install + Profile + Wallet */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between sm:justify-end">
+          {/* Quick 1-Tap Global Language Switcher */}
+          <label className="flex items-center gap-1.5 px-2.5 py-2 bg-slate-900 hover:bg-slate-800 border border-amber-500/40 rounded-xl text-xs font-black text-amber-300 cursor-pointer shadow-sm">
+            <Globe className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <select
+              aria-label="ቋንቋ ይምረጡ (Select Language)"
+              value={currentLang}
+              onChange={(e) => onLanguageChange(e.target.value as AppLanguage)}
+              className="bg-transparent text-amber-200 font-black text-xs focus:outline-none cursor-pointer pr-1"
+            >
+              {APP_LANGUAGES.map((langOpt) => (
+                <option key={langOpt.code} value={langOpt.code} className="bg-slate-900 text-white">
+                  {langOpt.flag} {langOpt.nativeName}
+                </option>
+              ))}
+            </select>
+          </label>
+
           {/* PWA Install Button */}
           <button
             onClick={onInstallPwa}
@@ -97,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
             title={user && !user.isGuest ? 'ፕሮፋይልዎን ለማየት ወይም ለማስተካከል ይጫኑ' : 'ይግቡ ወይም ይመዝገቡ'}
           >
             <User className="w-4 h-4 text-amber-400 flex-shrink-0" />
-            <span className="max-w-[130px] truncate">
+            <span className="max-w-[120px] truncate">
               {user && !user.isGuest ? user.fullName.split(' ')[0] : 'ግባ / ተመዝገብ'}
             </span>
           </button>

@@ -3,7 +3,8 @@ import {
   Room, 
   RoomOccupant, 
   LiveSpeechMessage, 
-  VirtualGift 
+  VirtualGift,
+  LanguageCode
 } from './types';
 import { 
   INITIAL_ROOMS 
@@ -14,7 +15,21 @@ import { Navigation, MainNavigationTarget } from './components/Navigation';
 import { MasterDrawer, HouseId } from './components/MasterDrawer';
 import type { UserProfile } from './components/AuthModal';
 import type { HouseMemberRecord } from './components/HouseStageMedia';
-import { announceLanguageSwitch } from './services/speechService';
+import {
+  announceLanguageSwitch,
+  unlockAudioPlayback,
+  speakTranslationQueued,
+  clearDubbingQueue,
+  startSpeechRecognition,
+  stopSpeechRecognition,
+  startAudioChunkTranscription,
+  stopAudioChunkTranscription,
+  isSpeechRecognitionSupported
+} from './services/speechService';
+import {
+  translateBatchWithGemini,
+  translateTextWithGemini
+} from './services/geminiService';
 import { ENV_CONFIG, getApiUrl } from './config/env';
 import { useScreenWakeLock } from './services/wakeLock';
 import {
@@ -260,6 +275,40 @@ export default function App() {
   const [currentRoom, setCurrentRoom] = useState<Room>(INITIAL_ROOMS[0]);
   const [messages, setMessages] = useState<LiveSpeechMessage[]>([]);
 
+  // Live Cross-Language Voice Dubbing state (ON by default so listeners hear translations instantly)
+  const [autoDubEnabled, setAutoDubEnabled] = useState<boolean>(true);
+  const currentLangRef = React.useRef<AppLanguage>(currentLang);
+  const autoDubRef = React.useRef<boolean>(autoDubEnabled);
+  const currentUserRef = React.useRef<UserProfile | null>(currentUser);
+  const messagesRef = React.useRef<LiveSpeechMessage[]>(messages);
+  const spokenMessageKeysRef = React.useRef<Set<string>>(new Set());
+  const pendingListenerTranslationTimersRef = React.useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const lastSpokenUtteranceRef = React.useRef<{ text: string; ts: number }>({ text: '', ts: 0 });
+
+  useEffect(() => {
+    currentLangRef.current = currentLang;
+  }, [currentLang]);
+  useEffect(() => {
+    autoDubRef.current = autoDubEnabled;
+  }, [autoDubEnabled]);
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // Unlock browser AudioContext & SpeechSynthesis on first user tap/click anywhere
+  useEffect(() => {
+    const handleUnlock = () => unlockAudioPlayback();
+    window.addEventListener('pointerdown', handleUnlock, { once: true, passive: true });
+    window.addEventListener('keydown', handleUnlock, { once: true, passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', handleUnlock);
+      window.removeEventListener('keydown', handleUnlock);
+    };
+  }, []);
+
   // Fetch server-persisted custom rooms on startup
   useEffect(() => {
     fetch(getApiUrl('/api/rooms'))
@@ -301,6 +350,73 @@ export default function App() {
       ? activeTarget
       : 'h1';
 
+  // Helper: Resolve & speak incoming foreign-language message aloud for the listener
+  const handleIncomingTranslationPlayback = React.useCallback((msg: LiveSpeechMessage) => {
+    const listenerLang = currentLangRef.current as LanguageCode;
+    const selfId = currentUserRef.current?.idNumber;
+    const isSelfSender = Boolean(
+      (msg.senderId && selfId && msg.senderId === selfId) ||
+      (!msg.senderId && msg.speakerName === currentUserRef.current?.fullName && msg.sourceLang === listenerLang)
+    );
+    if (isSelfSender) return;
+    if (msg.sourceLang === listenerLang) return;
+
+    const spokenKey = `${msg.id}:${listenerLang}`;
+    const existingTranslation = msg.translations?.[listenerLang];
+
+    if (existingTranslation && existingTranslation.trim()) {
+      const pendingTimer = pendingListenerTranslationTimersRef.current.get(msg.id);
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        pendingListenerTranslationTimersRef.current.delete(msg.id);
+      }
+      if (autoDubRef.current && !spokenMessageKeysRef.current.has(spokenKey)) {
+        spokenMessageKeysRef.current.add(spokenKey);
+        void speakTranslationQueued(existingTranslation, listenerLang);
+      }
+      return;
+    }
+
+    // If batch translation from sender hasn't arrived within 420ms, listener translates directly
+    if (!pendingListenerTranslationTimersRef.current.has(msg.id)) {
+      const timer = setTimeout(async () => {
+        pendingListenerTranslationTimersRef.current.delete(msg.id);
+        const latestMsg = messagesRef.current.find((m) => m.id === msg.id) || msg;
+        const targetLang = currentLangRef.current as LanguageCode;
+        if (latestMsg.sourceLang === targetLang) return;
+
+        let resolved = latestMsg.translations?.[targetLang];
+        if (!resolved) {
+          resolved = (await translateTextWithGemini(latestMsg.originalText, latestMsg.sourceLang, targetLang)) || undefined;
+          if (resolved) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === msg.id
+                  ? { ...m, translationError: undefined, translations: { ...m.translations, [targetLang]: resolved } }
+                  : m
+              )
+            );
+          } else {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === msg.id
+                  ? { ...m, translationError: 'Translation unavailable' }
+                  : m
+              )
+            );
+          }
+        }
+
+        const keyAfter = `${msg.id}:${targetLang}`;
+        if (resolved && autoDubRef.current && !spokenMessageKeysRef.current.has(keyAfter)) {
+          spokenMessageKeysRef.current.add(keyAfter);
+          void speakTranslationQueued(resolved, targetLang);
+        }
+      }, 420);
+      pendingListenerTranslationTimersRef.current.set(msg.id, timer);
+    }
+  }, []);
+
   // Live Multi-User WebRTC & WebSocket Mesh Connection
   const realtime = useRealtimeRoom({
     roomId: activeRealtimeRoomId,
@@ -310,19 +426,44 @@ export default function App() {
       fullName: currentUser?.fullName || 'ተጠቃሚ',
       avatarUrl: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
       roleTitle: currentUser?.roleTitle || 'የማህበረሰብ አባል',
-      nationality: currentUser?.nationality || 'ኢትዮጵያ'
+      nationality: currentUser?.nationality || 'ኢትዮጵያ',
+      preferredLang: currentLang
     },
     onMessageReceived: (msg) => {
       setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+      handleIncomingTranslationPlayback(msg);
     },
     onMessageUpdated: (messageId, translations) => {
+      let updatedMsg: LiveSpeechMessage | null = null;
       setMessages((prev) =>
-        prev.map((m) =>
-          m.id === messageId
-            ? { ...m, translations: { ...m.translations, ...translations } }
-            : m
-        )
+        prev.map((m) => {
+          if (m.id === messageId) {
+            updatedMsg = {
+              ...m,
+              translationError: undefined,
+              translations: { ...m.translations, ...translations }
+            };
+            return updatedMsg;
+          }
+          return m;
+        })
       );
+      if (updatedMsg) {
+        handleIncomingTranslationPlayback(updatedMsg);
+      } else {
+        const listenerLang = currentLangRef.current as LanguageCode;
+        const translatedVal = translations?.[listenerLang];
+        const spokenKey = `${messageId}:${listenerLang}`;
+        if (translatedVal && autoDubRef.current && !spokenMessageKeysRef.current.has(spokenKey)) {
+          const pendingTimer = pendingListenerTranslationTimersRef.current.get(messageId);
+          if (pendingTimer) {
+            clearTimeout(pendingTimer);
+            pendingListenerTranslationTimersRef.current.delete(messageId);
+          }
+          spokenMessageKeysRef.current.add(spokenKey);
+          void speakTranslationQueued(translatedVal, listenerLang);
+        }
+      }
     },
     onRoomHistory: (_rid, historyMsgs) => {
       setMessages(historyMsgs || []);
@@ -339,8 +480,9 @@ export default function App() {
     }
   });
 
-  // Synchronized Language Change (Switches both UI text and Voice Audio)
+  // Synchronized Language Change (Switches UI text, WebRTC mesh preference & Voice Audio)
   const handleLanguageChange = (lang: AppLanguage) => {
+    unlockAudioPlayback();
     setCurrentLang(lang);
     announceLanguageSwitch(lang);
     const langNames: Record<AppLanguage, string> = {
@@ -387,21 +529,156 @@ export default function App() {
     showToast(t.announcements.seatLeft);
   };
 
-  const handleSendMessage = (msg: LiveSpeechMessage) => {
+  const handleSendMessage = React.useCallback((msg: LiveSpeechMessage) => {
     setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
     realtime.sendRealtimeMessage(msg);
-  };
+  }, [realtime]);
 
-  const handleTranslationComplete = (messageId: string, translations: Record<string, string>) => {
+  const handleTranslationComplete = React.useCallback((messageId: string, translations: Record<string, string>) => {
     setMessages((prev) =>
       prev.map((m) =>
         m.id === messageId
-          ? { ...m, translations: { ...m.translations, ...translations } }
+          ? { ...m, translationError: undefined, translations: { ...m.translations, ...translations } }
           : m
       )
     );
     realtime.broadcastTranslationUpdate(messageId, translations);
-  };
+  }, [realtime]);
+
+  const handleRetryTranslation = React.useCallback(async (msg: LiveSpeechMessage) => {
+    const targetLang = currentLangRef.current as LanguageCode;
+    if (msg.sourceLang === targetLang) return;
+    const translated = await translateTextWithGemini(msg.originalText, msg.sourceLang, targetLang);
+    if (translated) {
+      handleTranslationComplete(msg.id, { [targetLang]: translated });
+      if (autoDubRef.current) {
+        spokenMessageKeysRef.current.add(`${msg.id}:${targetLang}`);
+        void speakTranslationQueued(translated, targetLang);
+      }
+    } else {
+      showToast('⚠️ ትርጉሙን ከሰርቨር ማምጣት አልተቻለም። እባክዎ ቆይተው እንደገና ይሞክሩ።');
+    }
+  }, [handleTranslationComplete]);
+
+  // Broadcast spoken sentence immediately + translate in ONE single Gemini batch call
+  const handleBroadcastSpokenUtterance = React.useCallback((rawText: string) => {
+    const cleanText = (rawText || '').trim();
+    if (!cleanText || cleanText.length < 2) return;
+
+    const now = Date.now();
+    if (
+      lastSpokenUtteranceRef.current.text === cleanText &&
+      now - lastSpokenUtteranceRef.current.ts < 3000
+    ) {
+      return;
+    }
+    lastSpokenUtteranceRef.current = { text: cleanText, ts: now };
+
+    const activeLang = currentLangRef.current as LanguageCode;
+    const user = currentUserRef.current;
+    const msgId = `voice-${now}-${Math.floor(Math.random() * 1000)}`;
+    const initialTranslations: Partial<Record<LanguageCode, string>> = {
+      [activeLang]: cleanText
+    };
+
+    const newMsg: LiveSpeechMessage = {
+      id: msgId,
+      senderId: user?.idNumber,
+      speakerName: user?.fullName || 'ተጠቃሚ',
+      speakerAvatar: user?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+      sourceLang: activeLang,
+      originalText: cleanText,
+      translations: initialTranslations,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      seatNumber: realtime.seatNumber || 1
+    };
+
+    handleSendMessage(newMsg);
+    setRoyaltyPoints((prev) => prev + 25);
+
+    (async () => {
+      const targetLangs: LanguageCode[] = (
+        ['am', 'en', 'om', 'ti', 'ar', 'fr', 'es', 'zh', 'de'] as LanguageCode[]
+      ).filter((l) => l !== activeLang);
+
+      const { translations, error } = await translateBatchWithGemini(
+        cleanText,
+        activeLang,
+        targetLangs
+      );
+
+      const updatedKeys = Object.keys(translations).filter((k) => k !== activeLang);
+      if (updatedKeys.length > 0) {
+        handleTranslationComplete(msgId, translations as Record<string, string>);
+      } else if (error) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? { ...m, translationError: error } : m))
+        );
+      }
+    })();
+  }, [handleSendMessage, handleTranslationComplete, realtime.seatNumber]);
+
+  // Global Mic Speech Capture across ALL 16 Houses (Web Speech API + MediaRecorder Gemini Fallback)
+  useEffect(() => {
+    const shouldCaptureSpeech =
+      !realtime.isMicMuted && !!currentUser && activeTarget.startsWith('h');
+
+    if (!shouldCaptureSpeech) {
+      stopSpeechRecognition();
+      stopAudioChunkTranscription();
+      return;
+    }
+
+    let usingChunkFallback = false;
+    const startFallbackCapture = () => {
+      if (usingChunkFallback || !realtime.localStream) return;
+      usingChunkFallback = true;
+      startAudioChunkTranscription(
+        realtime.localStream,
+        currentLang as LanguageCode,
+        (transcript) => handleBroadcastSpokenUtterance(transcript),
+        () => {}
+      );
+    };
+
+    // Oromo (om) & Tigrinya (ti) are rarely supported by browser Web Speech API; use Gemini audio transcription directly if stream exists
+    const preferGeminiTranscription = currentLang === 'om' || currentLang === 'ti';
+
+    if (!preferGeminiTranscription && isSpeechRecognitionSupported()) {
+      const started = startSpeechRecognition(
+        currentLang as LanguageCode,
+        (finalText) => handleBroadcastSpokenUtterance(finalText),
+        (err) => {
+          if (
+            err === 'language-not-supported' ||
+            err === 'service-not-allowed' ||
+            err === 'SpeechRecognitionNotSupported' ||
+            err === 'network'
+          ) {
+            stopSpeechRecognition();
+            startFallbackCapture();
+          }
+        }
+      );
+      if (!started) {
+        startFallbackCapture();
+      }
+    } else {
+      startFallbackCapture();
+    }
+
+    return () => {
+      stopSpeechRecognition();
+      stopAudioChunkTranscription();
+    };
+  }, [
+    realtime.isMicMuted,
+    realtime.localStream,
+    currentUser,
+    activeTarget,
+    currentLang,
+    handleBroadcastSpokenUtterance
+  ]);
 
   const handleSendGift = (gift: VirtualGift, recipient: RoomOccupant) => {
     if (balanceETB < gift.priceETB) {
@@ -686,6 +963,16 @@ export default function App() {
             onLeaveSeat={handleLeaveSeat}
             userSeatedNumber={realtime.seatNumber}
             onAddRoyalty={handleAddRoyalty}
+            autoDubEnabled={autoDubEnabled}
+            onToggleAutoDub={() => {
+              unlockAudioPlayback();
+              setAutoDubEnabled((prev) => {
+                const next = !prev;
+                if (!next) clearDubbingQueue();
+                return next;
+              });
+            }}
+            onRetryTranslation={handleRetryTranslation}
           />
         )}
 
@@ -717,6 +1004,19 @@ export default function App() {
               userSeat={realtime.seatNumber}
               onClaimSeat={handleClaimSeat}
               onLeaveSeat={handleLeaveSeat}
+              messages={messages}
+              autoDubEnabled={autoDubEnabled}
+              onToggleAutoDub={() => {
+                unlockAudioPlayback();
+                setAutoDubEnabled((prev) => {
+                  const next = !prev;
+                  if (!next) clearDubbingQueue();
+                  return next;
+                });
+              }}
+              onSendMessage={handleSendMessage}
+              onTranslationComplete={handleTranslationComplete}
+              onRetryTranslation={handleRetryTranslation}
             />
             {houseMemberships[activeTarget] && (
               <>

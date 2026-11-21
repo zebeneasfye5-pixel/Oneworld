@@ -32,12 +32,8 @@ import {
   Armchair
 } from 'lucide-react';
 import { UserProfile } from './AuthModal';
-import { translateTextWithGemini } from '../services/geminiService';
-import { 
-  startSpeechRecognition, 
-  stopSpeechRecognition, 
-  speakText 
-} from '../services/speechService';
+import { translateBatchWithGemini } from '../services/geminiService';
+import { speakText, unlockAudioPlayback } from '../services/speechService';
 import { cameraManager } from '../services/cameraManager';
 import { GiftModal } from './GiftModal';
 import { PersonalRoomModal } from './PersonalRoomModal';
@@ -74,6 +70,9 @@ interface RoomStageProps {
   onLeaveSeat: () => void;
   userSeatedNumber: number | null;
   onAddRoyalty: (amount: number, reason: string) => void;
+  autoDubEnabled?: boolean;
+  onToggleAutoDub?: () => void;
+  onRetryTranslation?: (msg: LiveSpeechMessage) => void;
 }
 
 export const RoomStage: React.FC<RoomStageProps> = ({
@@ -103,7 +102,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
   onClaimSeat,
   onLeaveSeat,
   userSeatedNumber,
-  onAddRoyalty
+  onAddRoyalty,
+  autoDubEnabled = true,
+  onToggleAutoDub,
+  onRetryTranslation
 }) => {
   const t = TRANSLATIONS[userLang as AppLanguage] || TRANSLATIONS.am;
   const isMicOn = !isMicMuted;
@@ -212,7 +214,6 @@ export const RoomStage: React.FC<RoomStageProps> = ({
 
     return () => {
       unsubCmd();
-      stopSpeechRecognition();
     };
   }, [onFlipCamera, onRetryCamera]);
 
@@ -224,96 +225,29 @@ export const RoomStage: React.FC<RoomStageProps> = ({
     onFlipCamera?.();
   };
 
-  // Unified Microphone + Live Speech Recognition Toggle
+  // Unified Microphone Toggle (speech-to-translation capture is managed globally in App.tsx across all 16 houses)
   const toggleMicrophone = () => {
-    const nextMicOn = !isMicOn;
+    unlockAudioPlayback();
     onToggleMic?.();
-
-    if (nextMicOn) {
-      startSpeechRecognition(
-        userLang,
-        (text) => {
-          if (text.trim()) {
-            handleBroadcastVoiceSpeech(text);
-          }
-        },
-        (err) => {
-          console.warn('Speech recognition notice:', err);
-        },
-        () => {}
-      );
-    } else {
-      stopSpeechRecognition();
-    }
   };
 
-  // INSTANT SPEECH DELIVERY (0ms Latency Arrival + Real Gemini Background Translation Sync)
-  const handleBroadcastVoiceSpeech = (spokenText: string) => {
-    if (!spokenText.trim()) return;
-
-    const msgId = `voice-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const initialTranslations: Record<string, string> = {
-      [userLang]: spokenText
-    };
-
-    const newMsg: LiveSpeechMessage = {
-      id: msgId,
-      speakerName: currentUser?.fullName || 'ተጠቃሚ',
-      speakerAvatar: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
-      sourceLang: userLang,
-      originalText: spokenText,
-      translations: initialTranslations,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      seatNumber: userSeatedNumber || 1
-    };
-
-    onSendMessage(newMsg);
-    onAddRoyalty(25, 'የቀጥታ ድምፅ ንግግር ተሳትፎ');
-
-    (async () => {
-      try {
-        const targetLangs: LanguageCode[] = (['am', 'en', 'ar', 'fr', 'om', 'ti', 'es', 'zh', 'de'] as LanguageCode[])
-          .filter((l) => l !== userLang);
-
-        const translationPromises = targetLangs.map((lang) =>
-          translateTextWithGemini(spokenText, userLang, lang)
-        );
-
-        const results = await Promise.allSettled(translationPromises);
-        const resolvedTranslations: Record<string, string> = { ...initialTranslations };
-        let hasUpdates = false;
-
-        results.forEach((res, index) => {
-          if (res.status === 'fulfilled' && res.value) {
-            resolvedTranslations[targetLangs[index]] = res.value;
-            hasUpdates = true;
-          }
-        });
-
-        if (hasUpdates) {
-          onTranslationComplete?.(msgId, resolvedTranslations);
-        }
-      } catch {
-        // Keep original text if offline
-      }
-    })();
-  };
-
-  // INSTANT TEXT MESSAGE DELIVERY (0ms Latency Arrival + Real Gemini Background Translation Sync)
+  // INSTANT TEXT MESSAGE DELIVERY (0ms Arrival + Single-Call 9-Language Gemini Batch Translation Sync)
   const handleSendTextMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+    unlockAudioPlayback();
 
     const textToSend = inputText.trim();
     setInputText('');
 
     const msgId = `text-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const initialTranslations: Record<string, string> = {
+    const initialTranslations: Partial<Record<LanguageCode, string>> = {
       [userLang]: textToSend
     };
 
     const newMsg: LiveSpeechMessage = {
       id: msgId,
+      senderId: currentUser?.idNumber,
       speakerName: currentUser?.fullName || 'ተጠቃሚ',
       speakerAvatar: currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
       sourceLang: userLang,
@@ -324,32 +258,20 @@ export const RoomStage: React.FC<RoomStageProps> = ({
     };
 
     onSendMessage(newMsg);
+    onAddRoyalty(15, 'የመልእክት ትርጉም ተሳትፎ');
 
     (async () => {
       try {
         const targetLangs: LanguageCode[] = (['am', 'en', 'ar', 'fr', 'om', 'ti', 'es', 'zh', 'de'] as LanguageCode[])
           .filter((l) => l !== userLang);
 
-        const translationPromises = targetLangs.map((lang) =>
-          translateTextWithGemini(textToSend, userLang, lang)
-        );
-
-        const results = await Promise.allSettled(translationPromises);
-        const resolvedTranslations: Record<string, string> = { ...initialTranslations };
-        let hasUpdates = false;
-
-        results.forEach((res, index) => {
-          if (res.status === 'fulfilled' && res.value) {
-            resolvedTranslations[targetLangs[index]] = res.value;
-            hasUpdates = true;
-          }
-        });
-
-        if (hasUpdates) {
-          onTranslationComplete?.(msgId, resolvedTranslations);
+        const { translations } = await translateBatchWithGemini(textToSend, userLang, targetLangs);
+        const hasNewTranslations = Object.keys(translations).some((k) => k !== userLang);
+        if (hasNewTranslations) {
+          onTranslationComplete?.(msgId, translations as Record<string, string>);
         }
       } catch {
-        // Keep original text if offline
+        // Retry available on listener side
       }
     })();
   };
@@ -1201,24 +1123,43 @@ export const RoomStage: React.FC<RoomStageProps> = ({
         {/* Right Col: Instant Multilingual Speech Translation Stream & Chat */}
         <div className="bg-[#0f1422] border-2 border-amber-500/30 rounded-3xl flex flex-col h-[460px] sm:h-[620px] lg:h-[760px] shadow-2xl">
           {/* Header */}
-          <div className="p-4 border-b border-slate-800 bg-[#0a0d14] rounded-t-3xl flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Globe2 className="w-5 h-5 text-amber-400" />
-              <div>
-                <h3 className="text-sm sm:text-base font-black text-white">
+          <div className="p-4 border-b border-slate-800 bg-[#0a0d14] rounded-t-3xl flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <Globe2 className="w-5 h-5 text-amber-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-black text-white truncate">
                   {t.announcements.liveTranslatorTitle}
                 </h3>
-                <p className="text-xs font-bold text-slate-300">
+                <p className="text-xs font-bold text-slate-300 truncate">
                   {t.announcements.liveTranslatorSubtitle}
                 </p>
               </div>
             </div>
+            {onToggleAutoDub && (
+              <button
+                type="button"
+                onClick={onToggleAutoDub}
+                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-black border transition cursor-pointer flex items-center gap-1.5 ${
+                  autoDubEnabled
+                    ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300'
+                    : 'bg-slate-900 border-slate-700 text-slate-400'
+                }`}
+                title="የተተረጎመ ንግግር በቅፅበት በድምፅ ይሰማ"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{autoDubEnabled ? '🔊 ቀጥታ የድምፅ ትርጉም' : '🔇 ድምፅ ዝም'}</span>
+              </button>
+            )}
           </div>
 
           {/* Messages list */}
           <div className="flex-1 p-4 overflow-y-auto space-y-3.5">
             {messages.map((msg) => {
-              const translatedDisplay = msg.translations[userLang] || msg.originalText;
+              const hasTranslation = msg.sourceLang === userLang || Boolean(msg.translations?.[userLang]);
+              const translatedDisplay =
+                msg.sourceLang === userLang
+                  ? msg.originalText
+                  : (msg.translations?.[userLang] || '');
 
               return (
                 <div
@@ -1238,7 +1179,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-400">{msg.timestamp}</span>
                       <button
-                        onClick={() => speakText(translatedDisplay, userLang)}
+                        onClick={() => speakText(hasTranslation ? translatedDisplay : msg.originalText, hasTranslation ? userLang : msg.sourceLang)}
                         className="p-1.5 text-slate-300 hover:text-amber-400 hover:bg-slate-800 rounded-lg cursor-pointer"
                         title={t.announcements.speakTranslation}
                       >
@@ -1249,16 +1190,31 @@ export const RoomStage: React.FC<RoomStageProps> = ({
 
                   {/* Translated text prominently */}
                   <div className="p-3 rounded-xl bg-amber-950/25 border border-amber-500/35 text-amber-100 font-semibold text-sm sm:text-base leading-relaxed">
-                    <div className="text-xs uppercase tracking-wider text-amber-400 font-black mb-1">
-                      {t.announcements.liveTranslationTo}
+                    <div className="text-xs uppercase tracking-wider text-amber-400 font-black mb-1 flex items-center justify-between gap-2">
+                      <span>{t.announcements.liveTranslationTo} ({langFlags[userLang] || userLang.toUpperCase()})</span>
+                      {!hasTranslation && onRetryTranslation && (
+                        <button
+                          type="button"
+                          onClick={() => onRetryTranslation(msg)}
+                          className="text-[11px] px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 cursor-pointer"
+                        >
+                          🔄 ድጋሚ ተርጉም
+                        </button>
+                      )}
                     </div>
-                    "{translatedDisplay}"
+                    {hasTranslation ? (
+                      `"${translatedDisplay}"`
+                    ) : (
+                      <span className="text-xs text-amber-300/80 italic">
+                        {msg.translationError ? '⚠️ ትርጉሙ ገና አልደረሰም — ድጋሚ ይሞክሩ' : '⏳ በቅፅበት በመተርጎም ላይ...'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Original text */}
                   {msg.sourceLang !== userLang && (
                     <div className="text-xs font-medium text-slate-300 italic">
-                      {t.announcements.originalSpeech} ({msg.sourceLang.toUpperCase()}): "{msg.originalText}"
+                      {t.announcements.originalSpeech} ({langFlags[msg.sourceLang] || msg.sourceLang.toUpperCase()}): "{msg.originalText}"
                     </div>
                   )}
                 </div>

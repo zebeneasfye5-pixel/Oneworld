@@ -20,13 +20,19 @@ import {
   ChevronDown,
   ChevronUp,
   Armchair,
-  Layers
+  Layers,
+  Globe2,
+  Volume2,
+  Send
 } from 'lucide-react';
 import { UserProfile } from './AuthModal';
 import { AppLanguage, TRANSLATIONS } from '../i18n/translations';
+import { LiveSpeechMessage, LanguageCode } from '../types';
 import { RemotePeerData } from '../services/realtimeMesh';
 import { EdgeToEdgeVideo } from './EdgeToEdgeVideo';
 import { RemoteAudioPlayer } from './RemoteAudioPlayer';
+import { translateBatchWithGemini } from '../services/geminiService';
+import { speakText, unlockAudioPlayback } from '../services/speechService';
 
 export interface HouseMemberRecord {
   houseId: string;
@@ -67,6 +73,13 @@ interface HouseStageMediaProps {
   userSeat?: number | null;
   onClaimSeat?: (seatNumber: number) => void;
   onLeaveSeat?: () => void;
+  // Live Multilingual Translator & Dubbing props
+  messages?: LiveSpeechMessage[];
+  autoDubEnabled?: boolean;
+  onToggleAutoDub?: () => void;
+  onSendMessage?: (msg: LiveSpeechMessage) => void;
+  onTranslationComplete?: (messageId: string, translations: Record<string, string>) => void;
+  onRetryTranslation?: (msg: LiveSpeechMessage) => void;
 }
 
 export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
@@ -93,11 +106,18 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
   onRetryCamera,
   userSeat = null,
   onClaimSeat,
-  onLeaveSeat
+  onLeaveSeat,
+  messages = [],
+  autoDubEnabled = true,
+  onToggleAutoDub,
+  onSendMessage,
+  onTranslationComplete,
+  onRetryTranslation
 }) => {
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.am;
   const membership: HouseMemberRecord | null = houseMemberships[houseId] || null;
   const [showDetails, setShowDetails] = useState(false);
+  const [translatorInput, setTranslatorInput] = useState('');
 
   // Registration Form State
   const [selectedRole, setSelectedRole] = useState(houseRoleOptions[0] || 'Member');
@@ -185,11 +205,47 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
     setIsFullscreen((prev) => !prev);
   };
 
+  const handleSendHouseTranslatorMsg = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!translatorInput.trim() || !onSendMessage) return;
+    unlockAudioPlayback();
+
+    const textToSend = translatorInput.trim();
+    setTranslatorInput('');
+    const sourceLang = currentLang as LanguageCode;
+    const msgId = `house-${houseId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    const newMsg: LiveSpeechMessage = {
+      id: msgId,
+      senderId: currentUser?.idNumber,
+      speakerName: currentUser?.fullName || membership?.fullName || 'ተጠቃሚ',
+      speakerAvatar: membership?.avatarUrl || currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80',
+      sourceLang,
+      originalText: textToSend,
+      translations: { [sourceLang]: textToSend },
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      seatNumber: userSeat || 1
+    };
+
+    onSendMessage(newMsg);
+
+    (async () => {
+      const targetLangs: LanguageCode[] = (
+        ['am', 'en', 'om', 'ti', 'ar', 'fr', 'es', 'zh', 'de'] as LanguageCode[]
+      ).filter((l) => l !== sourceLang);
+      const { translations } = await translateBatchWithGemini(textToSend, sourceLang, targetLangs);
+      if (Object.keys(translations).some((k) => k !== sourceLang)) {
+        onTranslationComplete?.(msgId, translations as Record<string, string>);
+      }
+    })();
+  };
+
   const handleToggleMic = () => {
     if (!membership) {
       onShowToast(t.stageMedia.regRequired);
       return;
     }
+    unlockAudioPlayback();
     onToggleMic?.();
     onShowToast(isMicMuted ? `🎙️ ${t.stageMedia.micOn}` : `🔇 ${t.stageMedia.micOff}`);
   };
@@ -696,6 +752,107 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
           </div>
         </div>
       )}
+
+      {/* Live Multilingual Voice & Subtitle Translator Bar across Houses 2-16 */}
+      <div
+        className="mx-auto w-full sm:w-[92%] bg-slate-950/90 border border-amber-500/35 rounded-2xl p-3.5 sm:p-4 space-y-3"
+        style={{ maxWidth: '960px' }}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+          <div className="flex items-center gap-2">
+            <Globe2 className="w-4 h-4 text-amber-400" />
+            <span className="text-xs sm:text-sm font-black text-white">
+              {t.announcements.liveTranslatorTitle}
+            </span>
+          </div>
+          {onToggleAutoDub && (
+            <button
+              type="button"
+              onClick={onToggleAutoDub}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-black border cursor-pointer flex items-center gap-1.5 transition ${
+                autoDubEnabled
+                  ? 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300'
+                  : 'bg-slate-900 border-slate-700 text-slate-400'
+              }`}
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span>{autoDubEnabled ? '🔊 ቀጥታ የድምፅ ትርጉም' : '🔇 ድምፅ ዝም'}</span>
+            </button>
+          )}
+        </div>
+
+        {messages.length > 0 && (
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            {messages.slice(-5).map((msg) => {
+              const langCode = currentLang as LanguageCode;
+              const hasTranslation = msg.sourceLang === langCode || Boolean(msg.translations?.[langCode]);
+              const translatedDisplay =
+                msg.sourceLang === langCode ? msg.originalText : (msg.translations?.[langCode] || '');
+
+              return (
+                <div
+                  key={msg.id}
+                  className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-start justify-between gap-2 text-xs"
+                >
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 text-[11px] text-amber-300 font-black">
+                      <span>{msg.speakerName}</span>
+                      <span className="text-slate-500 font-normal">({msg.sourceLang.toUpperCase()} → {currentLang.toUpperCase()})</span>
+                    </div>
+                    {hasTranslation ? (
+                      <p className="text-amber-100 font-semibold break-words">"{translatedDisplay}"</p>
+                    ) : (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-amber-300/80 italic">⏳ በመተርጎም ላይ...</span>
+                        {onRetryTranslation && (
+                          <button
+                            type="button"
+                            onClick={() => onRetryTranslation(msg)}
+                            className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-black cursor-pointer"
+                          >
+                            🔄 ድጋሚ ተርጉም
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {msg.sourceLang !== langCode && (
+                      <p className="text-[11px] text-slate-400 italic break-words">"{msg.originalText}"</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => speakText(hasTranslation ? translatedDisplay : msg.originalText, hasTranslation ? langCode : msg.sourceLang)}
+                    className="p-1.5 text-slate-300 hover:text-amber-400 hover:bg-slate-800 rounded-lg cursor-pointer flex-shrink-0"
+                    title="ትርጉሙን በድምፅ ስማ"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {onSendMessage && (
+          <form onSubmit={handleSendHouseTranslatorMsg} className="flex items-center gap-2">
+            <input
+              type="text"
+              value={translatorInput}
+              onChange={(e) => setTranslatorInput(e.target.value)}
+              placeholder={t.roomStage.inputPlaceholder}
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-500"
+            />
+            <button
+              type="submit"
+              disabled={!translatorInput.trim()}
+              className="p-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 rounded-xl font-black cursor-pointer"
+              title="ላክ እና ተርጉም"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        )}
+      </div>
 
       {/* Numbered Chairs Grid — ALL chairs display a visible Armchair icon */}
       <div className="bg-slate-950/70 border border-slate-800/80 rounded-2xl p-3.5 sm:p-4 space-y-3">

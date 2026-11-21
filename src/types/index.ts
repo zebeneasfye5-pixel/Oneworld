@@ -52,11 +52,13 @@ export interface Room {
 
 export interface LiveSpeechMessage {
   id: string;
+  senderId?: string;
   speakerName: string;
   speakerAvatar: string;
   sourceLang: LanguageCode;
   originalText: string;
-  translations: Record<LanguageCode, string>;
+  translations: Partial<Record<LanguageCode, string>>;
+  translationError?: string;
   timestamp: string;
   seatNumber: number;
 }

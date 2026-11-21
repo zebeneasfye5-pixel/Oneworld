@@ -24,6 +24,7 @@ interface UseRealtimeRoomOptions {
     avatarUrl: string;
     roleTitle?: string;
     nationality?: string;
+    preferredLang?: string;
   };
   enabled?: boolean;
   onMessageReceived?: (msg: LiveSpeechMessage) => void;
@@ -34,14 +35,12 @@ interface UseRealtimeRoomOptions {
   onSeatDenied?: (seatNumber: number, occupiedBy: string) => void;
 }
 
-const ICE_CACHE_KEY = 'ow_ice_config_v1';
+const ICE_CACHE_KEY = 'ow_ice_config_v2';
 
 const DEFAULT_ICE_CONFIG: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
+    { urls: 'stun:stun.l.google.com:19302' }
   ],
   iceCandidatePoolSize: 2,
   bundlePolicy: 'max-bundle',
@@ -62,10 +61,11 @@ function loadCachedIceConfig(): RTCConfiguration {
 }
 
 /**
- * Tune Opus SDP parameters for clear, ultra-low-bandwidth, stutter-free voice:
- * - useinbandfec=1 recovers dropped cellular packets smoothly without audio cutouts
- * - usedtx=1 stops transmitting during silence to drastically reduce data/CPU load
- * - maxaveragebitrate=28000 keeps voice crystal clear at ~24-28 kbps even on weak 2G/3G
+ * Tune Opus SDP parameters for uninterrupted, zero-cutout, crystal-clear real-time voice:
+ * - usedtx=0 keeps a continuous unbroken audio stream (prevents mobile VAD syllable clipping & cutouts)
+ * - useinbandfec=1 recovers dropped cellular packets seamlessly
+ * - minptime=20 avoids 100 pps mobile radio overhead & jitter starvation
+ * - maxaveragebitrate=36000 keeps audio rock-solid even on weak mobile networks
  */
 function optimizeSdpForVoice(sdp?: string): string | undefined {
   if (!sdp) return sdp;
@@ -74,13 +74,21 @@ function optimizeSdpForVoice(sdp?: string): string | undefined {
     if (!opusMatch) return sdp;
     const pt = opusMatch[1];
     const fmtpRegex = new RegExp(`a=fmtp:${pt}\\s+([^\\r\\n]+)`, 'i');
-    const extraParams = 'minptime=10;useinbandfec=1;usedtx=1;maxaveragebitrate=28000;cbr=0';
+    const extraParams = 'minptime=20;useinbandfec=1;usedtx=0;maxaveragebitrate=36000';
     if (fmtpRegex.test(sdp)) {
       return sdp.replace(fmtpRegex, (_m, existing) => {
         const cleaned = existing
           .split(';')
           .map((s: string) => s.trim())
-          .filter((s: string) => s && !s.startsWith('maxaveragebitrate=') && !s.startsWith('usedtx=') && !s.startsWith('useinbandfec='));
+          .filter(
+            (s: string) =>
+              s &&
+              !s.startsWith('maxaveragebitrate=') &&
+              !s.startsWith('usedtx=') &&
+              !s.startsWith('useinbandfec=') &&
+              !s.startsWith('minptime=') &&
+              !s.startsWith('cbr=')
+          );
         cleaned.push(extraParams);
         return `a=fmtp:${pt} ${cleaned.join(';')}`;
       });
@@ -101,13 +109,13 @@ function tuneSenderParams(sender: RTCRtpSender, kind: 'audio' | 'video', lowBand
       params.encodings = [{}];
     }
     if (kind === 'audio') {
-      params.encodings[0].maxBitrate = lowBandwidth ? 20_000 : 32_000;
+      params.encodings[0].maxBitrate = lowBandwidth ? 24_000 : 38_000;
       (params.encodings[0] as any).priority = 'high';
       (params.encodings[0] as any).networkPriority = 'high';
     } else {
       (params as any).degradationPreference = 'maintain-framerate';
-      params.encodings[0].maxBitrate = lowBandwidth ? 120_000 : 250_000;
-      params.encodings[0].maxFramerate = lowBandwidth ? 12 : 18;
+      params.encodings[0].maxBitrate = lowBandwidth ? 100_000 : 200_000;
+      params.encodings[0].maxFramerate = lowBandwidth ? 12 : 16;
     }
     sender.setParameters(params).catch(() => {});
   } catch {}
@@ -208,8 +216,8 @@ export function useRealtimeRoom({
     };
   }, []);
 
-  // Acquire lightweight, audio-first local stream (3x faster hardware lock & ~75% less data usage)
-  const acquireMedia = useCallback(async (facing: 'user' | 'environment' = 'user') => {
+  // Acquire lightweight, audio-first local stream — preserves active mic track during camera flips
+  const acquireMedia = useCallback(async (facing: 'user' | 'environment' = 'user', preserveExistingAudio = false) => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setCameraError('ይህ ብራውዘር ወይም ዌብቪው ካሜራ/ማይክሮፎን አይደግፍም። እባክዎ በChrome ወይም Safari ይክፈቱ።');
       return null;
@@ -217,12 +225,16 @@ export function useRealtimeRoom({
 
     const lowBandwidth = isConstrainedNetwork();
     const isPortrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
+    const existingLiveAudioTrack = preserveExistingAudio
+      ? localStreamRef.current?.getAudioTracks().find((t) => t.readyState === 'live') || null
+      : null;
+
+    // Leave hardware sampleRate unlocked so Android/Bluetooth HAL never glitches at 16kHz vs 48kHz
     const audioConstraint: MediaTrackConstraints = {
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
-      channelCount: 1,
-      sampleRate: 16000
+      channelCount: 1
     };
     const videoConstraint: MediaTrackConstraints = lowBandwidth
       ? {
@@ -240,29 +252,38 @@ export function useRealtimeRoom({
 
     let stream: MediaStream | null = null;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraint,
-        video: videoConstraint
-      });
-    } catch {
-      // Fallback 1: Audio-only instant capture so voice works immediately even if camera is busy/slow
-      try {
+      if (existingLiveAudioTrack) {
+        const videoOnly = await navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraint });
+        stream = new MediaStream([existingLiveAudioTrack, ...videoOnly.getVideoTracks()]);
+      } else {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: audioConstraint,
-          video: false
+          video: videoConstraint
         });
-      } catch {
-        // Fallback 2: Video-only if mic denied
+      }
+    } catch {
+      // Fallback 1: Audio-only instant capture so voice ALWAYS connects immediately even if camera is busy/slow
+      if (existingLiveAudioTrack) {
+        stream = new MediaStream([existingLiveAudioTrack]);
+      } else {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
-        } catch (err: any) {
-          const denied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
-          setCameraError(
-            denied
-              ? 'የካሜራ ወይም የድምፅ ፍቃድ አልተሰጠም። እባክዎ በስልክዎ/ብራውዘርዎ ፍቃድ ይስጡ።'
-              : 'ካሜራ ወይም ማይክሮፎን ማግኘት አልተቻለም።'
-          );
-          return null;
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: audioConstraint,
+            video: false
+          });
+        } catch {
+          // Fallback 2: Video-only if mic denied
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
+          } catch (err: any) {
+            const denied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+            setCameraError(
+              denied
+                ? 'የካሜራ ወይም የድምፅ ፍቃድ አልተሰጠም። እባክዎ በስልክዎ/ብራውዘርዎ ፍቃድ ይስጡ።'
+                : 'ካሜራ ወይም ማይክሮፎን ማግኘት አልተቻለም።'
+            );
+            return null;
+          }
         }
       }
     }
@@ -276,19 +297,39 @@ export function useRealtimeRoom({
         trk.enabled = !isVideoOffRef.current;
       });
 
+      // Stop ONLY old tracks that are NOT being reused in the new stream (never cut live audio during camera flip)
+      const keptIds = new Set(stream.getTracks().map((t) => t.id));
       if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current.getTracks().forEach((t) => {
+          if (!keptIds.has(t.id)) {
+            t.stop();
+          }
+        });
       }
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-      // Update tracks on all active peer connections and renegotiate cleanly
+      // Match existing transceivers by sender OR receiver kind so pre-created audio/video transceivers get replaceTrack() in 0ms!
       peerConnectionsRef.current.forEach((pc, targetPeerId) => {
+        const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
         const senders = pc.getSenders();
         let addedNewTrack = false;
+
         stream!.getTracks().forEach((track) => {
-          const existingSender = senders.find((s) => s.track?.kind === track.kind);
+          const matchingTransceiver = transceivers.find(
+            (tr) =>
+              tr.sender?.track?.kind === track.kind ||
+              tr.receiver?.track?.kind === track.kind
+          );
+          const existingSender =
+            matchingTransceiver?.sender || senders.find((s) => s.track?.kind === track.kind);
+
           if (existingSender) {
+            if (matchingTransceiver && (matchingTransceiver.direction === 'recvonly' || matchingTransceiver.direction === 'inactive')) {
+              try {
+                matchingTransceiver.direction = 'sendrecv';
+              } catch {}
+            }
             existingSender.replaceTrack(track).catch(() => {});
             tuneSenderParams(existingSender, track.kind === 'audio' ? 'audio' : 'video', lowBandwidth);
           } else {
@@ -316,6 +357,7 @@ export function useRealtimeRoom({
                     name: user.fullName,
                     avatar: user.avatarUrl,
                     role: user.roleTitle,
+                    preferredLang: user.preferredLang,
                     isMuted: isMicMutedRef.current,
                     isVideoOn: !isVideoOffRef.current,
                     seatNumber: seatNumberRef.current
@@ -531,11 +573,22 @@ export function useRealtimeRoom({
         const peer = next.get(targetPeerId);
         let streamToUse: MediaStream;
 
-        if (incomingStream) {
+        if (peer?.stream) {
+          // Mutate existing MediaStream container in-place so adding video never interrupts an already playing audio track!
+          const existingTrackIds = new Set(peer.stream.getTracks().map((t) => t.id));
+          if (!existingTrackIds.has(event.track.id)) {
+            peer.stream.addTrack(event.track);
+          }
+          if (incomingStream) {
+            incomingStream.getTracks().forEach((t) => {
+              if (!existingTrackIds.has(t.id)) {
+                peer.stream!.addTrack(t);
+              }
+            });
+          }
+          streamToUse = peer.stream;
+        } else if (incomingStream) {
           streamToUse = new MediaStream(incomingStream.getTracks());
-        } else if (peer?.stream) {
-          const tracks = [...peer.stream.getTracks().filter((t) => t.id !== event.track.id), event.track];
-          streamToUse = new MediaStream(tracks);
         } else {
           streamToUse = new MediaStream([event.track]);
         }
@@ -544,7 +597,7 @@ export function useRealtimeRoom({
           next.set(targetPeerId, {
             ...peer,
             stream: streamToUse,
-            isVideoOn: streamToUse.getVideoTracks().length > 0 ? peer.isVideoOn : peer.isVideoOn
+            isVideoOn: streamToUse.getVideoTracks().length > 0 ? true : peer.isVideoOn
           });
         } else {
           next.set(targetPeerId, {
@@ -638,6 +691,7 @@ export function useRealtimeRoom({
               avatar: user.avatarUrl,
               role: user.roleTitle,
               country: user.nationality || 'ኢትዮጵያ',
+              preferredLang: user.preferredLang || 'am',
               seatNumber: seatNumberRef.current,
               isMuted: isMicMutedRef.current,
               isVideoOn: !isVideoOffRef.current,
@@ -749,9 +803,9 @@ export function useRealtimeRoom({
                 // Reuse existing connection during mid-call track renegotiation
                 const pc = createPeerConnection(callerId, false, true);
                 if (pc.signalingState === 'have-local-offer') {
-                  // Glare handling: polite peer rolls back local offer
                   const isPolite = currentUserRef.current.id < callerId;
-                  if (!isPolite) break;
+                  const isRecovering = pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed';
+                  if (!isPolite && !isRecovering) break;
                   await pc.setLocalDescription({ type: 'rollback' } as any).catch(() => {});
                 }
                 await pc.setRemoteDescription(new RTCSessionDescription(sdp));
@@ -952,16 +1006,17 @@ export function useRealtimeRoom({
     };
   }, [enabled, roomId, currentUser.id, createPeerConnection, flushIceCandidates]);
 
-  // Broadcast live profile edits (name, avatar, role) to everyone in the room immediately
+  // Broadcast live profile & language edits immediately to everyone in the room
   useEffect(() => {
     if (!enabled || socketRef.current?.readyState !== WebSocket.OPEN) return;
     socketRef.current.send(JSON.stringify({
       type: 'profile-update',
       name: currentUser.fullName,
       avatar: currentUser.avatarUrl,
-      role: currentUser.roleTitle
+      role: currentUser.roleTitle,
+      preferredLang: currentUser.preferredLang
     }));
-  }, [enabled, currentUser.fullName, currentUser.avatarUrl, currentUser.roleTitle]);
+  }, [enabled, currentUser.fullName, currentUser.avatarUrl, currentUser.roleTitle, currentUser.preferredLang]);
 
   // Toggle Microphone (works even if camera/mic stream initializes lazily)
   const toggleMic = useCallback(async () => {
@@ -969,7 +1024,7 @@ export function useRealtimeRoom({
     setIsMicMuted(newMutedState);
 
     if (!localStreamRef.current || localStreamRef.current.getAudioTracks().length === 0) {
-      await acquireMedia(cameraFacing);
+      await acquireMedia(cameraFacing, false);
     }
 
     if (localStreamRef.current) {
@@ -992,7 +1047,7 @@ export function useRealtimeRoom({
     setIsVideoOff(newOffState);
 
     if (!newOffState && (!localStreamRef.current || localStreamRef.current.getVideoTracks().length === 0)) {
-      await acquireMedia(cameraFacing);
+      await acquireMedia(cameraFacing, true);
     }
 
     if (localStreamRef.current) {
@@ -1009,11 +1064,11 @@ export function useRealtimeRoom({
     }
   }, [acquireMedia, cameraFacing]);
 
-  // Flip Front / Back Camera cleanly across WebRTC peers
+  // Flip Front / Back Camera cleanly WITHOUT interrupting live microphone audio
   const flipCamera = useCallback(async () => {
     const nextFacing = cameraFacing === 'user' ? 'environment' : 'user';
     setCameraFacing(nextFacing);
-    await acquireMedia(nextFacing);
+    await acquireMedia(nextFacing, true);
   }, [cameraFacing, acquireMedia]);
 
   // Send real-time chat message

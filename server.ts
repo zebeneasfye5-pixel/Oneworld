@@ -7,7 +7,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Type, ThinkingLevel } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,9 +28,11 @@ const geminiClient = process.env.GEMINI_API_KEY && !process.env.GEMINI_API_KEY.i
     })
   : null;
 
-// In-memory LRU translation cache for sub-millisecond repeated translations
+// In-memory LRU caches for sub-millisecond repeated translations and synthesized TTS audio
 const translationCache = new Map<string, string>();
 const MAX_TRANSLATION_CACHE = 5000;
+const ttsCache = new Map<string, string>();
+const MAX_TTS_CACHE = 400;
 
 app.use(express.json({ limit: '5mb' }));
 
@@ -242,6 +244,7 @@ interface PeerUser {
   avatar: string;
   country?: string;
   countryFlag?: string;
+  preferredLang?: string;
   role?: string;
   seatNumber?: number | null;
   isMuted: boolean;
@@ -449,6 +452,7 @@ wss.on('connection', (ws: WebSocket) => {
               avatar: user.avatar || '',
               country: user.country || 'ኢትዮጵያ',
               countryFlag: user.countryFlag || '🇪🇹',
+              preferredLang: user.preferredLang || 'am',
               role: user.role || 'ተሳታፊ',
               seatNumber: assignedSeat,
               isMuted: !!user.isMuted,
@@ -634,6 +638,21 @@ wss.on('connection', (ws: WebSocket) => {
             if (payload.name) client.userMeta.name = String(payload.name);
             if (payload.avatar) client.userMeta.avatar = String(payload.avatar);
             if (payload.role) client.userMeta.role = String(payload.role);
+            if (payload.preferredLang) client.userMeta.preferredLang = String(payload.preferredLang);
+            if (client.roomId) {
+              broadcastToRoom(client.roomId, {
+                type: 'peer-media-updated',
+                peer: client.userMeta
+              });
+            }
+          }
+          break;
+        }
+
+        case 'language-change': {
+          const client = clients.get(ws);
+          if (client && payload.preferredLang) {
+            client.userMeta.preferredLang = String(payload.preferredLang);
             if (client.roomId) {
               broadcastToRoom(client.roomId, {
                 type: 'peer-media-updated',
@@ -1060,16 +1079,53 @@ app.get('/api/rtc-config', (_req: Request, res: Response) => {
 // Server-Side Gemini Translation & Education AI Endpoints
 // ---------------------------------------------------------------------------
 const LANG_NAMES: Record<string, string> = {
-  am: 'Amharic',
+  am: 'Amharic (አማርኛ)',
   en: 'English',
   om: 'Afaan Oromoo',
-  ti: 'Tigrinya',
-  ar: 'Arabic',
-  fr: 'French',
-  es: 'Spanish',
-  zh: 'Mandarin Chinese',
-  de: 'German'
+  ti: 'Tigrinya (ትግርኛ)',
+  ar: 'Arabic (العربية)',
+  fr: 'French (Français)',
+  es: 'Spanish (Español)',
+  zh: 'Mandarin Chinese (中文)',
+  de: 'German (Deutsch)'
 };
+
+function setBoundedCache(map: Map<string, string>, maxSize: number, key: string, value: string) {
+  if (map.size >= maxSize) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey) map.delete(oldestKey);
+  }
+  map.set(key, value);
+}
+
+async function generateLowLatencyTranslation(contents: string, config: any = {}) {
+  if (!geminiClient) {
+    throw new Error('GEMINI_API_KEY is not configured on the server.');
+  }
+  try {
+    return await geminiClient.models.generateContent({
+      model: 'gemini-3.1-flash-lite',
+      contents,
+      config: {
+        ...config,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
+      }
+    });
+  } catch (primaryErr: any) {
+    const msg = String(primaryErr?.message || primaryErr);
+    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('404') || msg.includes('NOT_FOUND')) {
+      return await geminiClient.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents,
+        config: {
+          ...config,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+        }
+      });
+    }
+    throw primaryErr;
+  }
+}
 
 app.post('/api/translate', async (req: Request, res: Response) => {
   const { text, sourceLang, targetLang } = req.body || {};
@@ -1080,7 +1136,8 @@ app.post('/api/translate', async (req: Request, res: Response) => {
     return res.json({ translatedText: text, cached: true });
   }
 
-  const cacheKey = `${sourceLang || 'auto'}=>${targetLang}:${text.trim()}`;
+  const cleanText = text.trim();
+  const cacheKey = `${sourceLang || 'auto'}=>${targetLang}:${cleanText}`;
   const cached = translationCache.get(cacheKey);
   if (cached) {
     return res.json({ translatedText: cached, cached: true });
@@ -1094,28 +1151,202 @@ app.post('/api/translate', async (req: Request, res: Response) => {
   }
 
   try {
-    const srcName = LANG_NAMES[sourceLang] || sourceLang || 'source language';
+    const srcName = LANG_NAMES[sourceLang] || sourceLang || 'the spoken source language';
     const tgtName = LANG_NAMES[targetLang] || targetLang;
-    const response = await geminiClient.models.generateContent({
-      model: 'gemini-4-hydrogen',
-      contents: `Translate accurately from ${srcName} to ${tgtName}. Output ONLY the translated text without quotes or explanations.\n\nText:\n${text}`
-    });
+    const response = await generateLowLatencyTranslation(
+      `Translate accurately and naturally from ${srcName} into ${tgtName}.\nOutput ONLY the natural ${tgtName} translation in its proper native script (for Amharic/Tigrinya use Ethiopic script; for Chinese use Simplified Chinese; for Arabic use Arabic script). Do not include quotes or explanations.\n\nText:\n${cleanText}`,
+      {
+        systemInstruction: 'You are an expert simultaneous live speech interpreter. Always output clear, idiomatic, accurate translations immediately.'
+      }
+    );
 
     const translated = response.text?.trim();
     if (!translated) {
       return res.status(502).json({ error: 'Empty translation from Gemini API' });
     }
 
-    if (translationCache.size >= MAX_TRANSLATION_CACHE) {
-      const oldestKey = translationCache.keys().next().value;
-      if (oldestKey) translationCache.delete(oldestKey);
-    }
-    translationCache.set(cacheKey, translated);
-
+    setBoundedCache(translationCache, MAX_TRANSLATION_CACHE, cacheKey, translated);
     return res.json({ translatedText: translated, cached: false });
   } catch (err: any) {
-    console.error('[Gemini Translate Error]', err?.message || err);
-    return res.status(502).json({ error: err?.message || 'Translation service error' });
+    const errMsg = err?.message || String(err);
+    const status = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') ? 429 : 502;
+    console.error('[Gemini Translate Error]', errMsg);
+    return res.status(status).json({ error: errMsg });
+  }
+});
+
+// Batch multi-language translation: translates into ALL active target languages in ONE Gemini call
+app.post('/api/translate-batch', async (req: Request, res: Response) => {
+  const { text, sourceLang, targetLangs } = req.body || {};
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: 'Text is required' });
+  }
+  const cleanText = text.trim();
+  const requested: string[] = Array.isArray(targetLangs)
+    ? targetLangs.filter((l: any) => typeof l === 'string' && l !== sourceLang && LANG_NAMES[l])
+    : [];
+
+  if (requested.length === 0) {
+    return res.json({ translations: { ...(sourceLang ? { [sourceLang]: cleanText } : {}) }, cached: true });
+  }
+
+  const resolved: Record<string, string> = {};
+  if (sourceLang) resolved[sourceLang] = cleanText;
+
+  const missing: string[] = [];
+  for (const tgt of requested) {
+    const cacheKey = `${sourceLang || 'auto'}=>${tgt}:${cleanText}`;
+    const cached = translationCache.get(cacheKey);
+    if (cached) {
+      resolved[tgt] = cached;
+    } else {
+      missing.push(tgt);
+    }
+  }
+
+  if (missing.length === 0) {
+    return res.json({ translations: resolved, cached: true });
+  }
+
+  if (!geminiClient) {
+    return res.status(503).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
+  }
+
+  try {
+    const srcName = LANG_NAMES[sourceLang] || sourceLang || 'the spoken language';
+    const targetList = missing.map((code) => `"${code}": ${LANG_NAMES[code]}`).join(', ');
+    const schemaProperties: Record<string, any> = {};
+    for (const code of missing) {
+      schemaProperties[code] = { type: Type.STRING, description: `Accurate natural translation in ${LANG_NAMES[code]}` };
+    }
+
+    const response = await generateLowLatencyTranslation(
+      `Translate the following spoken/chat utterance accurately from ${srcName} into each of these target languages (${targetList}).\nReturn a JSON object mapping each language code key cleanly to its natural translation in its native script.\n\nText:\n${cleanText}`,
+      {
+        systemInstruction: 'You are an expert simultaneous live interpreter across 9 global languages. Produce clear, natural, accurate translations for every requested language key.',
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: schemaProperties,
+          required: missing
+        }
+      }
+    );
+
+    const parsed = JSON.parse((response.text || '{}').trim());
+    for (const code of missing) {
+      const val = typeof parsed[code] === 'string' ? parsed[code].trim() : '';
+      if (val) {
+        resolved[code] = val;
+        setBoundedCache(translationCache, MAX_TRANSLATION_CACHE, `${sourceLang || 'auto'}=>${code}:${cleanText}`, val);
+      }
+    }
+
+    return res.json({ translations: resolved, cached: false });
+  } catch (err: any) {
+    const errMsg = err?.message || String(err);
+    const status = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') ? 429 : 502;
+    console.error('[Gemini Batch Translate Error]', errMsg);
+    return res.status(status).json({ error: errMsg, partialTranslations: resolved });
+  }
+});
+
+// Server-side Gemini TTS (gemini-3.8-flash-lite-tts) for clear instant voice playback in ALL languages (including Amharic, Oromo, Tigrinya, Chinese)
+app.post('/api/tts', async (req: Request, res: Response) => {
+  const { text, lang = 'am' } = req.body || {};
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: 'Text is required for TTS' });
+  }
+  const cleanText = text.trim().slice(0, 600);
+  const cacheKey = `${lang}:${cleanText}`;
+  const cachedAudio = ttsCache.get(cacheKey);
+  if (cachedAudio) {
+    return res.json({ audioBase64: cachedAudio, mimeType: 'audio/wav', cached: true });
+  }
+
+  if (!geminiClient) {
+    return res.status(503).json({ error: 'GEMINI_API_KEY is not configured on the server for TTS.' });
+  }
+
+  try {
+    const langLabel = LANG_NAMES[lang] || lang;
+    const response = await geminiClient.models.generateContent({
+      model: 'gemini-3.8-flash-lite-tts',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: cleanText,
+              speechMetadata: {
+                style: `Speak clearly, naturally, and fluently in ${langLabel} as a live real-time translator.`
+              }
+            }
+          ]
+        }
+      ],
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' }
+          }
+        }
+      }
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) {
+      return res.status(502).json({ error: 'No audio returned from TTS model' });
+    }
+
+    setBoundedCache(ttsCache, MAX_TTS_CACHE, cacheKey, base64Audio);
+    return res.json({ audioBase64: base64Audio, mimeType: 'audio/wav', cached: false });
+  } catch (err: any) {
+    const errMsg = err?.message || String(err);
+    const status = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') ? 429 : 502;
+    console.error('[Gemini TTS Error]', errMsg);
+    return res.status(status).json({ error: errMsg });
+  }
+});
+
+// Server-side Speech Transcription fallback (gemini-3.5-transcribe) for browsers/WebViews lacking Web Speech API
+app.post('/api/transcribe', async (req: Request, res: Response) => {
+  const { audioBase64, mimeType = 'audio/webm', sourceLang = 'am' } = req.body || {};
+  if (!audioBase64 || typeof audioBase64 !== 'string') {
+    return res.status(400).json({ error: 'audioBase64 is required' });
+  }
+
+  if (!geminiClient) {
+    return res.status(503).json({ error: 'GEMINI_API_KEY is not configured on the server.' });
+  }
+
+  try {
+    const srcName = LANG_NAMES[sourceLang] || sourceLang;
+    const response = await geminiClient.models.generateContent({
+      model: 'gemini-3.5-transcribe',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType,
+              data: audioBase64
+            }
+          },
+          {
+            text: `Transcribe the spoken speech accurately in ${srcName}. Output ONLY the transcribed words with punctuation, or an empty string if there is only silence or background noise.`
+          }
+        ]
+      }
+    });
+
+    const transcript = (response.text || '').trim();
+    return res.json({ transcript });
+  } catch (err: any) {
+    const errMsg = err?.message || String(err);
+    const status = errMsg.includes('429') || errMsg.includes('RESOURCE_EXHAUSTED') ? 429 : 502;
+    console.error('[Gemini Transcribe Error]', errMsg);
+    return res.status(status).json({ error: errMsg });
   }
 });
 
