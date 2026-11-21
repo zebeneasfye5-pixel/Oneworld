@@ -631,11 +631,8 @@ export const HouseStageMedia: React.FC<HouseStageMediaProps> = ({
                   <span className="text-white font-bold text-xs">{primaryRemotePeer.name}</span>
                 </div>
               )}
-              <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none flex items-center gap-1.5">
-                <span>{primaryRemotePeer.seatNumber ? `${primaryRemotePeer.seatNumber} · ` : ''}{primaryRemotePeer.name}</span>
-                <span className="text-[10px] text-amber-300">
-                  {primaryRemotePeer.connectionMode === 'p2p' ? '⚡P2P' : primaryRemotePeer.connectionMode === 'relay' ? '🛰️Server' : '🔄'}
-                </span>
+              <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none">
+                {primaryRemotePeer.seatNumber ? `${primaryRemotePeer.seatNumber} · ` : ''}{primaryRemotePeer.name}
               </span>
             </>
           ) : (

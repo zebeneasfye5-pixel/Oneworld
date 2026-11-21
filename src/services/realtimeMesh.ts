@@ -82,7 +82,7 @@ function optimizeSdpForVoice(sdp?: string): string | undefined {
     if (!opusMatch) return sdp;
     const pt = opusMatch[1];
     const fmtpRegex = new RegExp(`a=fmtp:${pt}\\s+([^\\r\\n]+)`, 'i');
-    const extraParams = 'minptime=20;useinbandfec=1;usedtx=0;maxaveragebitrate=36000';
+    const extraParams = 'minptime=20;useinbandfec=1;usedtx=0;maxaveragebitrate=48000';
     if (fmtpRegex.test(sdp)) {
       return sdp.replace(fmtpRegex, (_m, existing) => {
         const cleaned = existing
@@ -117,13 +117,13 @@ function tuneSenderParams(sender: RTCRtpSender, kind: 'audio' | 'video', lowBand
       params.encodings = [{}];
     }
     if (kind === 'audio') {
-      params.encodings[0].maxBitrate = lowBandwidth ? 24_000 : 38_000;
+      params.encodings[0].maxBitrate = lowBandwidth ? 32_000 : 48_000;
       (params.encodings[0] as any).priority = 'high';
       (params.encodings[0] as any).networkPriority = 'high';
     } else {
       (params as any).degradationPreference = 'maintain-framerate';
-      params.encodings[0].maxBitrate = lowBandwidth ? 100_000 : 200_000;
-      params.encodings[0].maxFramerate = lowBandwidth ? 12 : 16;
+      params.encodings[0].maxBitrate = lowBandwidth ? 140_000 : 350_000;
+      params.encodings[0].maxFramerate = lowBandwidth ? 15 : 24;
     }
     sender.setParameters(params).catch(() => {});
   } catch {}
@@ -169,6 +169,8 @@ export function useRealtimeRoom({
   const iceCandidateQueueRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const iceConfigRef = useRef<RTCConfiguration>(loadCachedIceConfig());
   const localStreamRef = useRef<MediaStream | null>(null);
+  const rawAudioTrackRef = useRef<MediaStreamTrack | null>(null);
+  const micEnhanceCtxRef = useRef<AudioContext | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const speakingTimerRef = useRef<number | null>(null);
@@ -196,13 +198,13 @@ export function useRealtimeRoom({
       ? `${currentUser.id}__${tabIdRef.current}`
       : `guest__${tabIdRef.current}`;
 
-  // Server Media Relay Tracking (P2P first; automatic 1.4s failover & RTP verification for restricted mobile NATs)
+  // Server Media Relay Tracking (P2P first; automatic 2.4s failover & RTP verification for restricted mobile NATs)
   const p2pWatchdogTimersRef = useRef<Map<string, number>>(new Map());
   const relayIncomingPeersRef = useRef<Set<string>>(new Set());
   const relayOutgoingTargetsRef = useRef<Set<string>>(new Set());
   const verifiedP2PAudioPeersRef = useRef<Set<string>>(new Set());
   const verifiedP2PVideoPeersRef = useRef<Set<string>>(new Set());
-  const lastRtpCountersRef = useRef<Map<string, { audioBytes: number; videoFrames: number }>>(new Map());
+  const lastRtpCountersRef = useRef<Map<string, { totalBytes: number; audioBytes: number; videoFrames: number }>>(new Map());
   const stopRelayAudioCaptureRef = useRef<(() => void) | null>(null);
   const relayVideoTimerRef = useRef<number | null>(null);
 
@@ -359,6 +361,60 @@ export function useRealtimeRoom({
     );
   }, []);
 
+  // Far-Field Long-Range Microphone Booster: high-pass filter + 2.4x preamp + dynamics compressor
+  const buildFarFieldAudioTrack = useCallback((rawTrack: MediaStreamTrack): MediaStreamTrack => {
+    rawAudioTrackRef.current = rawTrack;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return rawTrack;
+
+      if (micEnhanceCtxRef.current && micEnhanceCtxRef.current.state !== 'closed') {
+        micEnhanceCtxRef.current.close().catch(() => {});
+      }
+      const ctx = new AudioCtx();
+      micEnhanceCtxRef.current = ctx;
+
+      const src = ctx.createMediaStreamSource(new MediaStream([rawTrack]));
+      const highPass = ctx.createBiquadFilter();
+      highPass.type = 'highpass';
+      highPass.frequency.value = 85;
+
+      const preAmp = ctx.createGain();
+      preAmp.gain.value = 2.4;
+
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -34;
+      compressor.knee.value = 24;
+      compressor.ratio.value = 8;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.22;
+
+      const makeupGain = ctx.createGain();
+      makeupGain.gain.value = 1.65;
+
+      const dest = ctx.createMediaStreamDestination();
+      src.connect(highPass);
+      highPass.connect(preAmp);
+      preAmp.connect(compressor);
+      compressor.connect(makeupGain);
+      makeupGain.connect(dest);
+
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      const boostedTrack = dest.stream.getAudioTracks()[0];
+      if (boostedTrack) {
+        boostedTrack.enabled = !isMicMutedRef.current;
+        return boostedTrack;
+      }
+    } catch {
+      // Fallback safely to raw track
+    }
+    return rawTrack;
+  }, []);
+
   // Two-Phase Audio-First Media Acquisition (~80ms voice connect + parallel video)
   const acquireMedia = useCallback(async (facing: 'user' | 'environment' = 'user', preserveExistingAudio = false) => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -371,9 +427,10 @@ export function useRealtimeRoom({
     const existingLiveAudioTrack =
       localStreamRef.current?.getAudioTracks().find((t) => t.readyState === 'live') || null;
 
+    // Disable aggressive browser noiseSuppression gate so voices from far away are picked up clearly
     const audioConstraint: MediaTrackConstraints = {
       echoCancellation: true,
-      noiseSuppression: true,
+      noiseSuppression: false,
       autoGainControl: true,
       channelCount: 1
     };
@@ -381,13 +438,13 @@ export function useRealtimeRoom({
       ? {
           width: { ideal: isPortrait ? 240 : 320, max: 480 },
           height: { ideal: isPortrait ? 320 : 240, max: 480 },
-          frameRate: { ideal: 12, max: 15 },
+          frameRate: { ideal: 15, max: 18 },
           facingMode: facing
         }
       : {
-          width: { ideal: isPortrait ? 320 : 480, max: 640 },
+          width: { ideal: isPortrait ? 360 : 480, max: 640 },
           height: { ideal: isPortrait ? 480 : 360, max: 640 },
-          frameRate: { ideal: 15, max: 20 },
+          frameRate: { ideal: 24, max: 30 },
           facingMode: facing
         };
 
@@ -398,8 +455,10 @@ export function useRealtimeRoom({
     if (!activeAudioTrack) {
       try {
         const audioOnlyStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint, video: false });
-        activeAudioTrack = audioOnlyStream.getAudioTracks()[0] || null;
-        if (activeAudioTrack) {
+        const rawAudio = audioOnlyStream.getAudioTracks()[0] || null;
+        if (rawAudio) {
+          rawAudio.enabled = !isMicMutedRef.current;
+          activeAudioTrack = buildFarFieldAudioTrack(rawAudio);
           activeAudioTrack.enabled = !isMicMutedRef.current;
           const quickAudioStream = new MediaStream([
             activeAudioTrack,
@@ -477,15 +536,16 @@ export function useRealtimeRoom({
     }
 
     return mergedStream;
-  }, [ensureRelayAudioCapture, syncTracksToPeer]);
+  }, [buildFarFieldAudioTrack, ensureRelayAudioCapture, syncTracksToPeer]);
 
-  // Adaptive lightweight Video Relay Sender (mounted in DOM so Android Chrome & iOS Safari decode frames!)
+  // Adaptive smooth Video Relay Sender (~13fps with WebSocket backpressure guard to eliminate lag)
   useEffect(() => {
     if (!enabled || typeof document === 'undefined') return;
 
+    const lowBw = isConstrainedNetwork();
     const canvas = document.createElement('canvas');
-    canvas.width = 240;
-    canvas.height = 180;
+    canvas.width = lowBw ? 240 : 320;
+    canvas.height = lowBw ? 180 : 240;
     const ctx = canvas.getContext('2d');
     const hiddenVideo = document.createElement('video');
     hiddenVideo.muted = true;
@@ -498,13 +558,16 @@ export function useRealtimeRoom({
 
     let captureTrackId = '';
     let imageCaptureInstance: any = null;
+    const intervalMs = lowBw ? 105 : 75;
 
     relayVideoTimerRef.current = window.setInterval(async () => {
+      const sock = socketRef.current;
       if (
         relayOutgoingTargetsRef.current.size === 0 ||
         isVideoOffRef.current ||
         !localStreamRef.current ||
-        socketRef.current?.readyState !== WebSocket.OPEN ||
+        sock?.readyState !== WebSocket.OPEN ||
+        sock.bufferedAmount > 48000 ||
         !ctx
       ) {
         return;
@@ -524,8 +587,8 @@ export function useRealtimeRoom({
             const bitmap = await imageCaptureInstance.grabFrame();
             ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
             bitmap.close?.();
-            const frame = canvas.toDataURL('image/jpeg', 0.5);
-            if (frame && frame.length < 48000 && socketRef.current?.readyState === WebSocket.OPEN) {
+            const frame = canvas.toDataURL('image/jpeg', lowBw ? 0.48 : 0.56);
+            if (frame && frame.length < 52000 && socketRef.current?.readyState === WebSocket.OPEN) {
               socketRef.current.send(JSON.stringify({
                 type: 'relay-media-video',
                 frame,
@@ -548,8 +611,8 @@ export function useRealtimeRoom({
       if (hiddenVideo.readyState >= 2 && hiddenVideo.videoWidth > 0) {
         try {
           ctx.drawImage(hiddenVideo, 0, 0, canvas.width, canvas.height);
-          const frame = canvas.toDataURL('image/jpeg', 0.5);
-          if (frame && frame.length < 48000 && socketRef.current?.readyState === WebSocket.OPEN) {
+          const frame = canvas.toDataURL('image/jpeg', lowBw ? 0.48 : 0.56);
+          if (frame && frame.length < 52000 && socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({
               type: 'relay-media-video',
               frame,
@@ -558,7 +621,7 @@ export function useRealtimeRoom({
           }
         } catch {}
       }
-    }, 160);
+    }, intervalMs);
 
     return () => {
       if (relayVideoTimerRef.current) {
@@ -642,6 +705,13 @@ export function useRealtimeRoom({
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(() => {});
       }
+      if (micEnhanceCtxRef.current && micEnhanceCtxRef.current.state !== 'closed') {
+        micEnhanceCtxRef.current.close().catch(() => {});
+      }
+      if (rawAudioTrackRef.current) {
+        rawAudioTrackRef.current.stop();
+        rawAudioTrackRef.current = null;
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((t) => t.stop());
         localStreamRef.current = null;
@@ -718,15 +788,18 @@ export function useRealtimeRoom({
       } catch {}
     }
 
-    // 1.4-second P2P watchdog: guarantees instant media over Server Relay unless real P2P RTP packets flow
+    // 2.4-second P2P watchdog: gives native WebRTC time to establish smooth 24fps P2P;
+    // falls back to Server Relay ONLY if real UDP/ICE media packets haven't started flowing
     const watchdog = window.setTimeout(() => {
-      if (
-        pc.signalingState !== 'closed' &&
-        (!verifiedP2PAudioPeersRef.current.has(targetPeerId) || !verifiedP2PVideoPeersRef.current.has(targetPeerId))
-      ) {
+      if (pc.signalingState === 'closed') return;
+      const counters = lastRtpCountersRef.current.get(targetPeerId);
+      const hasAnyInboundP2P =
+        (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') &&
+        ((counters?.totalBytes || 0) > 0 || verifiedP2PAudioPeersRef.current.has(targetPeerId) || verifiedP2PVideoPeersRef.current.has(targetPeerId));
+      if (!hasAnyInboundP2P) {
         activateRelayForPeer(targetPeerId);
       }
-    }, 1400);
+    }, 2400);
     p2pWatchdogTimersRef.current.set(targetPeerId, watchdog);
 
     pc.onsignalingstatechange = () => {
@@ -751,7 +824,13 @@ export function useRealtimeRoom({
         pc.iceConnectionState === 'connected' ||
         pc.iceConnectionState === 'completed';
 
-      if (iceReady && verifiedP2PAudioPeersRef.current.has(targetPeerId) && verifiedP2PVideoPeersRef.current.has(targetPeerId)) {
+      const counters = lastRtpCountersRef.current.get(targetPeerId);
+      const hasFlowingP2P =
+        (counters?.totalBytes || 0) > 0 ||
+        verifiedP2PAudioPeersRef.current.has(targetPeerId) ||
+        verifiedP2PVideoPeersRef.current.has(targetPeerId);
+
+      if (iceReady && hasFlowingP2P) {
         const wd = p2pWatchdogTimersRef.current.get(targetPeerId);
         if (wd) {
           window.clearTimeout(wd);
@@ -923,7 +1002,7 @@ export function useRealtimeRoom({
   }, [activateRelayForPeer, syncTracksToPeer]);
 
   // Continuous WebRTC RTP Byte/Frame Verification (every 1.2s):
-  // Proves actual remote audio & video packets are arriving before stopping Server Media Relay
+  // Switches cleanly to native 24fps P2P as soon as real UDP packets flow (works even when mic is muted or camera off!)
   useEffect(() => {
     if (!enabled) return;
     const timer = window.setInterval(async () => {
@@ -932,28 +1011,43 @@ export function useRealtimeRoom({
         try {
           const stats = await pc.getStats();
           let audioBytes = 0;
+          let videoBytes = 0;
           let videoFrames = 0;
           stats.forEach((report: any) => {
             if (report.type === 'inbound-rtp') {
               if (report.kind === 'audio' || report.mediaType === 'audio') {
                 audioBytes += Number(report.bytesReceived || 0);
               } else if (report.kind === 'video' || report.mediaType === 'video') {
+                videoBytes += Number(report.bytesReceived || 0);
                 videoFrames += Number(report.framesDecoded || 0);
               }
             }
           });
-          const prev = lastRtpCountersRef.current.get(peerId) || { audioBytes: 0, videoFrames: 0 };
+          const totalBytes = audioBytes + videoBytes;
+          const prev = lastRtpCountersRef.current.get(peerId) || { totalBytes: 0, audioBytes: 0, videoFrames: 0 };
           const audioFlowing = audioBytes > prev.audioBytes && audioBytes > 0;
           const videoFlowing = videoFrames > prev.videoFrames && videoFrames > 0;
-          lastRtpCountersRef.current.set(peerId, { audioBytes, videoFrames });
+          const anyMediaFlowing = totalBytes > prev.totalBytes && totalBytes > 0;
+          lastRtpCountersRef.current.set(peerId, { totalBytes, audioBytes, videoFrames });
 
-          if (audioFlowing) verifiedP2PAudioPeersRef.current.add(peerId);
-          else verifiedP2PAudioPeersRef.current.delete(peerId);
+          if (audioFlowing || (anyMediaFlowing && audioBytes > 0)) {
+            verifiedP2PAudioPeersRef.current.add(peerId);
+          } else if (!anyMediaFlowing) {
+            verifiedP2PAudioPeersRef.current.delete(peerId);
+          }
 
-          if (videoFlowing) verifiedP2PVideoPeersRef.current.add(peerId);
-          else verifiedP2PVideoPeersRef.current.delete(peerId);
+          if (videoFlowing || (anyMediaFlowing && videoFrames > 0)) {
+            verifiedP2PVideoPeersRef.current.add(peerId);
+          } else if (!anyMediaFlowing) {
+            verifiedP2PVideoPeersRef.current.delete(peerId);
+          }
 
-          if (audioFlowing && videoFlowing) {
+          const iceReady =
+            pc.connectionState === 'connected' ||
+            pc.iceConnectionState === 'connected' ||
+            pc.iceConnectionState === 'completed';
+
+          if (iceReady && anyMediaFlowing) {
             if (relayIncomingPeersRef.current.has(peerId)) {
               relayIncomingPeersRef.current.delete(peerId);
               relayOutgoingTargetsRef.current.delete(peerId);
@@ -963,7 +1057,7 @@ export function useRealtimeRoom({
             }
             setRemotePeers((curr) => {
               const ex = curr.get(peerId);
-              if (ex && ex.connectionMode !== 'p2p') {
+              if (ex && (ex.connectionMode !== 'p2p' || ex.relayVideoFrame)) {
                 const next = new Map(curr);
                 next.set(peerId, { ...ex, connectionMode: 'p2p', relayVideoFrame: undefined });
                 return next;
@@ -1144,8 +1238,11 @@ export function useRealtimeRoom({
 
               case 'relay-stopped': {
                 const { fromPeerId } = data;
-                if (fromPeerId && verifiedP2PAudioPeersRef.current.has(String(fromPeerId)) && verifiedP2PVideoPeersRef.current.has(String(fromPeerId))) {
-                  relayOutgoingTargetsRef.current.delete(String(fromPeerId));
+                if (fromPeerId) {
+                  const counters = lastRtpCountersRef.current.get(String(fromPeerId));
+                  if ((counters?.totalBytes || 0) > 0 || verifiedP2PAudioPeersRef.current.has(String(fromPeerId)) || verifiedP2PVideoPeersRef.current.has(String(fromPeerId))) {
+                    relayOutgoingTargetsRef.current.delete(String(fromPeerId));
+                  }
                 }
                 break;
               }
@@ -1435,9 +1532,12 @@ export function useRealtimeRoom({
     }));
   }, [enabled, currentUser.fullName, currentUser.avatarUrl, currentUser.roleTitle, currentUser.preferredLang]);
 
-  // Toggle Microphone (resumes WebAudio relay playback too)
+  // Toggle Microphone (syncs both raw hardware track & far-field boosted track + resumes WebAudio relay)
   const toggleMic = useCallback(async () => {
     resumeRelayPlaybackAudio();
+    if (micEnhanceCtxRef.current?.state === 'suspended') {
+      micEnhanceCtxRef.current.resume().catch(() => {});
+    }
     const newMutedState = !isMicMutedRef.current;
     setIsMicMuted(newMutedState);
 
@@ -1445,6 +1545,9 @@ export function useRealtimeRoom({
       await acquireMedia(cameraFacing, false);
     }
 
+    if (rawAudioTrackRef.current) {
+      rawAudioTrackRef.current.enabled = !newMutedState;
+    }
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach((t) => {
         t.enabled = !newMutedState;

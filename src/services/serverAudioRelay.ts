@@ -1,13 +1,25 @@
 /**
- * Server-Relayed Low-Latency PCM Audio Engine
- * Provides 100% firewall/CGNAT-proof voice communication over WebSocket (wss://)
- * whenever direct WebRTC UDP/ICE cannot establish within 2.2s on strict mobile networks.
+ * Server-Relayed Low-Latency Continuous Ring-Buffer Audio Engine
+ * Eliminates packet boundary clicks/crackling ("track") and provides smooth,
+ * uninterrupted voice playback over WebSocket (wss://) when carrier NATs block P2P.
  */
+
+interface PeerRingState {
+  ring: Float32Array;
+  capacity: number;
+  readPos: number;
+  writePos: number;
+  available: number;
+  started: boolean;
+  fade: number;
+  lastSample: number;
+}
 
 let sharedRelayPlaybackCtx: AudioContext | null = null;
 let sharedRelayGain: GainNode | null = null;
+let sharedPlaybackProcessor: ScriptProcessorNode | null = null;
 let isDubbingDucked = false;
-const peerPlayCursors = new Map<string, number>();
+const peerRings = new Map<string, PeerRingState>();
 
 if (typeof window !== 'undefined') {
   window.addEventListener('oneworld:dubbing-state', (ev: Event) => {
@@ -39,6 +51,53 @@ function getOrCreatePlaybackCtx(): AudioContext | null {
       sharedRelayGain = sharedRelayPlaybackCtx.createGain();
       sharedRelayGain.gain.value = isDubbingDucked ? 0.15 : 1.0;
       sharedRelayGain.connect(sharedRelayPlaybackCtx.destination);
+
+      const ctxRate = sharedRelayPlaybackCtx.sampleRate || 48000;
+      const prefillTarget = Math.max(1024, Math.round(ctxRate * 0.09)); // 90ms smooth jitter buffer
+
+      sharedPlaybackProcessor = sharedRelayPlaybackCtx.createScriptProcessor(1024, 0, 1);
+      sharedPlaybackProcessor.onaudioprocess = (ev) => {
+        const out = ev.outputBuffer.getChannelData(0);
+        out.fill(0);
+
+        for (const [, state] of peerRings.entries()) {
+          if (!state.started) {
+            if (state.available >= prefillTarget) {
+              state.started = true;
+            } else {
+              continue;
+            }
+          }
+
+          for (let i = 0; i < out.length; i++) {
+            if (state.available > 0) {
+              const sample = state.ring[state.readPos];
+              state.readPos = (state.readPos + 1) % state.capacity;
+              state.available--;
+              state.fade = Math.min(1, state.fade + 0.015);
+              state.lastSample = sample;
+              out[i] += sample * state.fade;
+            } else {
+              // Softly decay on brief packet gap to prevent any audible click/crack
+              state.fade = Math.max(0, state.fade - 0.02);
+              state.lastSample *= 0.94;
+              out[i] += state.lastSample * state.fade;
+              if (state.fade <= 0.001) {
+                state.started = false;
+                break;
+              }
+            }
+          }
+        }
+
+        // Soft limiter to guarantee zero digital clipping with multiple simultaneous speakers
+        for (let i = 0; i < out.length; i++) {
+          if (out[i] > 0.95) out[i] = 0.95 + Math.tanh(out[i] - 0.95) * 0.04;
+          else if (out[i] < -0.95) out[i] = -0.95 + Math.tanh(out[i] + 0.95) * 0.04;
+        }
+      };
+
+      sharedPlaybackProcessor.connect(sharedRelayGain);
     }
 
     if (sharedRelayPlaybackCtx.state === 'suspended') {
@@ -109,8 +168,8 @@ function downsampleTo16kHz(float32Input: Float32Array, inputSampleRate: number):
 }
 
 /**
- * Starts lightweight PCM16 16kHz capture on a MediaStream audio track.
- * Sends chunks ONLY when mic is unmuted AND at least one peer requires server relay.
+ * Starts smooth 80ms PCM16 16kHz capture on a MediaStream audio track with hangover gating
+ * so far-away soft voices and trailing words are never clipped.
  */
 export function startRelayAudioCapture(
   stream: MediaStream,
@@ -135,16 +194,18 @@ export function startRelayAudioCapture(
     const audioTrackStream = new MediaStream([stream.getAudioTracks()[0]]);
     captureCtx = new AudioCtx();
     source = captureCtx.createMediaStreamSource(audioTrackStream);
-    processor = captureCtx.createScriptProcessor(4096, 1, 1);
+    processor = captureCtx.createScriptProcessor(2048, 1, 1);
     silentGain = captureCtx.createGain();
     silentGain.gain.value = 0;
 
     let sampleAccumulator: number[] = [];
-    const SEND_FRAME_SAMPLES = 2400; // 150ms @ 16kHz (~4.8KB per packet)
+    const SEND_FRAME_SAMPLES = 1280; // 80ms @ 16kHz (~2.5KB per packet for ultra-smooth low-latency flow)
+    let silentFramesRemaining = 0;
 
     processor.onaudioprocess = (ev) => {
       if (stopped || !shouldSendFn()) {
         sampleAccumulator = [];
+        silentFramesRemaining = 0;
         return;
       }
       if (captureCtx && captureCtx.state === 'suspended') {
@@ -157,14 +218,18 @@ export function startRelayAudioCapture(
         sampleAccumulator.push(downsampled[i]);
       }
 
-      if (sampleAccumulator.length >= SEND_FRAME_SAMPLES) {
+      while (sampleAccumulator.length >= SEND_FRAME_SAMPLES) {
         const frame = new Int16Array(sampleAccumulator.splice(0, SEND_FRAME_SAMPLES));
-        // Skip only near-zero dead silence to preserve soft mobile voices
         let energy = 0;
         for (let i = 0; i < frame.length; i += 4) {
           energy += Math.abs(frame[i]);
         }
-        if (energy / (frame.length / 4) > 6) {
+        const avgAmp = energy / (frame.length / 4);
+        if (avgAmp > 3) {
+          silentFramesRemaining = 4; // 320ms smooth hangover so trailing distant speech is never cut off
+        }
+        if (silentFramesRemaining > 0) {
+          if (avgAmp <= 3) silentFramesRemaining--;
           onChunk(int16ToBase64(frame), 16000);
         }
       }
@@ -193,42 +258,68 @@ export function startRelayAudioCapture(
 }
 
 /**
- * Plays a received 16-bit PCM audio frame seamlessly on a jitter-compensated timeline.
+ * Feeds incoming 16kHz PCM16 frame cleanly into the continuous WebAudio jitter ring-buffer
+ * with linear resampling to hardware sampleRate — zero boundary clicks or audio drops.
  */
-export function playRelayedPcmChunk(peerId: string, pcm16Base64: string, sampleRate = 16000): void {
+export function playRelayedPcmChunk(peerId: string, pcm16Base64: string, sourceRate = 16000): void {
   const ctx = getOrCreatePlaybackCtx();
-  if (!ctx || !sharedRelayGain || !pcm16Base64) return;
+  if (!ctx || !pcm16Base64) return;
 
   try {
     const int16 = base64ToInt16(pcm16Base64);
     if (int16.length === 0) return;
 
-    const buffer = ctx.createBuffer(1, int16.length, sampleRate);
-    const channelData = buffer.getChannelData(0);
-    for (let i = 0; i < int16.length; i++) {
-      channelData[i] = int16[i] / 0x8000;
+    const targetRate = ctx.sampleRate || 48000;
+    const capacity = Math.max(8192, Math.round(targetRate * 1.0)); // 1s ring capacity
+
+    let state = peerRings.get(peerId);
+    if (!state || state.capacity !== capacity) {
+      state = {
+        ring: new Float32Array(capacity),
+        capacity,
+        readPos: 0,
+        writePos: 0,
+        available: 0,
+        started: false,
+        fade: 0,
+        lastSample: 0
+      };
+      peerRings.set(peerId, state);
     }
 
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    src.connect(sharedRelayGain);
+    const ratio = sourceRate / targetRate;
+    const outCount = Math.max(1, Math.round(int16.length / ratio));
+    const maxBacklog = Math.round(targetRate * 0.35); // Cap latency at 350ms
 
-    const now = ctx.currentTime;
-    let scheduledAt = peerPlayCursors.get(peerId) || now + 0.06;
-    if (scheduledAt < now + 0.015) {
-      scheduledAt = now + 0.04;
-    } else if (scheduledAt > now + 0.45) {
-      // Cap jitter buffer to 450ms so audio never lags behind video
-      scheduledAt = now + 0.08;
+    for (let i = 0; i < outCount; i++) {
+      const srcIdx = i * ratio;
+      const idx0 = Math.floor(srcIdx);
+      const idx1 = Math.min(int16.length - 1, idx0 + 1);
+      const frac = srcIdx - idx0;
+      const s0 = int16[idx0] / 0x8000;
+      const s1 = int16[idx1] / 0x8000;
+      const sample = s0 + (s1 - s0) * frac;
+
+      state.ring[state.writePos] = sample;
+      state.writePos = (state.writePos + 1) % state.capacity;
+      if (state.available < state.capacity) {
+        state.available++;
+      } else {
+        state.readPos = (state.readPos + 1) % state.capacity;
+      }
     }
 
-    src.start(scheduledAt);
-    peerPlayCursors.set(peerId, scheduledAt + buffer.duration);
+    // Trim excess backlog cleanly to prevent drift lag
+    if (state.available > maxBacklog) {
+      const trim = state.available - Math.round(targetRate * 0.12);
+      state.readPos = (state.readPos + trim) % state.capacity;
+      state.available -= trim;
+    }
   } catch {
     // ignore corrupted frame
   }
 }
 
 export function clearPeerRelayCursor(peerId: string): void {
-  peerPlayCursors.delete(peerId);
+  peerRings.delete(peerId);
 }
