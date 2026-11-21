@@ -264,12 +264,24 @@ interface SocketClient {
 const clients = new Map<WebSocket, SocketClient>();
 const rooms = new Map<string, Set<WebSocket>>();
 
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({
+  noServer: true,
+  perMessageDeflate: false,
+  maxPayload: 2 * 1024 * 1024
+});
 
 server.on('upgrade', (request, socket, head) => {
   const host = request.headers.host || 'localhost:3000';
   const url = new URL(request.url || '', `http://${host}`);
   if (url.pathname === '/ws') {
+    try {
+      if (typeof (socket as any).setNoDelay === 'function') {
+        (socket as any).setNoDelay(true);
+      }
+      if (typeof (socket as any).setKeepAlive === 'function') {
+        (socket as any).setKeepAlive(true, 10000);
+      }
+    } catch {}
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit('connection', ws, request);
     });
@@ -676,6 +688,109 @@ wss.on('connection', (ws: WebSocket) => {
           break;
         }
 
+        case 'request-relay': {
+          const sender = clients.get(ws);
+          const { targetPeerId } = payload;
+          if (!sender?.userId || !targetPeerId) break;
+          const targetWs = findSocketByUserId(String(targetPeerId), sender.roomId);
+          if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(JSON.stringify({
+              type: 'relay-requested',
+              fromPeerId: sender.userId
+            }));
+          }
+          break;
+        }
+
+        case 'stop-relay': {
+          const sender = clients.get(ws);
+          const { targetPeerId } = payload;
+          if (!sender?.userId || !targetPeerId) break;
+          const targetWs = findSocketByUserId(String(targetPeerId), sender.roomId);
+          if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(JSON.stringify({
+              type: 'relay-stopped',
+              fromPeerId: sender.userId
+            }));
+          }
+          break;
+        }
+
+        case 'relay-media-audio': {
+          const sender = clients.get(ws);
+          if (!sender?.roomId || !sender.userId || !payload.pcm16) break;
+          const outMsg = JSON.stringify({
+            type: 'relay-media-audio',
+            peerId: sender.userId,
+            pcm16: payload.pcm16,
+            sampleRate: Number(payload.sampleRate) || 16000
+          });
+          const targets: string[] | undefined = Array.isArray(payload.targetPeerIds) ? payload.targetPeerIds : undefined;
+          if (targets && targets.length > 0) {
+            for (const tid of targets) {
+              const tWs = findSocketByUserId(String(tid), sender.roomId);
+              if (tWs && tWs !== ws && tWs.readyState === WebSocket.OPEN) {
+                try { tWs.send(outMsg); } catch {}
+              }
+            }
+          } else {
+            const room = rooms.get(sender.roomId);
+            if (room) {
+              for (const memberWs of room) {
+                if (memberWs !== ws && memberWs.readyState === WebSocket.OPEN) {
+                  try { memberWs.send(outMsg); } catch {}
+                }
+              }
+            }
+          }
+          break;
+        }
+
+        case 'relay-media-video': {
+          const sender = clients.get(ws);
+          if (!sender?.roomId || !sender.userId || !payload.frame) break;
+          const outMsg = JSON.stringify({
+            type: 'relay-media-video',
+            peerId: sender.userId,
+            frame: payload.frame
+          });
+          const targets: string[] | undefined = Array.isArray(payload.targetPeerIds) ? payload.targetPeerIds : undefined;
+          if (targets && targets.length > 0) {
+            for (const tid of targets) {
+              const tWs = findSocketByUserId(String(tid), sender.roomId);
+              if (tWs && tWs !== ws && tWs.readyState === WebSocket.OPEN) {
+                try { tWs.send(outMsg); } catch {}
+              }
+            }
+          } else {
+            const room = rooms.get(sender.roomId);
+            if (room) {
+              for (const memberWs of room) {
+                if (memberWs !== ws && memberWs.readyState === WebSocket.OPEN) {
+                  try { memberWs.send(outMsg); } catch {}
+                }
+              }
+            }
+          }
+          break;
+        }
+
+        case 'media-ready': {
+          const sender = clients.get(ws);
+          if (sender?.roomId) {
+            if (payload.hasAudio !== undefined) sender.userMeta.isMuted = payload.isMuted ?? sender.userMeta.isMuted;
+            if (payload.isVideoOn !== undefined) sender.userMeta.isVideoOn = payload.isVideoOn;
+            broadcastToRoom(sender.roomId, {
+              type: 'peer-media-ready',
+              peerId: sender.userId,
+              peer: sender.userMeta,
+              hasAudio: !!payload.hasAudio,
+              hasVideo: !!payload.hasVideo
+            }, ws);
+          }
+          break;
+        }
+
         case 'house-register': {
           const { houseId, memberRecord } = payload;
           if (houseId && memberRecord?.memberId) {
@@ -1047,15 +1162,17 @@ app.post('/api/houses/:houseId/register', (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Real WebRTC STUN + TURN Relay Configuration
+// Real WebRTC STUN + TURN Relay Configuration + Built-in WS Media Relay
 // ---------------------------------------------------------------------------
-app.get('/api/rtc-config', (_req: Request, res: Response) => {
+let cachedDynamicTurn: { iceServers: any[]; expiresAt: number } | null = null;
+
+app.get('/api/rtc-config', async (_req: Request, res: Response) => {
   const iceServers: any[] = [
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' }
+    { urls: 'stun:stun.l.google.com:19302' }
   ];
 
+  let turnConfigured = false;
   const turnUrl = process.env.TURN_URL;
   const turnUsername = process.env.TURN_USERNAME;
   const turnCredential = process.env.TURN_CREDENTIAL;
@@ -1066,11 +1183,50 @@ app.get('/api/rtc-config', (_req: Request, res: Response) => {
       username: turnUsername,
       credential: turnCredential
     });
+    turnConfigured = true;
+  }
+
+  // Optional dynamic Cloudflare Calls TURN provisioning when configured
+  const cfTurnId = process.env.CLOUDFLARE_TURN_TOKEN_ID;
+  const cfTurnSecret = process.env.CLOUDFLARE_TURN_API_TOKEN;
+  if (!turnConfigured && cfTurnId && cfTurnSecret) {
+    if (cachedDynamicTurn && Date.now() < cachedDynamicTurn.expiresAt) {
+      iceServers.push(...cachedDynamicTurn.iceServers);
+      turnConfigured = true;
+    } else {
+      try {
+        const cfRes = await fetch(
+          `https://rtc.live.cloudflare.com/v1/turn/keys/${cfTurnId}/credentials/generate-ice-servers`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${cfTurnSecret}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ttl: 14400 })
+          }
+        );
+        if (cfRes.ok) {
+          const cfJson: any = await cfRes.json();
+          if (Array.isArray(cfJson?.iceServers)) {
+            cachedDynamicTurn = {
+              iceServers: cfJson.iceServers,
+              expiresAt: Date.now() + 1000 * 3600 * 3
+            };
+            iceServers.push(...cfJson.iceServers);
+            turnConfigured = true;
+          }
+        }
+      } catch {
+        // fallback cleanly to built-in WebSocket Media Relay
+      }
+    }
   }
 
   return res.json({
     iceServers,
-    turnConfigured: !!(turnUrl && !turnUrl.includes('turn.example.com')),
+    turnConfigured,
+    wsMediaRelay: true,
     sfuConfigured: !!(process.env.LIVEKIT_URL && !process.env.LIVEKIT_URL.includes('your-livekit-cluster'))
   });
 });
@@ -1652,7 +1808,11 @@ app.get('/api/health', (_req: Request, res: Response) => {
     connectedUsers: clients.size,
     registeredUsers: Object.keys(store.users).length,
     aiReady: !!geminiClient,
-    turnConfigured: !!(process.env.TURN_URL && !process.env.TURN_URL.includes('turn.example.com')),
+    wsMediaRelay: true,
+    turnConfigured: !!(
+      (process.env.TURN_URL && !process.env.TURN_URL.includes('turn.example.com')) ||
+      (process.env.CLOUDFLARE_TURN_TOKEN_ID && process.env.CLOUDFLARE_TURN_API_TOKEN)
+    ),
     timestamp: new Date().toISOString()
   });
 });

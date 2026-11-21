@@ -455,9 +455,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
               <div className="relative w-full h-full min-h-0 min-w-0 overflow-hidden bg-black">
                 {primaryRemotePeer ? (
                   <>
-                    {primaryRemotePeer.stream && (primaryRemotePeer.isVideoOn || primaryRemotePeer.stream.getVideoTracks().length > 0) ? (
+                    {(primaryRemotePeer.stream && (primaryRemotePeer.isVideoOn || primaryRemotePeer.stream.getVideoTracks().length > 0)) || primaryRemotePeer.relayVideoFrame ? (
                       <EdgeToEdgeVideo
                         stream={primaryRemotePeer.stream}
+                        fallbackFrame={primaryRemotePeer.relayVideoFrame}
                         muted={true}
                         mirror={false}
                         zoom={zoomScale}
@@ -481,8 +482,11 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                         <span className="text-white font-bold text-xs">{primaryRemotePeer.name}</span>
                       </div>
                     )}
-                    <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none">
-                      {primaryRemotePeer.seatNumber ? `${primaryRemotePeer.seatNumber} · ` : ''}{primaryRemotePeer.name}
+                    <span className="absolute bottom-2 left-2 z-10 px-2 py-0.5 rounded-lg bg-black/75 border border-emerald-500/60 text-[11px] font-black text-emerald-300 pointer-events-none flex items-center gap-1.5">
+                      <span>{primaryRemotePeer.seatNumber ? `${primaryRemotePeer.seatNumber} · ` : ''}{primaryRemotePeer.name}</span>
+                      <span className="text-[10px] text-amber-300">
+                        {primaryRemotePeer.connectionMode === 'p2p' ? '⚡P2P' : primaryRemotePeer.connectionMode === 'relay' ? '🛰️Server' : '🔄'}
+                      </span>
                     </span>
                   </>
                 ) : (
@@ -703,9 +707,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                   {/* 100% Single Speaker Full Edge-to-Edge Stream (Adjustable Zoom 30% - 250%) */}
                   <div className="w-full h-full relative overflow-hidden bg-black">
                     {showingRemote && primaryRemotePeer ? (
-                      primaryRemotePeer.stream && (primaryRemotePeer.isVideoOn || primaryRemotePeer.stream.getVideoTracks().length > 0) ? (
+                      (primaryRemotePeer.stream && (primaryRemotePeer.isVideoOn || primaryRemotePeer.stream.getVideoTracks().length > 0)) || primaryRemotePeer.relayVideoFrame ? (
                         <EdgeToEdgeVideo
                           stream={primaryRemotePeer.stream}
+                          fallbackFrame={primaryRemotePeer.relayVideoFrame}
                           muted={true}
                           mirror={false}
                           zoom={fullscreenZoom}
@@ -776,9 +781,10 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                           </div>
                         )
                       ) : secondaryRemotePeer ? (
-                        secondaryRemotePeer.stream && (secondaryRemotePeer.isVideoOn || secondaryRemotePeer.stream.getVideoTracks().length > 0) ? (
+                        (secondaryRemotePeer.stream && (secondaryRemotePeer.isVideoOn || secondaryRemotePeer.stream.getVideoTracks().length > 0)) || secondaryRemotePeer.relayVideoFrame ? (
                           <EdgeToEdgeVideo
                             stream={secondaryRemotePeer.stream}
+                            fallbackFrame={secondaryRemotePeer.relayVideoFrame}
                             muted={true}
                             mirror={false}
                             zoom={1}
@@ -998,6 +1004,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                 const chairStream = isUserSeat
                   ? (isVideoOn && isUsingRealWebcam && cameraActive ? localStream : null)
                   : (remotePeer?.stream && (remotePeer.isVideoOn || remotePeer.stream.getVideoTracks().length > 0) ? remotePeer.stream : null);
+                const chairRelayFrame = isUserSeat ? null : (remotePeer?.relayVideoFrame || null);
 
                 return (
                   <div
@@ -1049,7 +1056,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
 
                     {isOccupied && occupant ? (
                       <>
-                        {chairStream ? (
+                        {chairStream || chairRelayFrame ? (
                           <div className={`relative w-full h-28 sm:h-32 rounded-xl overflow-hidden bg-black border-2 mb-1.5 ${
                             (isUserSeat && isMicOn && isSpeaking) || occupant.isSpeaking
                               ? 'border-amber-400 ring-2 ring-amber-400/60'
@@ -1059,6 +1066,7 @@ export const RoomStage: React.FC<RoomStageProps> = ({
                           }`}>
                             <EdgeToEdgeVideo
                               stream={chairStream}
+                              fallbackFrame={chairRelayFrame}
                               muted={true}
                               mirror={isUserSeat && cameraFacing === 'user'}
                               zoom={1}

@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { RoomOccupant, LiveSpeechMessage, VirtualGift, Room } from '../types';
 import { getApiUrl } from '../config/env';
+import {
+  startRelayAudioCapture,
+  playRelayedPcmChunk,
+  clearPeerRelayCursor,
+  resumeRelayPlaybackAudio
+} from './serverAudioRelay';
 
 export interface RemotePeerData {
   id: string;
@@ -14,6 +20,8 @@ export interface RemotePeerData {
   isVideoOn: boolean;
   isSpeaking: boolean;
   stream?: MediaStream;
+  relayVideoFrame?: string;
+  connectionMode?: 'connecting' | 'p2p' | 'relay';
 }
 
 interface UseRealtimeRoomOptions {
@@ -35,7 +43,7 @@ interface UseRealtimeRoomOptions {
   onSeatDenied?: (seatNumber: number, occupiedBy: string) => void;
 }
 
-const ICE_CACHE_KEY = 'ow_ice_config_v2';
+const ICE_CACHE_KEY = 'ow_ice_config_v3';
 
 const DEFAULT_ICE_CONFIG: RTCConfiguration = {
   iceServers: [
@@ -165,7 +173,14 @@ export function useRealtimeRoom({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const speakingTimerRef = useRef<number | null>(null);
 
-  // Keep fresh refs for callbacks & state to avoid tearing down WS connections unnecessarily
+  // Server Media Relay Tracking (P2P first; automatic 2.2s failover to WS relay for restricted mobile/carrier NATs)
+  const p2pWatchdogTimersRef = useRef<Map<string, number>>(new Map());
+  const relayIncomingPeersRef = useRef<Set<string>>(new Set());
+  const relayOutgoingTargetsRef = useRef<Set<string>>(new Set());
+  const stopRelayAudioCaptureRef = useRef<(() => void) | null>(null);
+  const relayVideoTimerRef = useRef<number | null>(null);
+
+  // Fresh refs for callbacks & state
   const isMicMutedRef = useRef(isMicMuted);
   isMicMutedRef.current = isMicMuted;
   const isVideoOffRef = useRef(isVideoOff);
@@ -193,7 +208,7 @@ export function useRealtimeRoom({
     onSeatDenied
   };
 
-  // Load & cache TURN + STUN config from backend (non-blocking, instant on repeat visits)
+  // Load & cache STUN + TURN config from backend (non-blocking)
   useEffect(() => {
     let cancelled = false;
     fetch(getApiUrl('/api/rtc-config'))
@@ -216,7 +231,107 @@ export function useRealtimeRoom({
     };
   }, []);
 
-  // Acquire lightweight, audio-first local stream — preserves active mic track during camera flips
+  // Synchronizes localStream tracks cleanly onto a PeerConnection & sends re-offer ONLY when needed
+  const syncTracksToPeer = useCallback((pc: RTCPeerConnection, targetPeerId: string) => {
+    const stream = localStreamRef.current;
+    if (!stream || stream.getTracks().length === 0 || pc.signalingState === 'closed') return;
+
+    const lowBandwidth = isConstrainedNetwork();
+    const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
+    const senders = pc.getSenders();
+    let needsRenegotiation = false;
+
+    stream.getTracks().forEach((track) => {
+      const matchingTransceiver = transceivers.find(
+        (tr) => tr.sender?.track?.kind === track.kind || tr.receiver?.track?.kind === track.kind
+      );
+      const existingSender =
+        matchingTransceiver?.sender || senders.find((s) => s.track?.kind === track.kind);
+
+      if (existingSender) {
+        const hadNoTrack = !existingSender.track;
+        const directionWasRecvOrInactive =
+          matchingTransceiver &&
+          (matchingTransceiver.direction === 'recvonly' || matchingTransceiver.direction === 'inactive');
+
+        if (matchingTransceiver && directionWasRecvOrInactive) {
+          try {
+            matchingTransceiver.direction = 'sendrecv';
+          } catch {}
+          needsRenegotiation = true;
+        }
+        if (hadNoTrack) {
+          needsRenegotiation = true;
+        }
+        if (existingSender.track?.id !== track.id) {
+          existingSender.replaceTrack(track).catch(() => {});
+        }
+        tuneSenderParams(existingSender, track.kind === 'audio' ? 'audio' : 'video', lowBandwidth);
+      } else {
+        const newSender = pc.addTrack(track, stream);
+        tuneSenderParams(newSender, track.kind === 'audio' ? 'audio' : 'video', lowBandwidth);
+        needsRenegotiation = true;
+      }
+    });
+
+    if (needsRenegotiation && pc.signalingState === 'stable' && socketRef.current?.readyState === WebSocket.OPEN) {
+      const user = currentUserRef.current;
+      pc.createOffer()
+        .then((offer) => {
+          const tunedSdp = optimizeSdpForVoice(offer.sdp);
+          return pc.setLocalDescription({ type: offer.type, sdp: tunedSdp });
+        })
+        .then(() => {
+          if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({
+              type: 'webrtc-offer',
+              targetPeerId,
+              sdp: pc.localDescription,
+              caller: {
+                id: user.id,
+                name: user.fullName,
+                avatar: user.avatarUrl,
+                role: user.roleTitle,
+                preferredLang: user.preferredLang,
+                isMuted: isMicMutedRef.current,
+                isVideoOn: !isVideoOffRef.current,
+                seatNumber: seatNumberRef.current
+              }
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  // Restart Server Media Relay capture whenever localStream changes
+  const ensureRelayAudioCapture = useCallback((stream: MediaStream | null) => {
+    if (stopRelayAudioCaptureRef.current) {
+      stopRelayAudioCaptureRef.current();
+      stopRelayAudioCaptureRef.current = null;
+    }
+    if (!stream || stream.getAudioTracks().length === 0) return;
+
+    stopRelayAudioCaptureRef.current = startRelayAudioCapture(
+      stream,
+      () =>
+        !isMicMutedRef.current &&
+        relayOutgoingTargetsRef.current.size > 0 &&
+        socketRef.current?.readyState === WebSocket.OPEN,
+      (pcm16Base64, sampleRate) => {
+        if (socketRef.current?.readyState === WebSocket.OPEN && relayOutgoingTargetsRef.current.size > 0) {
+          socketRef.current.send(JSON.stringify({
+            type: 'relay-media-audio',
+            pcm16: pcm16Base64,
+            sampleRate,
+            targetPeerIds: Array.from(relayOutgoingTargetsRef.current)
+          }));
+        }
+      }
+    );
+  }, []);
+
+  // Two-Phase Audio-First Media Acquisition (~80ms voice connect + parallel video)
   const acquireMedia = useCallback(async (facing: 'user' | 'environment' = 'user', preserveExistingAudio = false) => {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setCameraError('ይህ ብራውዘር ወይም ዌብቪው ካሜራ/ማይክሮፎን አይደግፍም። እባክዎ በChrome ወይም Safari ይክፈቱ።');
@@ -225,11 +340,9 @@ export function useRealtimeRoom({
 
     const lowBandwidth = isConstrainedNetwork();
     const isPortrait = typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
-    const existingLiveAudioTrack = preserveExistingAudio
-      ? localStreamRef.current?.getAudioTracks().find((t) => t.readyState === 'live') || null
-      : null;
+    const existingLiveAudioTrack =
+      localStreamRef.current?.getAudioTracks().find((t) => t.readyState === 'live') || null;
 
-    // Leave hardware sampleRate unlocked so Android/Bluetooth HAL never glitches at 16kHz vs 48kHz
     const audioConstraint: MediaTrackConstraints = {
       echoCancellation: true,
       noiseSuppression: true,
@@ -250,130 +363,148 @@ export function useRealtimeRoom({
           facingMode: facing
         };
 
-    let stream: MediaStream | null = null;
+    // Phase 1: Instant Audio-First capture (~80ms on all phones) so voice never waits on cold camera hardware
+    let activeAudioTrack: MediaStreamTrack | null =
+      preserveExistingAudio && existingLiveAudioTrack ? existingLiveAudioTrack : existingLiveAudioTrack;
+
+    if (!activeAudioTrack) {
+      try {
+        const audioOnlyStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraint, video: false });
+        activeAudioTrack = audioOnlyStream.getAudioTracks()[0] || null;
+        if (activeAudioTrack) {
+          activeAudioTrack.enabled = !isMicMutedRef.current;
+          const quickAudioStream = new MediaStream([
+            activeAudioTrack,
+            ...(localStreamRef.current?.getVideoTracks().filter((t) => t.readyState === 'live') || [])
+          ]);
+          localStreamRef.current = quickAudioStream;
+          setLocalStream(quickAudioStream);
+          ensureRelayAudioCapture(quickAudioStream);
+          peerConnectionsRef.current.forEach((pc, pid) => syncTracksToPeer(pc, pid));
+          if (socketRef.current?.readyState === WebSocket.OPEN) {
+            socketRef.current.send(JSON.stringify({
+              type: 'media-ready',
+              hasAudio: true,
+              hasVideo: quickAudioStream.getVideoTracks().length > 0,
+              isMuted: isMicMutedRef.current,
+              isVideoOn: !isVideoOffRef.current
+            }));
+          }
+        }
+      } catch {
+        // Proceed cleanly to try camera
+      }
+    }
+
+    // Phase 2: Acquire Video Track asynchronously without blocking audio
+    let activeVideoTrack: MediaStreamTrack | null = null;
     try {
-      if (existingLiveAudioTrack) {
-        const videoOnly = await navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraint });
-        stream = new MediaStream([existingLiveAudioTrack, ...videoOnly.getVideoTracks()]);
-      } else {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: audioConstraint,
-          video: videoConstraint
-        });
+      const videoStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraint });
+      activeVideoTrack = videoStream.getVideoTracks()[0] || null;
+    } catch (err: any) {
+      if (!activeAudioTrack) {
+        const denied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+        setCameraError(
+          denied
+            ? 'የካሜራ ወይም የድምፅ ፍቃድ አልተሰጠም። እባክዎ በስልክዎ/ብራውዘርዎ ፍቃድ ይስጡ።'
+            : 'ካሜራ ወይም ማይክሮፎን ማግኘት አልተቻለም።'
+        );
       }
-    } catch {
-      // Fallback 1: Audio-only instant capture so voice ALWAYS connects immediately even if camera is busy/slow
-      if (existingLiveAudioTrack) {
-        stream = new MediaStream([existingLiveAudioTrack]);
-      } else {
+    }
+
+    const finalTracks: MediaStreamTrack[] = [];
+    if (activeAudioTrack && activeAudioTrack.readyState === 'live') {
+      activeAudioTrack.enabled = !isMicMutedRef.current;
+      finalTracks.push(activeAudioTrack);
+    }
+    if (activeVideoTrack && activeVideoTrack.readyState === 'live') {
+      activeVideoTrack.enabled = !isVideoOffRef.current;
+      finalTracks.push(activeVideoTrack);
+    }
+
+    if (finalTracks.length === 0) return localStreamRef.current;
+
+    const mergedStream = new MediaStream(finalTracks);
+    const keptIds = new Set(mergedStream.getTracks().map((t) => t.id));
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => {
+        if (!keptIds.has(t.id)) t.stop();
+      });
+    }
+
+    setCameraError(null);
+    localStreamRef.current = mergedStream;
+    setLocalStream(mergedStream);
+    ensureRelayAudioCapture(mergedStream);
+
+    peerConnectionsRef.current.forEach((pc, pid) => syncTracksToPeer(pc, pid));
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'media-ready',
+        hasAudio: !!activeAudioTrack,
+        hasVideo: !!activeVideoTrack,
+        isMuted: isMicMutedRef.current,
+        isVideoOn: !isVideoOffRef.current
+      }));
+    }
+
+    return mergedStream;
+  }, [ensureRelayAudioCapture, syncTracksToPeer]);
+
+  // Adaptive lightweight Video Relay Sender (runs ONLY when >= 1 peer needs Server Relay)
+  useEffect(() => {
+    if (!enabled) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 240;
+    canvas.height = 180;
+    const ctx = canvas.getContext('2d');
+    const hiddenVideo = document.createElement('video');
+    hiddenVideo.muted = true;
+    hiddenVideo.playsInline = true;
+
+    relayVideoTimerRef.current = window.setInterval(() => {
+      if (
+        relayOutgoingTargetsRef.current.size === 0 ||
+        isVideoOffRef.current ||
+        !localStreamRef.current ||
+        socketRef.current?.readyState !== WebSocket.OPEN ||
+        !ctx
+      ) {
+        return;
+      }
+      const videoTrack = localStreamRef.current.getVideoTracks().find((t) => t.readyState === 'live' && t.enabled);
+      if (!videoTrack) return;
+
+      if (hiddenVideo.srcObject !== localStreamRef.current) {
+        hiddenVideo.srcObject = localStreamRef.current;
+        hiddenVideo.play().catch(() => {});
+      }
+      if (hiddenVideo.readyState >= 2 && hiddenVideo.videoWidth > 0) {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: audioConstraint,
-            video: false
-          });
-        } catch {
-          // Fallback 2: Video-only if mic denied
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false });
-          } catch (err: any) {
-            const denied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
-            setCameraError(
-              denied
-                ? 'የካሜራ ወይም የድምፅ ፍቃድ አልተሰጠም። እባክዎ በስልክዎ/ብራውዘርዎ ፍቃድ ይስጡ።'
-                : 'ካሜራ ወይም ማይክሮፎን ማግኘት አልተቻለም።'
-            );
-            return null;
+          ctx.drawImage(hiddenVideo, 0, 0, canvas.width, canvas.height);
+          const frame = canvas.toDataURL('image/jpeg', 0.52);
+          if (frame && frame.length < 45000) {
+            socketRef.current.send(JSON.stringify({
+              type: 'relay-media-video',
+              frame,
+              targetPeerIds: Array.from(relayOutgoingTargetsRef.current)
+            }));
           }
-        }
+        } catch {}
       }
-    }
+    }, 160);
 
-    if (stream) {
-      setCameraError(null);
-      stream.getAudioTracks().forEach((trk) => {
-        trk.enabled = !isMicMutedRef.current;
-      });
-      stream.getVideoTracks().forEach((trk) => {
-        trk.enabled = !isVideoOffRef.current;
-      });
-
-      // Stop ONLY old tracks that are NOT being reused in the new stream (never cut live audio during camera flip)
-      const keptIds = new Set(stream.getTracks().map((t) => t.id));
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((t) => {
-          if (!keptIds.has(t.id)) {
-            t.stop();
-          }
-        });
+    return () => {
+      if (relayVideoTimerRef.current) {
+        window.clearInterval(relayVideoTimerRef.current);
+        relayVideoTimerRef.current = null;
       }
-      localStreamRef.current = stream;
-      setLocalStream(stream);
+      hiddenVideo.srcObject = null;
+    };
+  }, [enabled]);
 
-      // Match existing transceivers by sender OR receiver kind so pre-created audio/video transceivers get replaceTrack() in 0ms!
-      peerConnectionsRef.current.forEach((pc, targetPeerId) => {
-        const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
-        const senders = pc.getSenders();
-        let addedNewTrack = false;
-
-        stream!.getTracks().forEach((track) => {
-          const matchingTransceiver = transceivers.find(
-            (tr) =>
-              tr.sender?.track?.kind === track.kind ||
-              tr.receiver?.track?.kind === track.kind
-          );
-          const existingSender =
-            matchingTransceiver?.sender || senders.find((s) => s.track?.kind === track.kind);
-
-          if (existingSender) {
-            if (matchingTransceiver && (matchingTransceiver.direction === 'recvonly' || matchingTransceiver.direction === 'inactive')) {
-              try {
-                matchingTransceiver.direction = 'sendrecv';
-              } catch {}
-            }
-            existingSender.replaceTrack(track).catch(() => {});
-            tuneSenderParams(existingSender, track.kind === 'audio' ? 'audio' : 'video', lowBandwidth);
-          } else {
-            const newSender = pc.addTrack(track, stream!);
-            tuneSenderParams(newSender, track.kind === 'audio' ? 'audio' : 'video', lowBandwidth);
-            addedNewTrack = true;
-          }
-        });
-
-        if (addedNewTrack && pc.signalingState === 'stable' && socketRef.current?.readyState === WebSocket.OPEN) {
-          const user = currentUserRef.current;
-          pc.createOffer()
-            .then((offer) => {
-              const tunedSdp = optimizeSdpForVoice(offer.sdp);
-              return pc.setLocalDescription({ type: offer.type, sdp: tunedSdp });
-            })
-            .then(() => {
-              if (socketRef.current?.readyState === WebSocket.OPEN) {
-                socketRef.current.send(JSON.stringify({
-                  type: 'webrtc-offer',
-                  targetPeerId,
-                  sdp: pc.localDescription,
-                  caller: {
-                    id: user.id,
-                    name: user.fullName,
-                    avatar: user.avatarUrl,
-                    role: user.roleTitle,
-                    preferredLang: user.preferredLang,
-                    isMuted: isMicMutedRef.current,
-                    isVideoOn: !isVideoOffRef.current,
-                    seatNumber: seatNumberRef.current
-                  }
-                }));
-              }
-            })
-            .catch(() => {});
-        }
-      });
-    }
-
-    return stream;
-  }, []);
-
-  // Initialize Local Media once authenticated
+  // Initialize Local Media + Low-CPU Audio Analyser once authenticated
   useEffect(() => {
     if (!enabled) return;
     let active = true;
@@ -382,7 +513,6 @@ export function useRealtimeRoom({
       const stream = await acquireMedia('user');
       if (!active || !stream) return;
 
-      // Setup Low-CPU Audio Analyser for Speaking Detection (polls every 180ms, skipped when muted)
       if (stream.getAudioTracks().length > 0) {
         try {
           const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -439,6 +569,10 @@ export function useRealtimeRoom({
         window.clearInterval(speakingTimerRef.current);
         speakingTimerRef.current = null;
       }
+      if (stopRelayAudioCaptureRef.current) {
+        stopRelayAudioCaptureRef.current();
+        stopRelayAudioCaptureRef.current = null;
+      }
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(() => {});
       }
@@ -461,7 +595,27 @@ export function useRealtimeRoom({
     }
   }, []);
 
-  // Create Peer Connection helper with Adaptive Bitrate, Renegotiation & TURN support
+  // Activate Server Media Relay for a peer whose direct WebRTC failed or took > 2.2s
+  const activateRelayForPeer = useCallback((targetPeerId: string) => {
+    relayIncomingPeersRef.current.add(targetPeerId);
+    relayOutgoingTargetsRef.current.add(targetPeerId);
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'request-relay',
+        targetPeerId
+      }));
+    }
+    setRemotePeers((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(targetPeerId);
+      if (existing && existing.connectionMode !== 'p2p') {
+        next.set(targetPeerId, { ...existing, connectionMode: 'relay' });
+      }
+      return next;
+    });
+  }, []);
+
+  // Create Peer Connection helper with Adaptive Bitrate, 2.2s Server Relay Failover & Perfect Negotiation
   const createPeerConnection = useCallback((targetPeerId: string, initiator: boolean, reuseExisting = false) => {
     if (reuseExisting && peerConnectionsRef.current.has(targetPeerId)) {
       const existingPc = peerConnectionsRef.current.get(targetPeerId)!;
@@ -475,6 +629,12 @@ export function useRealtimeRoom({
       peerConnectionsRef.current.delete(targetPeerId);
     }
 
+    const oldWatchdog = p2pWatchdogTimersRef.current.get(targetPeerId);
+    if (oldWatchdog) {
+      window.clearTimeout(oldWatchdog);
+      p2pWatchdogTimersRef.current.delete(targetPeerId);
+    }
+
     const pc = new RTCPeerConnection(iceConfigRef.current);
     peerConnectionsRef.current.set(targetPeerId, pc);
 
@@ -486,12 +646,30 @@ export function useRealtimeRoom({
         tuneSenderParams(sender, track.kind === 'audio' ? 'audio' : 'video', lowBandwidth);
       });
     } else if (initiator) {
-      // Ensure SDP offer always negotiates audio+video receive transceivers even before local camera resolves
       try {
         pc.addTransceiver('audio', { direction: 'sendrecv' });
         pc.addTransceiver('video', { direction: 'sendrecv' });
       } catch {}
     }
+
+    // 2.2-second P2P watchdog: guarantees instant media over Server Relay if carrier CGNAT/firewall blocks UDP
+    const watchdog = window.setTimeout(() => {
+      if (
+        pc.signalingState !== 'closed' &&
+        pc.connectionState !== 'connected' &&
+        pc.iceConnectionState !== 'connected' &&
+        pc.iceConnectionState !== 'completed'
+      ) {
+        activateRelayForPeer(targetPeerId);
+      }
+    }, 2200);
+    p2pWatchdogTimersRef.current.set(targetPeerId, watchdog);
+
+    pc.onsignalingstatechange = () => {
+      if (pc.signalingState === 'stable') {
+        syncTracksToPeer(pc, targetPeerId);
+      }
+    };
 
     pc.onicecandidate = (event) => {
       if (event.candidate && socketRef.current?.readyState === WebSocket.OPEN) {
@@ -503,66 +681,100 @@ export function useRealtimeRoom({
       }
     };
 
-    // Automatic ICE restart if network drops or switches (Wi-Fi <-> Mobile Data)
+    const handleConnectionStateUpdate = () => {
+      const connected =
+        pc.connectionState === 'connected' ||
+        pc.iceConnectionState === 'connected' ||
+        pc.iceConnectionState === 'completed';
+
+      if (connected) {
+        const wd = p2pWatchdogTimersRef.current.get(targetPeerId);
+        if (wd) {
+          window.clearTimeout(wd);
+          p2pWatchdogTimersRef.current.delete(targetPeerId);
+        }
+        relayIncomingPeersRef.current.delete(targetPeerId);
+        relayOutgoingTargetsRef.current.delete(targetPeerId);
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ type: 'stop-relay', targetPeerId }));
+        }
+        setRemotePeers((prev) => {
+          const next = new Map(prev);
+          const existing = next.get(targetPeerId);
+          if (existing) {
+            next.set(targetPeerId, { ...existing, connectionMode: 'p2p', relayVideoFrame: undefined });
+          }
+          return next;
+        });
+      }
+    };
+
+    pc.onconnectionstatechange = handleConnectionStateUpdate;
+
+    // Automatic ICE restart + immediate Server Relay failover if network switches
     let disconnectTimer: number | null = null;
     pc.oniceconnectionstatechange = () => {
+      handleConnectionStateUpdate();
       if (disconnectTimer) {
         window.clearTimeout(disconnectTimer);
         disconnectTimer = null;
       }
-      if (pc.iceConnectionState === 'failed' && socketRef.current?.readyState === WebSocket.OPEN) {
-        const user = currentUserRef.current;
-        pc.createOffer({ iceRestart: true, offerToReceiveAudio: true, offerToReceiveVideo: true })
-          .then((offer) => {
-            const tunedSdp = optimizeSdpForVoice(offer.sdp);
-            return pc.setLocalDescription({ type: offer.type, sdp: tunedSdp });
-          })
-          .then(() => {
-            if (socketRef.current?.readyState === WebSocket.OPEN) {
-              socketRef.current.send(JSON.stringify({
-                type: 'webrtc-offer',
-                targetPeerId,
-                sdp: pc.localDescription,
-                caller: {
-                  id: user.id,
-                  name: user.fullName,
-                  avatar: user.avatarUrl,
-                  role: user.roleTitle,
-                  isMuted: isMicMutedRef.current,
-                  isVideoOn: !isVideoOffRef.current,
-                  seatNumber: seatNumberRef.current
-                }
-              }));
-            }
-          })
-          .catch(() => {});
+      if (pc.iceConnectionState === 'failed') {
+        activateRelayForPeer(targetPeerId);
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          const user = currentUserRef.current;
+          pc.createOffer({ iceRestart: true, offerToReceiveAudio: true, offerToReceiveVideo: true })
+            .then((offer) => pc.setLocalDescription({ type: offer.type, sdp: optimizeSdpForVoice(offer.sdp) }))
+            .then(() => {
+              if (socketRef.current?.readyState === WebSocket.OPEN) {
+                socketRef.current.send(JSON.stringify({
+                  type: 'webrtc-offer',
+                  targetPeerId,
+                  sdp: pc.localDescription,
+                  caller: {
+                    id: user.id,
+                    name: user.fullName,
+                    avatar: user.avatarUrl,
+                    role: user.roleTitle,
+                    isMuted: isMicMutedRef.current,
+                    isVideoOn: !isVideoOffRef.current,
+                    seatNumber: seatNumberRef.current
+                  }
+                }));
+              }
+            })
+            .catch(() => {});
+        }
       } else if (pc.iceConnectionState === 'disconnected') {
         disconnectTimer = window.setTimeout(() => {
-          if (pc.iceConnectionState === 'disconnected' && socketRef.current?.readyState === WebSocket.OPEN) {
-            const user = currentUserRef.current;
-            pc.createOffer({ iceRestart: true })
-              .then((offer) => pc.setLocalDescription({ type: offer.type, sdp: optimizeSdpForVoice(offer.sdp) }))
-              .then(() => {
-                if (socketRef.current?.readyState === WebSocket.OPEN) {
-                  socketRef.current.send(JSON.stringify({
-                    type: 'webrtc-offer',
-                    targetPeerId,
-                    sdp: pc.localDescription,
-                    caller: {
-                      id: user.id,
-                      name: user.fullName,
-                      avatar: user.avatarUrl,
-                      role: user.roleTitle,
-                      isMuted: isMicMutedRef.current,
-                      isVideoOn: !isVideoOffRef.current,
-                      seatNumber: seatNumberRef.current
-                    }
-                  }));
-                }
-              })
-              .catch(() => {});
+          if (pc.iceConnectionState === 'disconnected') {
+            activateRelayForPeer(targetPeerId);
+            if (socketRef.current?.readyState === WebSocket.OPEN) {
+              const user = currentUserRef.current;
+              pc.createOffer({ iceRestart: true })
+                .then((offer) => pc.setLocalDescription({ type: offer.type, sdp: optimizeSdpForVoice(offer.sdp) }))
+                .then(() => {
+                  if (socketRef.current?.readyState === WebSocket.OPEN) {
+                    socketRef.current.send(JSON.stringify({
+                      type: 'webrtc-offer',
+                      targetPeerId,
+                      sdp: pc.localDescription,
+                      caller: {
+                        id: user.id,
+                        name: user.fullName,
+                        avatar: user.avatarUrl,
+                        role: user.roleTitle,
+                        isMuted: isMicMutedRef.current,
+                        isVideoOn: !isVideoOffRef.current,
+                        seatNumber: seatNumberRef.current
+                      }
+                    }));
+                  }
+                })
+                .catch(() => {});
+            }
           }
-        }, 2500);
+        }, 1600);
       }
     };
 
@@ -574,7 +786,7 @@ export function useRealtimeRoom({
         let streamToUse: MediaStream;
 
         if (peer?.stream) {
-          // Mutate existing MediaStream container in-place so adding video never interrupts an already playing audio track!
+          // Mutate existing MediaStream in-place so adding video never interrupts live audio
           const existingTrackIds = new Set(peer.stream.getTracks().map((t) => t.id));
           if (!existingTrackIds.has(event.track.id)) {
             peer.stream.addTrack(event.track);
@@ -607,7 +819,8 @@ export function useRealtimeRoom({
             isMuted: false,
             isVideoOn: streamToUse.getVideoTracks().length > 0,
             isSpeaking: false,
-            stream: streamToUse
+            stream: streamToUse,
+            connectionMode: 'connecting'
           });
         }
         return next;
@@ -643,9 +856,9 @@ export function useRealtimeRoom({
     }
 
     return pc;
-  }, []);
+  }, [activateRelayForPeer, syncTracksToPeer]);
 
-  // Connect to WebSocket Signaling Server with Heartbeat & Exponential Backoff
+  // Connect to WebSocket Signaling + Media Relay Server
   useEffect(() => {
     if (!enabled) return;
 
@@ -699,13 +912,12 @@ export function useRealtimeRoom({
             }
           }));
 
-          // Client-side ping every 18s for mobile carrier NAT & Telegram/IMO WebView stability
           clearInterval(pingInterval);
           pingInterval = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({ type: 'ping' }));
             }
-          }, 18000);
+          }, 16000);
         };
 
         ws.onmessage = async (evt) => {
@@ -744,7 +956,8 @@ export function useRealtimeRoom({
                       seatNumber: p.seatNumber,
                       isMuted: p.isMuted,
                       isVideoOn: p.isVideoOn,
-                      isSpeaking: p.isSpeaking
+                      isSpeaking: p.isSpeaking,
+                      connectionMode: 'connecting'
                     });
                     createPeerConnection(p.id, true);
                   });
@@ -770,8 +983,89 @@ export function useRealtimeRoom({
                     seatNumber: p.seatNumber,
                     isMuted: p.isMuted,
                     isVideoOn: p.isVideoOn,
-                    isSpeaking: p.isSpeaking
+                    isSpeaking: p.isSpeaking,
+                    connectionMode: existing?.connectionMode || 'connecting'
                   });
+                  return next;
+                });
+                // Start passive connection monitor in case joiner's offer takes > 2.2s
+                if (!peerConnectionsRef.current.has(p.id)) {
+                  createPeerConnection(p.id, false);
+                }
+                break;
+              }
+
+              case 'peer-media-ready': {
+                const { peerId, peer } = data;
+                if (!peerId || peerId === currentUserRef.current.id) break;
+                if (peer) {
+                  setRemotePeers((prev) => {
+                    const next = new Map(prev);
+                    const existing = next.get(peerId);
+                    if (existing) {
+                      next.set(peerId, {
+                        ...existing,
+                        isMuted: peer.isMuted ?? existing.isMuted,
+                        isVideoOn: peer.isVideoOn ?? existing.isVideoOn
+                      });
+                    }
+                    return next;
+                  });
+                }
+                break;
+              }
+
+              case 'relay-requested': {
+                const { fromPeerId } = data;
+                if (fromPeerId) {
+                  relayOutgoingTargetsRef.current.add(String(fromPeerId));
+                }
+                break;
+              }
+
+              case 'relay-stopped': {
+                const { fromPeerId } = data;
+                if (fromPeerId) {
+                  const pc = peerConnectionsRef.current.get(String(fromPeerId));
+                  if (pc && (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected')) {
+                    relayOutgoingTargetsRef.current.delete(String(fromPeerId));
+                  }
+                }
+                break;
+              }
+
+              case 'relay-media-audio': {
+                const { peerId, pcm16, sampleRate } = data;
+                if (!peerId || !pcm16) break;
+                const pc = peerConnectionsRef.current.get(peerId);
+                const hasLiveP2PAudio =
+                  pc &&
+                  (pc.connectionState === 'connected' || pc.iceConnectionState === 'connected') &&
+                  remotePeersRef.current.get(peerId)?.stream?.getAudioTracks().some((t) => t.readyState === 'live');
+                if (!hasLiveP2PAudio) {
+                  playRelayedPcmChunk(peerId, pcm16, sampleRate || 16000);
+                }
+                break;
+              }
+
+              case 'relay-media-video': {
+                const { peerId, frame } = data;
+                if (!peerId || !frame) break;
+                setRemotePeers((prev) => {
+                  const next = new Map(prev);
+                  const existing = next.get(peerId);
+                  if (existing) {
+                    const hasP2PVideo =
+                      existing.connectionMode === 'p2p' &&
+                      existing.stream?.getVideoTracks().some((t) => t.readyState === 'live');
+                    if (!hasP2PVideo) {
+                      next.set(peerId, {
+                        ...existing,
+                        relayVideoFrame: frame,
+                        connectionMode: existing.connectionMode === 'p2p' ? 'p2p' : 'relay'
+                      });
+                    }
+                  }
                   return next;
                 });
                 break;
@@ -794,13 +1088,13 @@ export function useRealtimeRoom({
                       seatNumber: caller.seatNumber,
                       isMuted: caller.isMuted,
                       isVideoOn: caller.isVideoOn,
-                      isSpeaking: caller.isSpeaking
+                      isSpeaking: caller.isSpeaking,
+                      connectionMode: existing?.connectionMode || 'connecting'
                     });
                     return next;
                   });
                 }
 
-                // Reuse existing connection during mid-call track renegotiation
                 const pc = createPeerConnection(callerId, false, true);
                 if (pc.signalingState === 'have-local-offer') {
                   const isPolite = currentUserRef.current.id < callerId;
@@ -880,6 +1174,7 @@ export function useRealtimeRoom({
                       isMuted: p.isMuted,
                       isVideoOn: p.isVideoOn,
                       isSpeaking: p.isSpeaking,
+                      relayVideoFrame: p.isVideoOn === false ? undefined : existing.relayVideoFrame,
                       seatNumber: p.seatNumber !== undefined ? p.seatNumber : existing.seatNumber
                     });
                   } else if (p.id !== currentUserRef.current.id) {
@@ -893,7 +1188,8 @@ export function useRealtimeRoom({
                       seatNumber: p.seatNumber,
                       isMuted: !!p.isMuted,
                       isVideoOn: !!p.isVideoOn,
-                      isSpeaking: !!p.isSpeaking
+                      isSpeaking: !!p.isSpeaking,
+                      connectionMode: 'connecting'
                     });
                   }
                   return next;
@@ -904,6 +1200,14 @@ export function useRealtimeRoom({
               case 'user-left': {
                 const { peerId } = data;
                 if (peerId) {
+                  const wd = p2pWatchdogTimersRef.current.get(peerId);
+                  if (wd) {
+                    window.clearTimeout(wd);
+                    p2pWatchdogTimersRef.current.delete(peerId);
+                  }
+                  relayIncomingPeersRef.current.delete(peerId);
+                  relayOutgoingTargetsRef.current.delete(peerId);
+                  clearPeerRelayCursor(peerId);
                   peerConnectionsRef.current.get(peerId)?.close();
                   peerConnectionsRef.current.delete(peerId);
                   iceCandidateQueueRef.current.delete(peerId);
@@ -956,7 +1260,7 @@ export function useRealtimeRoom({
           clearInterval(pingInterval);
           setIsConnected(false);
           if (!unmounted) {
-            const delay = Math.min(5000, 500 * Math.pow(1.6, retryAttempt++));
+            const delay = Math.min(4000, 400 * Math.pow(1.5, retryAttempt++));
             reconnectTimeout = setTimeout(connect, delay);
           }
         };
@@ -968,7 +1272,7 @@ export function useRealtimeRoom({
         };
       } catch {
         if (!unmounted) {
-          reconnectTimeout = setTimeout(connect, 1200);
+          reconnectTimeout = setTimeout(connect, 1000);
         }
       }
     }
@@ -992,6 +1296,10 @@ export function useRealtimeRoom({
       document.removeEventListener('visibilitychange', handleOnlineOrVisible);
       clearTimeout(reconnectTimeout);
       clearInterval(pingInterval);
+      p2pWatchdogTimersRef.current.forEach((wd) => window.clearTimeout(wd));
+      p2pWatchdogTimersRef.current.clear();
+      relayIncomingPeersRef.current.clear();
+      relayOutgoingTargetsRef.current.clear();
       if (socketRef.current) {
         try {
           socketRef.current.close();
@@ -1018,8 +1326,9 @@ export function useRealtimeRoom({
     }));
   }, [enabled, currentUser.fullName, currentUser.avatarUrl, currentUser.roleTitle, currentUser.preferredLang]);
 
-  // Toggle Microphone (works even if camera/mic stream initializes lazily)
+  // Toggle Microphone (resumes WebAudio relay playback too)
   const toggleMic = useCallback(async () => {
+    resumeRelayPlaybackAudio();
     const newMutedState = !isMicMutedRef.current;
     setIsMicMuted(newMutedState);
 
@@ -1043,6 +1352,7 @@ export function useRealtimeRoom({
 
   // Toggle Video Camera
   const toggleVideo = useCallback(async () => {
+    resumeRelayPlaybackAudio();
     const newOffState = !isVideoOffRef.current;
     setIsVideoOff(newOffState);
 
@@ -1094,8 +1404,9 @@ export function useRealtimeRoom({
     }
   }, [roomId]);
 
-  // Claim Seat Realtime (rejects locally if another user already occupies that seat)
+  // Claim Seat Realtime
   const claimSeatRealtime = useCallback((seatNum: number): boolean => {
+    resumeRelayPlaybackAudio();
     for (const rp of remotePeersRef.current.values()) {
       if (rp.seatNumber === seatNum) {
         if (callbacksRef.current.onSeatDenied) {
@@ -1142,7 +1453,6 @@ export function useRealtimeRoom({
   const zoomOut = () => setZoomLevel((prev) => Math.max(prev - 0.25, 0.75));
   const resetZoom = () => setZoomLevel(1);
 
-  // Build genuine real-time occupants list strictly from authenticated local user & connected WebRTC peers
   const combinedOccupants: RoomOccupant[] = [];
   if (seatNumber !== null && currentUser.id !== 'pending-auth') {
     combinedOccupants.push({

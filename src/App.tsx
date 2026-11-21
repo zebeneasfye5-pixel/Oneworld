@@ -26,6 +26,7 @@ import {
   stopAudioChunkTranscription,
   isSpeechRecognitionSupported
 } from './services/speechService';
+import { resumeRelayPlaybackAudio } from './services/serverAudioRelay';
 import {
   translateBatchWithGemini,
   translateTextWithGemini
@@ -300,7 +301,10 @@ export default function App() {
 
   // Unlock browser AudioContext & SpeechSynthesis on first user tap/click anywhere
   useEffect(() => {
-    const handleUnlock = () => unlockAudioPlayback();
+    const handleUnlock = () => {
+      unlockAudioPlayback();
+      resumeRelayPlaybackAudio();
+    };
     window.addEventListener('pointerdown', handleUnlock, { once: true, passive: true });
     window.addEventListener('keydown', handleUnlock, { once: true, passive: true });
     return () => {

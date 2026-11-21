@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 interface EdgeToEdgeVideoProps {
   stream: MediaStream | null | undefined;
+  fallbackFrame?: string | null;
   muted?: boolean;
   mirror?: boolean;
   zoom?: number;
@@ -10,11 +11,12 @@ interface EdgeToEdgeVideoProps {
 
 /**
  * EdgeToEdgeVideo (IMO / TikTok style full-bleed renderer + custom zoom 0.3x - 2.5x)
- * Eliminates black letterboxing/pillarboxing at zoom >= 1 while letting users smoothly
- * zoom out (< 1.0 down to 0.3x) or zoom in (> 1.0 up to 2.5x) inside fullscreen.
+ * Eliminates black letterboxing/pillarboxing at zoom >= 1 while supporting both direct WebRTC
+ * MediaStreams AND instant Server-Relayed live video frames on restricted mobile networks.
  */
 export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
   stream,
+  fallbackFrame = null,
   muted = false,
   mirror = false,
   zoom = 1,
@@ -23,6 +25,11 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(null);
+
+  const hasLiveVideoStream = !!(
+    stream &&
+    stream.getVideoTracks().some((tr) => tr.readyState === 'live')
+  );
 
   const recalculateCover = useCallback(() => {
     const container = containerRef.current;
@@ -135,16 +142,39 @@ export const EdgeToEdgeVideo: React.FC<EdgeToEdgeVideoProps> = ({
       ref={containerRef}
       className={`relative w-full h-full overflow-hidden bg-black ${className}`}
     >
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={muted}
-        onLoadedMetadata={recalculateCover}
-        onResize={recalculateCover}
-        onPlaying={recalculateCover}
-        style={videoStyle}
-      />
+      {hasLiveVideoStream ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={muted}
+          onLoadedMetadata={recalculateCover}
+          onResize={recalculateCover}
+          onPlaying={recalculateCover}
+          style={videoStyle}
+        />
+      ) : fallbackFrame ? (
+        <img
+          src={fallbackFrame}
+          alt="Live Video Relay"
+          className="w-full h-full object-cover object-center select-none"
+          style={{
+            transform: fallbackTransform,
+            transition: 'transform 200ms ease-out',
+          }}
+        />
+      ) : (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted={muted}
+          onLoadedMetadata={recalculateCover}
+          onResize={recalculateCover}
+          onPlaying={recalculateCover}
+          style={videoStyle}
+        />
+      )}
     </div>
   );
 };
